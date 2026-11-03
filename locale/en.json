@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "LAN Mesh",
+    "description": "Connect DSH agents on the same LAN so they can discover each other and exchange messages for collaborative work."
+  }
+}

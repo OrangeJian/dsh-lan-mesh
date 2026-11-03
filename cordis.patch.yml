@@ -1,0 +1,10 @@
+- insert:
+    - id: dsh-lan-mesh
+      name: dsh-lan-mesh
+      config:
+        displayName: ''
+        port: 45871
+        discoveryPort: 45870
+        clusterSecret: ''
+        autoWake: true
+        trustedPeers: []

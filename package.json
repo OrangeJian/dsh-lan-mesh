@@ -1,0 +1,49 @@
+{
+  "name": "dsh-lan-mesh",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "LAN peer-to-peer collaboration mesh for DeepSeek Harness agents.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "lan",
+    "mesh",
+    "p2p",
+    "collaboration",
+    "plugin"
+  ],
+  "license": "MIT",
+  "author": "OrangeJian <185303934@qq.com>",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "lib",
+    "docs",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}
