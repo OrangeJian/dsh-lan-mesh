@@ -315,6 +315,8 @@ function renderAgentAction(value) {
  * one would render a green dot for everyone. Remote members report their node's
  * reachability, local ones whether their session is running.
  */
+const MENTIONS_SCHEMA = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['memberKey', 'label'], properties: { memberKey: { type: 'string' }, label: { type: 'string' } } } };
+const SKILL_REFS_SCHEMA = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['name', 'sourceNodeId', 'sourceNodeName'], properties: { name: { type: 'string' }, sourceNodeId: { type: 'string' }, sourceNodeName: { type: 'string' } } } };
 const MEMBER_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -324,6 +326,7 @@ const MEMBER_SCHEMA = {
     sessionId: { type: 'string' },
     name: { type: 'string' },
     title: { type: 'string' },
+    nodeName: { type: 'string' },
     role: { type: 'string', enum: ['leader', 'member'] },
     key: { type: 'string' },
     live: { type: 'boolean' },
@@ -690,6 +693,8 @@ export function apply(ctx, rawConfig) {
                       kind: { type: 'string' },
                       topic: { type: 'string' },
                       text: { type: 'string' },
+                      structuredMentions: MENTIONS_SCHEMA,
+                      skillRefs: SKILL_REFS_SCHEMA,
                     },
                   },
                 },
@@ -715,6 +720,8 @@ export function apply(ctx, rawConfig) {
                 kind: item.kind,
                 topic: item.topic,
                 text: item.text,
+                ...(item.structuredMentions === undefined ? {} : { structuredMentions: item.structuredMentions }),
+                ...(item.skillRefs === undefined ? {} : { skillRefs: item.skillRefs }),
               })),
             };
           },
@@ -904,6 +911,8 @@ export function apply(ctx, rawConfig) {
             properties: {
               room: { type: 'string', description: '房间名或房间 id。' },
               text: { type: 'string', description: '要发送的正文，纯文本。' },
+              mentions: MENTIONS_SCHEMA,
+              skillRefs: SKILL_REFS_SCHEMA,
             },
           },
           output: {
@@ -927,6 +936,8 @@ export function apply(ctx, rawConfig) {
               room: String(args.room ?? ''),
               sessionId,
               text: String(args.text ?? ''),
+              mentions: args.mentions,
+              skillRefs: args.skillRefs,
             });
             const remote = Array.isArray(result.delivered) ? result.delivered : [];
             const remoteNote =
@@ -1368,7 +1379,7 @@ export function apply(ctx, rawConfig) {
         case 'roomSay':
           return {
             ok: true,
-            value: await node.sayInRoom({ room: str('room'), sessionId: str('sessionId'), text: str('text') }),
+            value: await node.sayInRoom({ room: str('room'), sessionId: str('sessionId'), text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, file: request.file }),
           };
         case 'roomDetail':
           return { ok: true, value: await node.roomDetail({ room: str('room'), sessionId: str('sessionId') }) };

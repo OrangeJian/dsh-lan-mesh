@@ -1261,7 +1261,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const applyMention = (member) => {
         if (mention === undefined) return;
         const insert = member.__all === true
-          ? `${COPY.mentionAll} `
+          ? 'all '
           : `${labelOf(member)} `;
         const next = `${draft.slice(0, mention.start)}@${insert}${draft.slice(mention.start + mention.length)}`;
         setDraft(next);
@@ -1273,7 +1273,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           retained.push({ memberKey: member.key, label: labelOf(member), start: mention.start,
             end: mention.start + insert.length });
         }
-        setDraftMentions(retained);
+        setDraftMentions(member.__all === true ? [] : retained);
         setCaret(mention.start + insert.length + 1);
         setMentionOff(false);
       };
@@ -1318,6 +1318,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         setBusy('say');
         try {
           const sayArgs = { room: roomId, sessionId, text };
+          if (draftMentions.length > 0 && !/@all(?:\s|$)/i.test(text)) sayArgs.mentions = draftMentions.map(({ memberKey, label }) => ({ memberKey, label }));
           if (attachedFile !== null) sayArgs.file = attachedFile;
           const value = await call('roomSay', sayArgs);
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];

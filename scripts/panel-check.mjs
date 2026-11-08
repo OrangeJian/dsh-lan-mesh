@@ -852,6 +852,19 @@ checks.push(
   ],
 );
 
+await click('lm-sendBtn');
+const exactRequest = requested.filter(row => row.endpoint === 'roomSay').at(-1);
+checks.push(['composer serializes only exact selected identity and label', exactRequest?.payload.mentions?.[0]?.memberKey === 'node-c/session-7' && !('start' in exactRequest.payload.mentions[0])]);
+await typeInto('lm-composerInput', '@bet');
+await press('lm-composerInput', 'Enter');
+const selectedText = lastNodes.find(entry => hasClass(entry, 'lm-composerInput')).props.value;
+await typeInto('lm-composerInput', selectedText + '@all');
+await press('lm-composerInput', 'Enter');
+checks.push(['choosing all clears individual reference identities', !stateSlots.some(slot => Array.isArray(slot) && slot.some(item => item?.memberKey))]);
+await click('lm-sendBtn');
+const allRequest = requested.filter(row => row.endpoint === 'roomSay').at(-1);
+checks.push(['broadcast alongside selected individual sends readable all without exact filter', /@all(?:\s|$)/.test(allRequest?.payload.text ?? '') && allRequest?.payload.mentions === undefined]);
+
 // Removing a selected token must remove its identity even if identical text
 // remains elsewhere in the draft.
 await typeInto('lm-composerInput', '');

@@ -98,6 +98,7 @@ const sessionPersistence = {
 };
 liveAgents.set(LEADER, { id: LEADER, status: 'idle', followup() {} });
 
+let panelFetch;
 const stub = {
   logger: { warn() {}, info() {}, debug() {} },
   get(name) {
@@ -131,7 +132,7 @@ const stub = {
     // `connection` (the panel route; absent here, exercised by rooms-smoke).
     const scope = {
       tools: names.includes('tools') ? this.get('tools') : undefined,
-      connection: undefined,
+      connection: names.includes('connection') ? { fetch: { register: definition => { panelFetch = definition.fetch; return () => {}; } } } : undefined,
       effect: (fn) => this.effect(fn),
     };
     callback(scope);
@@ -215,7 +216,16 @@ try {
   const assigned = await run('lan_mesh_room_task', { action: 'assign', room: roomId, assignee: 'Peer', title: 'verify the projection', detail: 'compare shapes' }, 'room_task assign');
   const taskId = assigned?.task?.id ?? '';
   await run('lan_mesh_room_task', { action: 'status', room: roomId, task: taskId, status: 'doing', note: 'on it' }, 'room_task status', { sessionId: PEER });
-  await run('lan_mesh_room_say', { room: roomId, text: 'hello room' }, 'room_say');
+  const mention = { memberKey: again.room.members.find(member => member.sessionId === PEER).key, label: 'Peer' };
+  const skillRef = { name: 'missing-skill', sourceNodeId: 'remote-source', sourceNodeName: 'Remote' };
+  const referenceArgs = { room: roomId, text: '@Peer /missing-skill hello room', mentions: [mention], skillRefs: [skillRef] };
+  check('room_say parameters expose references', framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters, referenceArgs).length === 0, framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters, referenceArgs).join('; '));
+  await run('lan_mesh_room_say', referenceArgs, 'room_say');
+  const rpcResponse = await panelFetch(new Request('http://mesh.invalid/', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'ref-rpc',payload:{method:'roomSay',payload:{...referenceArgs,sessionId:LEADER}}})}));
+  const rpcBody = await rpcResponse.json();
+  check('roomSay RPC accepts structured metadata', rpcBody.result?.ok === true, JSON.stringify(rpcBody).slice(0,300));
+  const inbox = await run('lan_mesh_inbox', { unread_only: false }, 'reference inbox');
+  check('inbox output preserves exact references', inbox?.messages.some(message => message.structuredMentions?.[0]?.memberKey === mention.memberKey && message.skillRefs?.[0]?.name === skillRef.name));
   await run('lan_mesh_room_member', { action: 'leave', room: roomId }, 'room_member leave', { sessionId: PEER });
 
   console.log('\nerror paths are rejections, not malformed values');
