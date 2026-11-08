@@ -862,6 +862,20 @@ checks.push(['editing out the selected token drops its identity',
   !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
 
 // Same-machine duplicates need session IDs as a final discriminator.
+await typeInto('lm-composerInput', '');
+await typeInto('lm-composerInput', '@bet');
+await press('lm-composerInput', 'Enter');
+await typeInto('lm-composerInput', '@Beta rollout @Beta rollout ');
+await typeInto('lm-composerInput', '@Beta rollout ');
+checks.push(['deleting the selected first duplicate never transfers identity to typed text',
+  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+await typeInto('lm-composerInput', '');
+await typeInto('lm-composerInput', '@bet');
+await press('lm-composerInput', 'Enter');
+await typeInto('lm-composerInput', '@Beta rolloutX ');
+checks.push(['appending to the mention label invalidates selected identity',
+  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+
 remoteAgent.nodeName = offlinePeer.nodeName = 'Shared workstation';
 offlinePeer.nodeId = 'node-b';
 await typeInto('lm-composerInput', '@');

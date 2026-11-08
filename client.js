@@ -772,7 +772,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
     }
 
     /** Keep identities only for unchanged mention spans across a draft edit. */
-    function editedMentions(mentions, before, after) {
+    function editedMentions(mentions, before, after, edit) {
+      if (before === after) return mentions;
       let start = 0;
       while (start < before.length && start < after.length && before[start] === after[start]) start++;
       let oldEnd = before.length;
@@ -781,10 +782,20 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         oldEnd--;
         newEnd--;
       }
+      if (edit) ({ start, oldEnd, newEnd } = edit);
       return mentions.flatMap((item) => {
-        if (item.end <= start) return [item];
-        if (item.start >= oldEnd) return [{ ...item, start: item.start + newEnd - oldEnd, end: item.end + newEnd - oldEnd }];
-        return [];
+        const token = `@${item.label}`;
+        // Text alone cannot tell which identical occurrence was edited. Drop
+        // ambiguous identities rather than transferring them to typed text.
+        // Picker replacements supply their exact range and do not need to guess.
+        if (!edit && (before.split(token).length > 2 || after.split(token).length > 2)) return [];
+        let retained;
+        if (item.end <= start) retained = item;
+        else if (item.start >= oldEnd) retained = { ...item, start: item.start + newEnd - oldEnd, end: item.end + newEnd - oldEnd };
+        if (!retained || after.slice(retained.start, retained.end) !== token) return [];
+        if (retained.start > 0 && !/\s/.test(after[retained.start - 1])) return [];
+        if (retained.end < after.length && !/\s/.test(after[retained.end])) return [];
+        return [retained];
       });
     }
 
@@ -1254,7 +1265,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           : `${labelOf(member)} `;
         const next = `${draft.slice(0, mention.start)}@${insert}${draft.slice(mention.start + mention.length)}`;
         setDraft(next);
-        const retained = editedMentions(draftMentions, draft, next);
+        const retained = editedMentions(draftMentions, draft, next, {
+          start: mention.start, oldEnd: mention.start + mention.length,
+          newEnd: mention.start + insert.length + 1,
+        });
         if (member.__all !== true && member.key) {
           retained.push({ memberKey: member.key, label: labelOf(member), start: mention.start,
             end: mention.start + insert.length });
