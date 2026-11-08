@@ -417,8 +417,10 @@ const answers = {
           read: true,
         },
         {
-          // Historical skill references: one this node can resolve, one it
-          // cannot. Both must render, and only the second says "not installed".
+          // Historical skill references, all three states at once: one this node
+          // holds from the same source, one it holds only as a different skill
+          // that shares the name, and one it does not have at all. All three must
+          // render, and only the last may say "not installed".
           id: 'm4',
           kind: 'room-message',
           room: 'room-1',
@@ -429,6 +431,7 @@ const answers = {
           structuredMentions: [],
           skillRefs: [
             { name: 'digest', sourceNodeId: 'node-a', sourceNodeName: 'Local node' },
+            { name: 'digest', sourceNodeId: 'node-b', sourceNodeName: 'Far machine' },
             { name: 'ghost-skill', sourceNodeId: 'node-z', sourceNodeName: 'Unreachable' },
           ],
           read: true,
@@ -825,21 +828,32 @@ checks.push(
   // reopened room still shows what the sender pointed at.
   [
     'historical messages restore their skill references',
-    count('lm-skillRef') === 2 &&
+    count('lm-skillRef') === 3 &&
       lastText.includes('digest') &&
       lastText.includes('ghost-skill'),
   ],
-  // One of the two references is not in this node's catalogue: it must say so
-  // rather than vanish, and the other must not be mistaken for it.
+  // Same name, different source: this node does have a `digest`, but not the one
+  // the far machine pointed at, so it must be neither "identical" nor "missing".
   [
-    'a reference this node cannot resolve is marked, the other is not',
+    'a same-named skill from another node is neither matched nor called missing',
+    count('lm-skillRefNamesake') === 1 &&
+      lastNodes.some(
+        (entry) => hasClass(entry, 'lm-skillRefNamesake') && entry.props?.title?.includes('不一定是同一个'),
+      ),
+  ],
+  // One of the three references is genuinely absent here: it must say so rather
+  // than vanish.
+  [
+    'a reference this node cannot resolve is marked, the others are not',
     count('lm-skillRefMissing') === 1 &&
       lastNodes.some((entry) => hasClass(entry, 'lm-skillRef') && entry.props?.title?.includes('Unreachable')),
   ],
   // The chip always names the source node: two nodes may both ship `deploy`.
   [
     'a restored reference names its source node',
-    lastText.includes('来自 Local node') && lastText.includes('来自 Unreachable'),
+    lastText.includes('来自 Local node') &&
+      lastText.includes('来自 Far machine') &&
+      lastText.includes('来自 Unreachable'),
   ],
 );
 

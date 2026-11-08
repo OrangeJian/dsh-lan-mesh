@@ -165,6 +165,7 @@ window.__ModuleLoader__.load({
           skillSelected: '已引用',
           skillRemove: '移除引用',
           skillMissing: '本机未安装此技能',
+          skillNamesake: '本机有同名技能，不一定是同一个',
           skillSourceOf: '来自',
           skillRefsLabel: '引用的技能',
           skillRefsAria: '本条消息引用的技能',
@@ -342,6 +343,7 @@ window.__ModuleLoader__.load({
           skillSelected: 'Referenced',
           skillRemove: 'Remove reference',
           skillMissing: 'Not installed on this node',
+          skillNamesake: 'This node has a skill by that name, not necessarily this one',
           skillSourceOf: 'from',
           skillRefsLabel: 'Referenced skills',
           skillRefsAria: 'Skills referenced by this message',
@@ -572,6 +574,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-skillRef{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:var(--dsw-alias-bg-layer-2);font-size:11px;color:var(--dsw-alias-label-secondary)}
 .lm-skillRefName{color:var(--dsw-alias-label-primary);font-weight:600}
 .lm-skillRefMissing{border-style:dashed;color:var(--dsw-alias-label-tertiary)}
+.lm-skillRefNamesake{border-style:dotted;color:var(--dsw-alias-label-tertiary)}
 .lm-skillRefMissing .lm-skillRefName{color:var(--dsw-alias-label-secondary);font-weight:500}
 .lm-skillRefsLabel{font-size:11px;color:var(--dsw-alias-label-tertiary)}
 .lm-skillRefSource{color:var(--dsw-alias-label-tertiary)}
@@ -936,22 +939,27 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
     }
 
     /**
-     * Whether a received reference is present in this node's catalogue.
+     * How a received skill reference relates to this node's catalogue.
      *
-     * A reference is metadata about what the sender meant. It is available
-     * when this node lists the same skill from the same node — never inferred
-     * from the name alone, since two nodes may ship different skills that
-     * happen to share one.
+     * Three answers, because two would lie. A reference names a skill at a
+     * particular node, and this node may hold (a) that very row, (b) a different
+     * skill that happens to share the name, or (c) nothing by that name. Only
+     * (a) proves identity: a shared name is not a shared skill, and references
+     * carry no version, so (b) is neither "the same capability" nor "not
+     * installed here".
      * @param {object[]} skills - this node's catalogue rows.
      * @param {{ name?: string, sourceNodeId?: string }} ref - received reference.
-     * @returns {boolean}
+     * @returns {'exact' | 'namesake' | 'missing'}
      */
-    function skillRefAvailable(skills, ref) {
+    function skillRefState(skills, ref) {
       const rows = Array.isArray(skills) ? skills : [];
       const name = typeof ref?.name === 'string' ? ref.name : '';
-      if (name === '') return false;
+      if (name === '') return 'missing';
+      const named = rows.filter((row) => row?.name === name);
+      if (named.length === 0) return 'missing';
       const source = typeof ref?.sourceNodeId === 'string' ? ref.sourceNodeId : '';
-      return rows.some((row) => row?.name === name && (source === '' || row?.sourceNodeId === source));
+      if (source === '') return 'namesake';
+      return named.some((row) => row?.sourceNodeId === source) ? 'exact' : 'namesake';
     }
 
     /**
@@ -1260,9 +1268,11 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
        if (body !== null) bubbleContents.push(body);
        if (attachment !== null) bubbleContents.push(attachment);
        // Skill references ride beside the text, never inside it: the body keeps
-       // the exact words the sender typed, and the chips say which capabilities
-       // they pointed at. A missing skill stays visible — the reader must see
-       // what was meant even when this node cannot offer it.
+       // the exact words the sender typed, and the chips name the capabilities
+       // they pointed at along with the node that owns each one. A reference
+       // this node cannot resolve stays visible, because the reader still has to
+       // see what was meant; one that merely shares a name with a local skill
+       // says exactly that instead of impersonating the sender's capability.
        const refs = skillRefsOf(message);
        if (refs.length > 0) {
          const catalogue = Array.isArray(props.skills) ? props.skills : [];
@@ -1272,20 +1282,27 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
              { className: 'lm-skillRefs', role: 'group', 'aria-label': COPY.skillRefsAria },
              h('span', { className: 'lm-skillRefsLabel' }, `${COPY.skillRefsLabel}:`),
              ...refs.map((ref, index) => {
-               const missing = !skillRefAvailable(catalogue, ref);
+               const state = skillRefState(catalogue, ref);
+               const note =
+                 state === 'missing' ? COPY.skillMissing : state === 'namesake' ? COPY.skillNamesake : '';
                const source = String(ref.sourceNodeName ?? '') || String(ref.sourceNodeId ?? '');
+               const title = `${ref.name}${note === '' ? '' : ` \u00b7 ${note}`}` +
+                 (source === '' ? '' : ` \u00b7 ${COPY.skillSourceOf} ${source}`);
                return h(
                  'span',
                  {
                    key: `${ref.sourceNodeId ?? ''}/${ref.name}/${index}`,
-                   className: missing ? 'lm-skillRef lm-skillRefMissing' : 'lm-skillRef',
-                   title: missing
-                     ? `${ref.name} · ${COPY.skillMissing}${source === '' ? '' : ` · ${COPY.skillSourceOf} ${source}`}`
-                     : `${ref.name}${source === '' ? '' : ` · ${COPY.skillSourceOf} ${source}`}`,
+                   className:
+                     state === 'exact'
+                       ? 'lm-skillRef'
+                       : state === 'namesake'
+                         ? 'lm-skillRef lm-skillRefNamesake'
+                         : 'lm-skillRef lm-skillRefMissing',
+                   title,
                  },
                  h('span', { className: 'lm-skillRefName' }, String(ref.name)),
                  source === '' ? null : h('span', { className: 'lm-skillRefSource' }, `${COPY.skillSourceOf} ${source}`),
-                 missing ? h('span', { className: 'lm-skillRefBadge' }, COPY.skillMissing) : null,
+                 note === '' ? null : h('span', { className: 'lm-skillRefBadge' }, note),
                );
              }),
            ),
@@ -1785,10 +1802,12 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       /**
        * Pull one local agent session into this room.
        *
-       * The server decides whether the caller may do this (the room leader, or a
-       * human member of this room); the button is only shown to those viewers.
-       * Nothing about the caller's identity is sent as evidence — `sessionId` is
-       * the same identity every other room call uses.
+       * The server decides whether this may happen (the room leader, or a human
+       * member of this room). The authority is not something this call can
+       * claim: the endpoint is reached only through the owner-authenticated
+       * panel route, and the server derives the human rule from that fact. The
+       * row is rendered for members and leaders as a convenience only — hiding
+       * or showing a button never widens what the server accepts.
        */
       const doInvite = async () => {
         if (inviteSession === '') {
@@ -1797,7 +1816,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         }
         setBusy('invite');
         try {
-          await call('roomInvite', { room: roomId, sessionId, memberSessionId: inviteSession });
+          await call('roomInvite', { room: roomId, memberSessionId: inviteSession });
           setInviteSession('');
           flash(COPY.invited, false);
           await load();

@@ -52,7 +52,7 @@ role      = 'leader' | 'member'
 | `agentDial` | `{target, text, topic?}` | 投递结果 |
 | `agentUndial` | `{target}` | `{removed}` |
 | `roomKick` | `{room, sessionId, member}` | `{room}`（仅 leader） |
-| `roomInvite` | `{room, sessionId, member}` | `{room, delivered}` |
+| `roomInvite` | `{room, memberSessionId, memberNodeId?}` | `{room, added}`（面板入口，权限由入口决定，见下） |
 | `notifyChannels` | `{}` | `{channels:[{id,label,kind}], pending}` |
 | `notifySend` | `{channel, text}` | 投递结果（单渠道自动发时用） |
 | `notifyConfirm` | `{id, channel}` | `{status, summary, ok?}`（按人选定的渠道发出挂起通知） |
@@ -120,8 +120,17 @@ role      = 'leader' | 'member'
 - `name` 是技能名（不带 `/`），`sourceNodeId`/`sourceNodeName` 是那台机器的节点标识
   与显示名。三字段就够了；版本与环境**没有**表达，也不在本批次范围内。
 - 去重键是 `(sourceNodeId, name)`——同名不同来源是两条不同的引用，绝不折叠。
-- 接收方本机没有同名同源技能时，**仍然展示**，加"未安装"标记，且不提供任何动作。
-  收到引用的 Agent 可以自行决定用不用本机某个技能，但系统绝不隐式安装或执行。
+- 接收方**总是展示**引用，并按本机目录分成三态，因为两种答案会撒谎：
+
+  | 本机目录 | 含义 | 展示 |
+  | --- | --- | --- |
+  | 同名 + 同源 | 就是发送方指的那个技能 | `lm-skillRef`，无标记 |
+  | 同名 + 异源（或引用无源） | 本机有同名技能，但**不保证是同一个** | `lm-skillRefNamesake`，"本机有同名技能，不一定是同一个" |
+  | 无同名 | 本机确实没有这个技能 | `lm-skillRefMissing`，"本机未安装此技能" |
+
+  同名异源既不能声称"就是它"（引用不带版本，无法证明同一能力），也不能说"没装"
+  （本机明明有）。来源节点名始终显示。收到引用的 Agent 可以自行决定用不用本机某个
+  技能，但系统绝不隐式安装或执行，也不提供点击动作。
 - 上限 32 条；`name` ≤128、`sourceNodeId` ≤64、`sourceNodeName` ≤128，禁止控制字符
   （校验在 `lib/room-message.mjs`，越界直接拒绝整条消息）。
 
@@ -138,6 +147,25 @@ role      = 'leader' | 'member'
 
 `kind` ∈ `'room-message'`（房间聊天）`| 'room-task'`（派活通知）`| 'note'`（点对点）。
 聊天窗口渲染时 **按 `kind === 'room-message'` 过滤**，派活通知单独用任务区展示。
+
+### 谁能邀请会话进房间
+
+`roomInvite` 有两种调用来源，服务端按**来源**而非 payload 判断权限：
+
+- **面板**：这条路由注册在 owner-only 的 connection 通道上，非 owner 主体会在
+  handler 之前被 403 拒绝。因此到达 handler 的请求就是"屏幕上这个人"，`via: 'panel'`
+  把这一事实显式带下去，服务端据此套用"人类成员"规则。payload 里的 `sessionId`
+  不再参与判断。
+- **Agent**：走自己的工具调用，身份是 `exec.agent.id`，只有**原 leader 路径**
+  （房间 leader 是它）能邀请。
+
+两种来源都只允许邀请**本节点**存在且可访问的会话（live 或可恢复的 stored），
+`memberNodeId` 只用于拒绝，不作为授权依据。agent 即使传 `sessionId: 'human'`
+也拿不到人类规则——那个 id 在这条路径上只是一个查不到 leader 的字符串。
+邀请会话进房间**不授予 Team 执行权限**，也不改变 kick/rename/assign/role 的边界。
+
+两段 sessionId 前 64 字符相同会让 Room member key 撞车，此时拒绝并返回
+`AMBIGUOUS_ROOM`，不做猜测合并。
 
 ## 4. 面板布局
 
@@ -200,9 +228,11 @@ role      = 'leader' | 'member'
   依据（不靠技能名、不靠顺序）。
 
   发送时 `skillRefs` 随消息一起走（见 §3）。接收方渲染时把引用显示在气泡底部，
-  标注"引用的技能"和来源节点；**本机没有这个技能的引用仍然显示**，加虚线和
-  "本机未安装此技能"标记，且不提供点击动作——引用是提示，不是安装或执行请求。
+  标注"引用的技能"和来源节点；**任何引用都仍然显示**，并按 §3 的三态区分：同名同源
+  是同一技能，同名异源只说"本机有同名技能，不一定是同一个"，无同名才说"本机未安装
+  此技能"。三态都不提供点击动作——引用是提示，不是安装或执行请求。
   Agent 读到引用后可以自己决定用不用本机某个技能，但没有任何隐式安装或隐式执行。
+  跨节点引用不会被标成"本机未安装"，因为那会把"另一台机器有"误报成"这台没有"。
 
   技能目录只列**本机**的：`roomSkills` 返回本机公开目录，不跨节点拉取远端目录
   （跨节点技能目录需要协议层另行批准）。目录不可用时菜单显示"本机技能目录不可用"，

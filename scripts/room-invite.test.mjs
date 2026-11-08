@@ -3,11 +3,12 @@
  *
  * The permission question here is not "did the button render" but "what does
  * the server accept". Every fact the decision rests on has to be derived on
- * this node: the caller's identity comes from the resolved session, membership
- * from the replicated room document, and the invited session from the real
- * local agent catalogue. A client that claims to be human, claims another
- * node, or names a session that does not exist here must not get a member row
- * manufactured on its behalf.
+ * this node: which authority a caller may use follows from the surface it
+ * arrived on — the owner-only panel route grants the human rule, an agent's own
+ * tool execution does not — while membership comes from the replicated room
+ * document and the invited session from the real local agent catalogue. A
+ * client that merely claims to be human, claims another node, or names a session
+ * that does not exist here must not get a member row manufactured for it.
  *
  * @module dsh-lan-mesh/scripts/room-invite.test
  */
@@ -73,7 +74,7 @@ test('a human room member can pull a local live agent session into the room', as
     agents: [{ id: 'worker-1', status: 'idle' }],
   });
 
-  const result = await node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: 'worker-1' });
+  const result = await node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: 'worker-1' });
   assert.equal(result.added, true);
   const added = result.room.members.find((member) => member.sessionId === 'worker-1');
   assert.ok(added, 'the invited session became a member');
@@ -97,7 +98,7 @@ test('a stored session this node can resume is a legitimate invite target', asyn
     stored: [{ id: 'stored-1', cwd: 'C:/work' }],
   });
 
-  const result = await node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: 'stored-1' });
+  const result = await node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: 'stored-1' });
   assert.equal(result.added, true);
   assert.ok(result.room.members.some((member) => member.sessionId === 'stored-1'));
 });
@@ -125,7 +126,7 @@ test('a human who is not a member of this room cannot add anyone', async (t) => 
   });
 
   await assert.rejects(
-    node.addRoomMember({ room: room.id, sessionId: 'human', memberSessionId: 'worker-1' }),
+    node.addRoomMember({ room: room.id, via: 'panel', memberSessionId: 'worker-1' }),
     (error) => error.code === 'NOT_LEADER' && /leader or a human room member/.test(error.message),
   );
   assert.equal(node.roomsDoc.rooms[room.id].members.some((member) => member.sessionId === 'worker-1'), false);
@@ -149,8 +150,9 @@ test('an agent member that is not the leader cannot add members by claiming to b
     agents: [{ id: 'worker-1', status: 'idle' }],
   });
 
-  // The payload lies about being human; the resolved session says otherwise, so
-  // the claim is simply ignored and the caller is judged as an agent member.
+  // The payload lies about being human; nothing in it can promote the caller,
+  // because the human rule is granted by the panel surface and this call did
+  // not come from one.
   await assert.rejects(
     node.addRoomMember({
       room: roomId,
@@ -161,6 +163,39 @@ test('an agent member that is not the leader cannot add members by claiming to b
       role: 'leader',
     }),
     (error) => error.code === 'NOT_LEADER',
+  );
+});
+
+test('an agent cannot borrow the human rule by passing the human session id', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'room-invite-impersonate-'));
+  const previous = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = previous;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  const { state, roomId } = seededState();
+  const node = makeNode({
+    nodeId: 'node-local',
+    nodeName: 'Local node',
+    state,
+    agents: [{ id: 'worker-1', status: 'idle' }],
+  });
+
+  // `node-local/human` is a real, listed member of this room, so a payload
+  // carrying that id would previously have been read as "a human member is
+  // asking". Without `via: 'panel'` no owner-authenticated surface is involved,
+  // so the call is an agent's and only the leader path remains — the string
+  // alone buys nothing.
+  await assert.rejects(
+    node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: 'worker-1' }),
+    (error) => error.code === 'NOT_LEADER',
+  );
+  assert.equal(
+    node.roomsDoc.rooms[roomId].members.some((member) => member.sessionId === 'worker-1'),
+    false,
+    'no member row was manufactured for the impersonating call',
   );
 });
 
@@ -184,7 +219,7 @@ test('a target hosted on another node is refused even when the client claims oth
   await assert.rejects(
     node.addRoomMember({
       room: roomId,
-      sessionId: 'human',
+      via: 'panel',
       memberSessionId: 'worker-1',
       memberNodeId: 'node-remote',
     }),
@@ -205,13 +240,13 @@ test('a session that does not exist on this node is refused', async (t) => {
   const node = makeNode({ nodeId: 'node-local', nodeName: 'Local node', state, agents: [] });
 
   await assert.rejects(
-    node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: 'ghost-session' }),
+    node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: 'ghost-session' }),
     (error) => error.code === 'BAD_REQUEST' && /does not exist/.test(error.message),
   );
   // The human's own session id is not an invite target either: it is already in
   // the room by construction and has no agent behind it.
   await assert.rejects(
-    node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: 'human' }),
+    node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: 'human' }),
     (error) => error.code === 'BAD_REQUEST' && /agent session is required/.test(error.message),
   );
 });
@@ -233,8 +268,8 @@ test('inviting the same session twice is idempotent', async (t) => {
     agents: [{ id: 'worker-1', status: 'idle' }],
   });
 
-  const first = await node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: 'worker-1' });
-  const second = await node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: 'worker-1' });
+  const first = await node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: 'worker-1' });
+  const second = await node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: 'worker-1' });
   assert.equal(first.added, true);
   assert.equal(second.added, false);
   const rows = second.room.members.filter((member) => member.key === memberKey('node-local', 'worker-1'));
@@ -289,7 +324,7 @@ test('two sessions sharing the 64-char member-key prefix are refused rather than
   });
 
   await assert.rejects(
-    node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: `${shared}-session-one` }),
+    node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: `${shared}-session-one` }),
     (error) => error.code === 'AMBIGUOUS_ROOM' && /ambiguous/.test(error.message),
   );
   assert.equal(node.roomsDoc.rooms[roomId].members.some((member) => member.sessionId === shared), false);
@@ -315,7 +350,7 @@ test('a stored session with the same 64-char prefix as a live one is also refuse
   });
 
   await assert.rejects(
-    node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: `${shared}-live` }),
+    node.addRoomMember({ room: roomId, via: 'panel', memberSessionId: `${shared}-live` }),
     (error) => error.code === 'AMBIGUOUS_ROOM',
   );
 });

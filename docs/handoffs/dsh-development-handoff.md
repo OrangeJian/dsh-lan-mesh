@@ -80,12 +80,12 @@
 
 | 文件 | 改动 |
 |---|---|
-| `client.js` | Room Composer 技能引用选择器：行首 `/` 与工具栏 `/技能` 共用可搜索菜单、chip 删除、发送 `skillRefs`、气泡展示引用与"本机未安装"标记；邀请行由 leader 扩大到房间的人类成员 |
-| `index.js` | 新增 `roomSkills` panel endpoint（只读投影本机技能目录，白名单字段，缺失/异常一律 `unavailable`） |
-| `lib/service.mjs` | `addRoomMember` 授权改为「leader 或本房间人类成员」，其余事实（调用者身份、成员资格、目标会话归属）全部服务端派生，客户端 `memberNodeId`/`human`/`role` 声明一律忽略 |
-| `scripts/panel-check.mjs` | 新增 23 项技能选择器/引用渲染断言与 2 项邀请行断言（共 136 项） |
+| `client.js` | Room Composer 技能引用选择器：行首 `/` 与工具栏 `/技能` 共用可搜索菜单、chip 删除、发送 `skillRefs`、气泡按三态展示引用（同名同源 / 同名异源 / 无同名）；邀请行由 leader 扩大到房间的人类成员，且邀请调用不再携带 `sessionId` |
+| `index.js` | 新增 `roomSkills` panel endpoint（只读投影本机技能目录，白名单字段，缺失/异常一律 `unavailable`）；`roomInvite` 改为传 `via:'panel'` 而不传 `sessionId` |
+| `lib/service.mjs` | `addRoomMember` 的授权来源由面板端点携带的 `via:'panel'` 决定，而不是 payload 里的 `sessionId` 字符串；`leader` 路径保持原样。其余事实（成员资格、目标会话归属）仍全部服务端派生，客户端 `memberNodeId`/`role` 声明一律忽略 |
+| `scripts/panel-check.mjs` | 新增 23 项技能选择器/引用渲染断言、1 项同名异源三态断言与 2 项邀请行断言（共 137 项） |
 | `scripts/schema-check.mjs` | 新增 `roomSkills` 真实 RPC 校验（unavailable/ready/同名不折叠/不泄露路径/字段白名单/抛错与畸形降级，共 66 项） |
-| `scripts/room-invite.test.mjs` | 新建，10 条邀请权限测试（含 64 字符前缀歧义拒绝） |
+| `scripts/room-invite.test.mjs` | 新建，11 条邀请权限测试（含 64 字符前缀歧义拒绝、agent 冒用 `sessionId:'human'` 被拒） |
 | `docs/ui-contract.md` | `roomSay` 形参补 `mentions?`/`skillRefs?`；新增 `roomSkills` 端点、`SkillRef`/`SkillRow` 类型、§4「技能引用」交互段 |
 | `ROADMAP.md` | M2 置为「本批次完成（待 Codex 独立验收）」，M1 保持「设备验收未完成（全部场景未验收）」，M3–M6 标注本批次不做 |
 | `docs/handoffs/m1-three-device-acceptance.md` | 新建，M1 真实三设备验收准备清单（12 项场景全部「未验收」） |
@@ -94,12 +94,12 @@
 
 | 命令 | 结果 |
 |---|---|
-| `npm test` | `tests 116 / pass 116 / fail 0`（exit 0） |
-| `node scripts/panel-check.mjs` | `panel check: 136/136 assertions passed` / `panel check ok`（exit 0） |
+| `npm test` | `tests 117 / pass 117 / fail 0`（exit 0） |
+| `node scripts/panel-check.mjs` | `panel check: 137/137 assertions passed` / `panel check ok`（exit 0） |
 | `$env:DSH_TOOLS_MODULE=<dsh-tools/lib/index.js 的 file:// URL>; node scripts/schema-check.mjs` | `schema check ok — 66/66`（exit 0） |
 | `npm run check:composer-compat` | `PASS composer compatibility: DSH 0.2.2-rc.1, 4 public client entry points; no private-import requirement`（exit 0） |
 | `node scripts/twin-transport-check.mjs` | `twin transport ok`（exit 0） |
-| `node --test scripts/room-invite.test.mjs` | `tests 10 / pass 10 / fail 0`（exit 0） |
+| `node --test scripts/room-invite.test.mjs` | `tests 11 / pass 11 / fail 0`（exit 0） |
 
 沙箱注意事项：`npm test` 在受限文件/进程沙箱下会以 `Error: spawn EPERM`（`errno: -4048`，`syscall: 'spawn'`）失败，因为 `node --test` 需要为每个测试文件派生子进程并捕获管道。这是沙箱边界，不是测试失败；在允许进程派生的环境下直接通过。`schema-check.mjs` 必须显式注入 `DSH_TOOLS_MODULE`，否则会报 `cannot locate the framework schema validator`（脚本设计如此，未硬编码机器路径）。
 
@@ -111,7 +111,7 @@
 2. 直接输入 `/foo` 不选菜单 → 原样发送、气泡无引用块；
 3. chip 上 `×` → 引用消失、正文不变；
 4. 发送后气泡底部出现「引用的技能」块并显示来源节点；
-5. 对端（不同节点）收到后，本机不存在的技能显示虚线 + 「本机未安装此技能」；
+5. 对端（不同节点）收到后：本机确实没有的技能显示虚线 + 「本机未安装此技能」；本机有同名但来源不同的技能显示点线 + 「本机有同名技能，不一定是同一个」，且**不得**被标成"未安装"；
 6. 非 leader 的人类成员在成员面板看到邀请行并能成功拉入一个本机会话；
 7. 非成员看不到邀请行。
 
@@ -124,7 +124,7 @@
 5. **邀请权限的边界**：人类成员可以拉入本节点任意可达会话（含已存盘可恢复的会话），但没有「这个会话是否应该进这个项目」的额外策略。若需要按 workspace 或角色限制，需要新的设计。
 6. **Agent 加入房间不授予 Team 执行权限**：本批次保持了这一边界，`addRoomMember` 不写 Team 账本，但这一点只有代码约定，没有独立的回归测试断言。
 7. **`addRoomMember` 的错误码**：权限失败统一返回 `NOT_LEADER`，目标会话非法返回 `BAD_REQUEST`，64 字符前缀歧义返回 `AMBIGUOUS_ROOM`。错误码沿用了旧语义（`NOT_LEADER` 现在覆盖「非 leader 且非人类成员」），前端只展示消息文本，不影响行为，但如果外部有按错误码分支的调用方需要同步。
-8. **调用者身份是自称的（协议级，未修）**：`request.sessionId` 是一个字符串，`#selfMember` 直接据此推导身份。本机任意 Agent 会话只要传 `sessionId:'human'`，就会被当成人类成员，从而通过「仅 leader 或人类成员」的检查——前提是房间里确实有 `nodeId/human` 这个成员。这是现有 Mesh 协议的固有假设（panel 与 tool 层都用 sessionId 字符串标识调用者），不是本次改动引入的，也**不能**在插件内修好：需要 Host 提供经过认证的调用者身份。按交接包要求，本条记录建议并等待确认，未擅自改协议。
+8. **邀请权限已改为按入口派生（评审反馈后修复，协议级仍待 Host 支持）**：`roomInvite` 不再从 payload 的 `sessionId` 推断人类身份，而是由面板端点显式传 `via:'panel'`。这条路由注册在 owner-only 的 connection 通道上（`dsh-client-connection` 在调用 handler 之前就拒绝非 owner 主体并返回 403），所以「请求确实来自本机已认证的面板」由通道保证，不依赖任何客户端声明。服务端据此套用「人类成员」规则，leader 规则仍由 `target.leader.key === self.key` 判定；agent 走工具调用时没有 `via`，即使传 `sessionId:'human'` 也只是一个查不到 leader 的字符串，`scripts/room-invite.test.mjs` 有对应用例。**残留边界**：其它 room 端点（`roomSay`/`roomRename`/`roomKick`/`roomAssign`/`roomStatus` 等）仍以 `request.sessionId` 作为调用者身份，它们靠「成员资格」而非「人类身份」授权，风险面小但不为零；彻底解决需要 Host 在 Fetch route 里提供经认证的调用者身份（当前 handler 拿不到 peer 对象，`fetch: (request) => Promise<Response>` 签名里没有 peer）。按交接包要求，本批次只修了评审指出的邀请入口，其余记录建议并等待确认。
 9. **目录上限造成的可用性边界**：`catalogueAgents({ peers: false })` 经 `lib/agents.mjs:17` 的 `MAX_AGENT_ROWS = 200` 截断，本机会话排在 200 之外时会被判「不存在或不可访问」。这是可用性边界，不是权限放大。
 
 ### 设计偏差

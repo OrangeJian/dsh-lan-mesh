@@ -1417,11 +1417,16 @@ export function apply(ctx, rawConfig) {
             value: await node.removeMember({ room: str('room'), sessionId: str('sessionId'), member: str('member') }),
           };
         case 'roomInvite':
+          // The panel route is registered on the owner-only connection channel,
+          // so reaching this handler already proves the caller is the local
+          // person; `via` carries that fact instead of a sessionId the payload
+          // could forge. An agent invites through its own tool call, which never
+          // comes through here.
           return {
             ok: true,
             value: await node.addRoomMember({
               room: str('room'),
-              sessionId: str('sessionId'),
+              via: 'panel',
               memberSessionId: str('memberSessionId'),
               memberNodeId: opt('memberNodeId'),
             }),
