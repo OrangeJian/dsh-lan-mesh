@@ -36,6 +36,8 @@ const DEFAULTS = {
   clusterSecret: '',
   autoWake: true,
   trustedPeers: [],
+  /** Feishu/Feiyou notification receivers (user ids, comma separated). */
+  feishuReceivers: 'chenzhijian',
 };
 
 /**
@@ -85,6 +87,10 @@ function resolveConfig(raw) {
     trustedPeers: Array.isArray(value.trustedPeers)
       ? value.trustedPeers.filter((item) => typeof item === 'string' && item !== '')
       : DEFAULTS.trustedPeers,
+    feishuReceivers:
+      typeof value.feishuReceivers === 'string' && value.feishuReceivers.trim() !== ''
+        ? value.feishuReceivers.trim()
+        : DEFAULTS.feishuReceivers,
   };
 }
 
@@ -400,6 +406,73 @@ const DELIVERED_SCHEMA = {
  * @param {object} ctx - Host context.
  * @param {object} config - resolved plugin configuration.
  */
+/**
+ * Push one line to Feishu/Feiyou through the internal precise-notify API.
+ *
+ * Runs on the Host (Node 18+ has a global fetch), so the browser panel never
+ * needs a second credential. Failures are swallowed: a broken notifier must
+ * never take the mesh down, the caller logs the attempt.
+ * @param {object} config - resolved plugin config.
+ * @param {string} msg - single-line message text.
+ * @param {string} [scope] - extra context appended in a diagnostic log only.
+ * @returns {Promise<{ok: boolean, detail?: string}>}
+ */
+async function notifyFeishu(config, msg, scope = '') {
+  const flat = String(msg ?? '').replace(/\r?\n/g, ' ').trim();
+  if (flat === '') return { ok: false, detail: 'empty message' };
+  const receivers = String(config.feishuReceivers ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item !== '');
+  if (receivers.length === 0) return { ok: false, detail: 'no receivers configured' };
+  const body = { msg: flat, receiver_list: receivers };
+  try {
+    const response = await fetch('http://11.113.0.137:9011/api/v1/sendPreciseFeiyou', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (response.ok !== true) return { ok: false, detail: `HTTP ${response.status}` };
+    return { ok: true, detail: `${receivers.join(',')}` };
+  } catch (error) {
+    return { ok: false, detail: String(error?.message ?? error) };
+  }
+}
+
+/** Entry point of the panel Fetch route. Kept separate so the route body stays readable. */
+async function fetchPanelRequest(httpRequest, handleEndpoint, log) {
+  if (httpRequest.method !== 'POST') return new Response('method not allowed', { status: 405 });
+  const contentType = httpRequest.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+  if (contentType !== 'application/json') {
+    return new Response('content type must be application/json', { status: 415 });
+  }
+  let body;
+  try {
+    body = await httpRequest.json();
+  } catch {
+    return new Response('body is not JSON', { status: 400 });
+  }
+  const rpcId = typeof body?.rpcId === 'string' && body.rpcId !== '' ? body.rpcId : 'invalid-request';
+  const envelope = body?.payload;
+  if (
+    body === null ||
+    typeof body !== 'object' ||
+    body.type !== 'client-request' ||
+    typeof body.rpcId !== 'string' ||
+    envelope === null ||
+    typeof envelope !== 'object' ||
+    typeof envelope.method !== 'string' ||
+    !Object.hasOwn(envelope, 'payload')
+  ) {
+    return reply(rpcId, {
+      ok: false,
+      error: { code: 'gateway/bad-request', message: 'Invalid LAN Mesh panel request.', details: {} },
+    });
+  }
+  return reply(rpcId, await handleEndpoint(envelope.method, envelope.payload));
+}
+
 export function apply(ctx, rawConfig) {
   const config = resolveConfig(rawConfig);
   const log = (message, detail) => {
@@ -414,11 +487,12 @@ export function apply(ctx, rawConfig) {
   };
   const node = new MeshNode({
     config,
-    agents: ctx.get('agents'),
-    sessionPersistence: ctx.get('sessionPersistence'),
-    agentDefaultModel: ctx.get('agentDefaultModel'),
     // Resolved lazily: `apply` runs before every Host service is mounted, so a
-    // service captured here can be undefined forever.
+    // service captured here can be undefined forever — and an undefined `agents`
+    // is exactly what made "new agent in a workspace" fail with NOT_SUPPORTED.
+    getAgents: () => ctx.get('agents'),
+    getSessionPersistence: () => ctx.get('sessionPersistence'),
+    getAgentDefaultModel: () => ctx.get('agentDefaultModel'),
     getAgentPresets: () => ctx.get('agentPresets'),
     // Titles live behind a projection registry that is not mounted yet either.
     getSessionProjections: () => ctx.get('sessionProjections'),
@@ -429,6 +503,7 @@ export function apply(ctx, rawConfig) {
     // Same laziness, and the array is filled further down: the closure is only
     // read when an Agent is composed, which is after this line has run.
     getToolDefinitions: () => toolDefinitions,
+    notifyFeishu: (message, scope) => notifyFeishu(config, message, scope),
     log,
   });
   /** Resolve the calling agent id so a wake-up reaches the right session. */
@@ -1036,36 +1111,19 @@ export function apply(ctx, rawConfig) {
         methods: ['POST'],
         requestBody: 'buffered',
         fetch: async (httpRequest) => {
-          if (httpRequest.method !== 'POST') return new Response('method not allowed', { status: 405 });
-          const contentType = httpRequest.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
-          if (contentType !== 'application/json') {
-            return new Response('content type must be application/json', { status: 415 });
-          }
-          let body;
           try {
-            body = await httpRequest.json();
-          } catch {
-            return new Response('body is not JSON', { status: 400 });
+            return await fetchPanelRequest(httpRequest, handleEndpoint, log);
+          } catch (error) {
+            log('panel fetch handler failed', error);
+            return new Response(
+              JSON.stringify({
+                type: 'server-response',
+                rpcId: 'invalid-request',
+                result: { ok: false, error: { code: 'LAN_MESH_FAILED', message: String(error?.message ?? error), details: {} } },
+              }),
+              { status: 500, headers: { 'content-type': 'application/json; charset=utf-8' } },
+            );
           }
-          const rpcId = typeof body?.rpcId === 'string' && body.rpcId !== '' ? body.rpcId : 'invalid-request';
-          const envelope = body?.payload;
-          if (
-            body === null ||
-            typeof body !== 'object' ||
-            body.type !== 'client-request' ||
-            typeof body.rpcId !== 'string' ||
-            envelope === null ||
-            typeof envelope !== 'object' ||
-            typeof envelope.method !== 'string' ||
-            !Object.hasOwn(envelope, 'payload')
-          ) {
-            return reply(rpcId, {
-              ok: false,
-              error: { code: 'gateway/bad-request', message: 'Invalid LAN Mesh panel request.', details: {} },
-            });
-          }
-          const result = await handleEndpoint(envelope.method, envelope.payload);
-          return reply(rpcId, result);
         },
       });
     });
@@ -1089,6 +1147,15 @@ export function apply(ctx, rawConfig) {
     const failed = (code, message) => ({ ok: false, error: { code, message, details: {} } });
     try {
       await node.start();
+      // ponytail: watchdog only; if `start` ever hangs, the panel gets a visible
+      // timeout instead of a forever-pending request. Remove once stable.
+      const startWatchdog = AbortSignal.timeout(15000);
+      await Promise.race([
+        node.start(),
+        new Promise((_, reject) => {
+          startWatchdog.addEventListener('abort', () => reject(new Error('node.start timed out')));
+        }),
+      ]);
       switch (endpoint) {
         case 'snapshot':
           return { ok: true, value: node.snapshot({ sessionId: opt('sessionId') }) };
@@ -1130,6 +1197,11 @@ export function apply(ctx, rawConfig) {
           };
         case 'roomLeave':
           return { ok: true, value: await node.leaveRoom({ room: str('room'), sessionId: str('sessionId') }) };
+        case 'roomKick':
+          return {
+            ok: true,
+            value: await node.removeMember({ room: str('room'), sessionId: str('sessionId'), member: str('member') }),
+          };
         case 'roomInvite':
           return {
             ok: true,

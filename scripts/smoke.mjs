@@ -84,7 +84,12 @@ try {
 
   const reply = await beta.send({ target: alpha.nodeId, text: 'ack from beta' });
   check('addressing by node id works', reply.delivered[0]?.ok === true, JSON.stringify(reply.delivered));
-  check('alpha stored the reply', alpha.inbox({ limit: 10 }).messages.length === 1);
+  // Alpha also keeps its own copy of the message it sent, so count alone is
+  // wrong; the reply itself is what proves inbound storage.
+  check(
+    'alpha stored the reply',
+    alpha.inbox({ limit: 10 }).messages.some((message) => message.text === 'ack from beta'),
+  );
 
   const duplicate = await alpha.send({ target: 'no-such-node', text: 'nowhere' });
   check('an unknown target reports no delivery', duplicate.delivered.length === 0 && typeof duplicate.note === 'string', JSON.stringify(duplicate));

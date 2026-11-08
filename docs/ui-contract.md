@@ -129,9 +129,11 @@ role      = 'leader' | 'member'
 - 轮询：选中房间 2 秒一次 `roomDetail` + 4 秒一次 `snapshot`；agent 清单与工作区列表手动刷新（不进轮询）。
 - 每个成员的「私聊」按钮：把右栏切到单发模式，用 `send` 端点，`target = `${nodeId}/${sessionId}``。
 - **昵称**：成员行的铅笔按钮调 `nickname {member, name}`，身份卡的输入框 `onBlur` 调 `nickname {self:true, name}`。昵称只存在本机（`nicknames.json`），`#titleOf` 里昵称优先于会话标题。
-- 会话跳转：成员行上的「打开会话」按钮，本地成员调用
-  `ctx.uiWorkspace.openSession(sessionId)` 再 `ctx.layout.selectPanel(null)`；
-  跨节点成员没有本地会话，按钮不渲染。
+- 会话跳转：成员行上的「打开会话」按钮与左栏的 agent 行都只调用
+  `ctx.uiWorkspace.openSession(sessionId)`——原生会话占据 main 区，而左栏本身是
+  `sidebar.workspaces` 槽里的组件，仍在原地，所以不会「跳出」插件页。
+  `ctx.layout.selectPanel(null)` 留给左栏导航（项目/收件箱/看板），用于把插件
+  body 重新放回 main。跨节点成员没有本地会话，按钮不渲染。
 - **`@` 提及**：输入框打 `@` 时按光标前的 token 过滤成员（按标题/名字，前缀优先），
   浮层最多 8 行；`↑`/`↓` 移动、`Enter`/`Tab` 选中、`Esc` 关闭；选中后用
   `@标题 ` 替换 token。`@` 必须位于行首或空白之后（`mail@x` 不触发），
@@ -147,8 +149,8 @@ role      = 'leader' | 'member'
 ```js
 inject: ['slots']            // 只有插槽是启动期硬依赖
 const serviceOf = (name) => ctx.get(name)   // 其余服务点击时现取，取不到就降级
-serviceOf('layout')?.selectPanel(null)
-serviceOf('uiWorkspace')?.openSession(sessionId)   // 一步切会话并显示对话
+serviceOf('layout')?.selectPanel(null)             // 释放原生选择，让插件 main 重新显示
+serviceOf('uiWorkspace')?.openSession(sessionId)   // 原生会话占用 main，侧栏不受影响
 ```
 
 **不要把 `layout` / `uiWorkspace` 写进 `inject`**：客户端 `inject` 是「没有它我就不该
