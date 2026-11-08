@@ -1384,8 +1384,8 @@ export function apply(ctx, rawConfig) {
             value: await node.send({ target: str('target'), text: str('text'), topic: opt('topic') }),
           };
         case 'markRead':
-          node.markAllRead();
-          return { ok: true, value: node.inbox({ limit: 100 }) };
+          await node.markAllRead(opt('messageId'));
+          return { ok: true, value: node.humanInbox() };
         case 'roomRead':
           return { ok: true, value: { flipped: node.markRoomRead(str('room'), opt('sessionId')) } };
         case 'sessions':
@@ -1476,7 +1476,7 @@ export function apply(ctx, rawConfig) {
         case 'roomDetail':
           return { ok: true, value: await node.roomDetail({ room: str('room'), sessionId: str('sessionId') }) };
         case 'agents':
-          return { ok: true, value: await node.catalogueAgents() };
+          return { ok: true, value: await node.catalogueAgents({ peers: request.localOnly === true ? false : undefined }) };
         case 'agentImport':
           return {
             ok: true,
@@ -1562,7 +1562,7 @@ export function apply(ctx, rawConfig) {
     return () => {
       live = false;
       void live;
-      void node.close();
+      return node.close();
     };
   });
 }

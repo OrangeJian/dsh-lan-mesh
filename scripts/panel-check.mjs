@@ -264,6 +264,12 @@ const answers = {
           receivedAt: '2026-01-01T10:09:00.000Z',
           read: false,
         },
+        {
+          id: 'i7', kind: 'note',
+          from: { nodeId: 'node-b', sessionId: 'human', title: 'Remote human' },
+          text: 'a remote human note', read: false,
+          receivedAt: '2026-01-01T10:10:00.000Z',
+        },
       ],
     },
     // Only what the person must act on: one unread mention and one task.
@@ -330,7 +336,7 @@ const answers = {
         name: 'echo-worker',
         live: true,
         imported: true,
-        status: 'idle',
+        status: 'running',
         cwd: 'C:\\w\\proj',
         workspace: 'proj',
         rooms: ['room-1'],
@@ -482,12 +488,21 @@ const answers = {
 
 const asked = [];
 const requested = [];
+let agentsGate;
 const fetch = async (route, init) => {
   const body = JSON.parse(init.body);
   const endpoint = body.payload.method;
   const payload = body.payload.payload ?? {};
   asked.push(endpoint);
   requested.push({ endpoint, payload });
+  if (endpoint === 'markRead') {
+    for (const message of answers.snapshot.inbox.messages) {
+      if (!payload.messageId || payload.messageId === message.id) message.read = true;
+    }
+    answers.snapshot.inbox.unread = answers.snapshot.inbox.messages.filter(message => !message.read && !(message.from?.nodeId === 'node-a' && (!message.from.sessionId || message.from.sessionId === 'human'))).length;
+    return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: answers.snapshot.inbox } }) };
+  }
+  if (endpoint === 'agents' && agentsGate) await agentsGate;
   if (endpoint === 'roomJoin') {
     const joined = { ...strangerRoom, isMember: true, role: 'member' };
     answers.snapshot.rooms.mine.push(joined);
@@ -506,6 +521,8 @@ const fetch = async (route, init) => {
   };
 };
 
+const intervals = new Map();
+let intervalId = 0;
 const context = vm.createContext({
   window,
   document,
@@ -515,8 +532,8 @@ const context = vm.createContext({
   fetch,
   console,
   // The panel polls; the harness drives refreshes by hand.
-  setInterval: () => 0,
-  clearInterval: () => {},
+  setInterval: (fn, ms) => { const id = ++intervalId; intervals.set(id, { fn, ms }); return id; },
+  clearInterval: (id) => intervals.delete(id),
 });
 vm.runInContext(source, context);
 const loaded = window.__loaded;
@@ -587,6 +604,7 @@ let lastText = '';
 
 /** Two components use separate hook position spaces, like two real components. */
 const resetHooks = () => {
+  for (const slot of effectSlots) slot?.cleanup?.();
   stateSlots.length = 0;
   effectSlots.length = 0;
   refSlots.length = 0;
@@ -713,6 +731,8 @@ const clickRail = (token, at = 0) => clickOn(RailHost, token, at);
 await switchTo(RailHost);
 
 const checks = [
+  ['rail spins only for the running catalogue row', count('lm-agentSpinner') === 1 && lastNodes.some(n => hasClass(n, 'lm-agentSpinner') && n.props['aria-label'] === '运行中')],
+  ['rail requests only local agents', requested.filter(r => r.endpoint === 'agents').every(r => r.payload.localOnly === true)],
   ['registered on the keyed main slot', registration?.name === 'main' && registration?.key === 'dsh-lan-mesh'],
   ['registers the sidebar entry', sidebar?.definition?.id === 'dsh-lan-mesh'],
   ['registers the rail in the native sidebar', railEntry?.definition?.name === 'sidebar.workspaces'],
@@ -757,6 +777,27 @@ const checks = [
   ['the pending notification can be dismissed', count('lm-notifyDismiss') === 1],
 ];
 
+// Drive the rail's actual timer. Slow calls cannot queue another poll, and a
+// subsequent local catalogue change must replace the running indicator.
+const railTimer = [...intervals.values()].find(timer => timer.ms === 4000);
+const beforePoll = asked.filter(e => e === 'agents').length;
+let releaseAgents;
+agentsGate = new Promise(resolve => { releaseAgents = resolve; });
+railTimer.fn();
+railTimer.fn();
+checks.push(['slow catalogue polls never overlap', asked.filter(e => e === 'agents').length === beforePoll + 1]);
+releaseAgents();
+agentsGate = undefined;
+await settleRail();
+answers.agents.agents[0].status = 'idle';
+railTimer.fn();
+await settleRail();
+checks.push(['four-second poll clears a finished agent spinner', count('lm-agentSpinner') === 0]);
+answers.agents.agents[0].status = 'running';
+railTimer.fn();
+await settleRail();
+checks.push(['four-second poll detects a running agent', count('lm-agentSpinner') === 1]);
+
 // Picking a channel for a held notification calls the Host's confirm endpoint,
 // then refreshes the snapshot (the harness keeps the pending row, which is fine:
 // a real Host drops it after a successful send).
@@ -772,6 +813,9 @@ checks.push(
 // The main area opens on the inbox and draws no rail of its own: the native
 // sidebar owns that column now.
 await switchTo(Component);
+const afterUnmount = asked.filter(e => e === 'agents').length;
+railTimer.fn();
+checks.push(['unmount removes and disables the rail poll', ![...intervals.values()].includes(railTimer) && asked.filter(e => e === 'agents').length === afterUnmount]);
 checks.push(
   ['the panel opens on the inbox', count('lm-msg') === 4 && !lastText.includes('发给')],
   ['the panel leaves the sidebar to the native slot', count('lm-rail') === 0],
@@ -874,6 +918,8 @@ checks.push(
   // matching dsh-agent-team's composer instead of a bare form row.
   ['composer renders as a single card', count('lm-composerCard') === 1],
   ['composer toolbar carries the attach button', count('lm-attachBtn') === 1],
+  ['skill picker is an accessible icon button', lastNodes.some(n => hasClass(n, 'lm-skillBtn') && n.props['aria-label'] === '插入技能引用' && n.children.some(c => c?.type === 'svg'))],
+  ['leader can mark a message as task', lastNodes.some(n => hasClass(n, 'lm-taskPill') && n.props.disabled === false)],
   ['room pane has a back button', count('lm-backBtn') === 1],
   // v0.2.1: the leader may kick peers (never the human, never itself, and only
   // when this pane actually owns the leader role).
@@ -1183,6 +1229,7 @@ checks.push(
   // A human member who is not the leader may still pull a local session in; the
   // panel only mirrors the server rule, it never decides it.
   ['a human member still sees the invite row', count('lm-inviteRow') === 1],
+  ['member sees the disabled task entry with an explanation', lastNodes.some(n => hasClass(n, 'lm-taskPill') && n.props.disabled === true && n.props.title.includes('只有 leader'))],
   ['empty conversation says so', lastText.includes('房间里还没有消息')],
 );
 
@@ -1210,7 +1257,8 @@ checks.push(
     'inbox lists only the unread messages',
     count('lm-msg') === 4 &&
       lastText.includes('a long note') &&
-      lastText.includes('my own note') &&
+      !lastText.includes('my own note') &&
+      lastText.includes('a remote human note') &&
       lastText.includes('the local agent answered me') &&
       lastText.includes('beta needs a decision on the header'),
   ],
@@ -1223,7 +1271,7 @@ checks.push(
     'inbox names the sender instead of the recipient',
     senderLabels().includes('Beta rollout') && senderLabels().includes('echo-worker') && !lastText.includes('发给'),
   ],
-  ['inbox marks only the human own copy as mine', count('lm-msgOut') === 1 && senderLabels().includes('我')],
+  ['inbox excludes local human and names remote human correctly', count('lm-msgOut') === 0 && senderLabels().includes('Remote human')],
   [
     'inbox tags room messages with their room',
     count('lm-msgRoomTag') === 2 && lastText.includes('#Alpha room'),
@@ -1248,12 +1296,29 @@ checks.push([
 ]);
 
 // Clicking a room row must open that room, not just mark it read.
+await click('lm-msg', 0);
+checks.push([
+  'clicking a private inbox message marks only that message and keeps the inbox open',
+  count('lm-msg') === 3 && !lastText.includes('a remote human note') && count('lm-chat') === 0
+    && requested.some(request => request.endpoint === 'markRead' && request.payload.messageId === 'i7'),
+]);
 await click('lm-msgJump');
 if (!asked.includes('roomDetail')) throw new Error('the inbox jump never asked for roomDetail');
+if (!requested.some(request => request.endpoint === 'markRead' && request.payload.messageId === 'i4')) throw new Error('room inbox click did not mark the clicked non-mention message read');
+if (!answers.snapshot.inbox.messages.find(message => message.id === 'i4').read) throw new Error('room message remained unread after clicking');
 checks.push([
   'clicking an inbox room message opens that room',
   count('lm-chat') === 1 && lastText.includes('hello from beta'),
 ]);
+await switchTo(RailHost);
+await clickRail('lm-nav-inbox');
+await switchTo(Component);
+checks.push(['returning to inbox keeps the clicked room message read', !lastText.includes('the local agent answered me') && count('lm-msg') === 2]);
+const markAllButton = lastNodes.find(entry => entry.type === 'button' && (entry.children ?? []).includes('全部标为已读'));
+if (!markAllButton) throw new Error('missing mark all read button');
+await markAllButton.props.onClick();
+await settle();
+checks.push(['mark all read clears the remaining inbox and count', count('lm-msg') === 0 && answers.snapshot.inbox.unread === 0]);
 
 // A rail Agent row opens the native conversation in the main area. The rail
 // itself lives in the sidebar, so it stays exactly where it is.

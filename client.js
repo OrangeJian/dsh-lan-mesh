@@ -139,6 +139,7 @@ window.__ModuleLoader__.load({
           assigned: '任务已分配',
           needTaskTitle: '请输入任务标题',
           quickTaskLabel: '设为任务',
+          quickTaskLeaderOnly: '只有 leader 可以分派任务',
           taskFailed: '创建任务失败',
           // file sharing
           attachFile: '添加附件',
@@ -318,6 +319,7 @@ window.__ModuleLoader__.load({
           assigned: 'Task assigned',
           needTaskTitle: 'Enter a task title',
           quickTaskLabel: 'Mark as task',
+          quickTaskLeaderOnly: 'Only the leader can assign tasks',
           taskFailed: 'Failed to create task',
           // file sharing
           attachFile: 'Attach file',
@@ -474,6 +476,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-sectionAdd:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-brand-primary)}
 .lm-sectionAdd:disabled{opacity:.4;cursor:default}
 .lm-agentRow{padding:5px 9px}
+.lm-agentSpinner{display:inline-block;flex:0 0 auto;width:10px;height:10px;border:1.5px solid var(--dsw-alias-border-l1);border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:lm-agent-spin .8s linear infinite}
+@keyframes lm-agent-spin{to{transform:rotate(360deg)}}
 .lm-agentName{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lm-agentMeta{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .lm-main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--dsw-alias-bg-base)}
@@ -565,7 +569,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-skillChipSource{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
 .lm-skillChipRemove{flex:none;font:inherit;font-size:12px;line-height:1;border:0;border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;padding:2px 5px}
 .lm-skillChipRemove:hover{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}
-.lm-skillBtn{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px 0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:13px;font-weight:500;line-height:20px;cursor:pointer}
+.lm-skillBtn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:5px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}
+.lm-skillIcon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lm-taskPill:disabled{opacity:.5;cursor:not-allowed}
 .lm-skillBtn:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .lm-skillBtnOn,.lm-skillBtnOn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 /* A received reference is a label, never a button: nothing to install, run,
@@ -2407,21 +2413,26 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   type: 'button',
                   className: skillMenuVisible ? 'lm-skillBtn lm-skillBtnOn' : 'lm-skillBtn',
                   'aria-pressed': skillMenuVisible,
-                  title: COPY.skillHint,
+                  'aria-label': COPY.skillPicker,
+                  title: `${COPY.skillPicker} — ${COPY.skillHint}`,
                   onClick: toggleSkillMenu,
                 },
-                h('span', null, `/${COPY.skill}`),
+                h('svg', { className: 'lm-skillIcon', viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+                  h('path', { d: 'm9 5-6 7 6 7m6-14 6 7-6 7M14 3l-4 18' })),
               ),
               // Quick-task toggle: the leader can turn the next message into a
               // task with one click. The assignee is derived from the first @mention.
-              isLeader === true
+              viewer.isMember === true
                 ? h(
                     'button',
                     {
                       type: 'button',
                       className: quickTask ? 'lm-taskPill lm-taskPillOn' : 'lm-taskPill',
                       'aria-pressed': quickTask,
-                      onClick: () => setQuickTask((current) => !current),
+                      disabled: isLeader !== true,
+                      title: isLeader === true ? COPY.quickTaskLabel : COPY.quickTaskLeaderOnly,
+                      'aria-label': isLeader === true ? COPY.quickTaskLabel : `${COPY.quickTaskLabel}: ${COPY.quickTaskLeaderOnly}`,
+                      onClick: () => { if (isLeader === true) setQuickTask((current) => !current); },
                     },
                     h('span', null, COPY.quickTaskLabel),
                   )
@@ -2762,7 +2773,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                       title: row.cwd || row.name,
                       onClick: () => props.onOpenAgent(row.id),
                     },
-                    h('span', { className: row.live === true ? 'lm-dot' : 'lm-dot lm-dotIdle' }),
+                    row.status === 'running'
+                      ? h('span', { className: 'lm-agentSpinner', role: 'status', 'aria-label': COPY.agentsLive })
+                      : h('span', { className: row.live === true ? 'lm-dot' : 'lm-dot lm-dotIdle' }),
                     h('span', { className: 'lm-agentName' }, row.title || row.name),
                     h(
                       'span',
@@ -3042,8 +3055,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
      * @param {object[]} messages - inbox records.
      * @returns {object[]} the unread ones, order preserved.
      */
-    function unreadMessages(messages) {
-      return (Array.isArray(messages) ? messages : []).filter((message) => message.read !== true);
+    function unreadMessages(messages, self) {
+      return (Array.isArray(messages) ? messages : []).filter((message) => message.read !== true
+        && !(message.from?.nodeId === self?.nodeId
+          && (!message.from?.sessionId || message.from.sessionId === HUMAN_SESSION_ID)));
     }
 
     /**
@@ -3068,8 +3083,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           // carries this node's id, but it is the agent talking to the person.
           // The session decides the actor, exactly as the room bubbles do.
           const fromSessionId = message.from?.sessionId ?? '';
-          const outgoing = fromSessionId === HUMAN_SESSION_ID
-            || (fromSessionId === '' && message.from?.nodeId === selfNodeId);
+          const outgoing = message.from?.nodeId === selfNodeId
+            && (fromSessionId === HUMAN_SESSION_ID || fromSessionId === '');
           const isRoomMsg = typeof message.room === 'string' && message.room !== '';
           const senderName = outgoing === true
             ? COPY.me
@@ -3081,7 +3096,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           // messages from growing a needless toggle.
           const long = body.split('\n').length > 3 || body.length > 200;
           const isOpen = expanded[message.id] === true;
-          const open = () => props.onOpenRoom?.(message.room);
+          const open = async () => {
+            if (await props.onMarkMessageRead?.(message.id) === false) return;
+            if (isRoomMsg) props.onOpenRoom?.(message.room);
+          };
           return h(
             'div',
             {
@@ -3091,19 +3109,17 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 (isRoomMsg === true ? 'lm-msgRoom ' : '') +
                 (isRoomMsg === true ? 'lm-msgJump ' : ''),
               key: message.id,
-              ...(isRoomMsg === true
-                ? {
+              ...{
                     role: 'button',
                     tabIndex: 0,
-                    title: `${COPY.openRoom} #${roomLabel}`,
+                    title: isRoomMsg ? `${COPY.openRoom} #${roomLabel}` : COPY.markRead,
                     onClick: open,
                     onKeyDown: (event) => {
                       if (event.key !== 'Enter' && event.key !== ' ') return;
                       event.preventDefault();
                       open();
                     },
-                  }
-                : null),
+                  },
             },
             h(
               'div',
@@ -3146,7 +3162,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
      * @returns {object} pane element.
      */
     function InboxPane(props) {
-      const inbox = unreadMessages(props.messages);
+      const inbox = unreadMessages(props.messages, props.self);
       return h(
         'div',
         { className: 'lm-emptyPane lm-inboxPane' },
@@ -3164,6 +3180,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
               expandedMessages: props.expandedMessages,
               onToggleMessage: props.onToggleMessage,
               onOpenRoom: props.onOpenRoom,
+              onMarkMessageRead: props.onMarkMessageRead,
             })),
       );
     }
@@ -3379,35 +3396,42 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [busy, setBusy] = React.useState('');
       const [notifyBusy, setNotifyBusy] = React.useState('');
 
-      const refresh = React.useCallback(async () => {
+      const refresh = React.useCallback(async (isActive = () => true) => {
         try {
           const value = await panelCall('snapshot', { sessionId: HUMAN_SESSION_ID });
+          if (!isActive()) return;
           setSnapshot(value);
           const name = typeof value?.self?.selfName === 'string' ? value.self.selfName : '';
           setNickname((current) => (current === '' ? name : current));
         } catch (error) {
-          patchMeshNav({ notice: `${COPY.error}: ${errorText(error)}`, noticeBad: true });
+          if (isActive()) patchMeshNav({ notice: `${COPY.error}: ${errorText(error)}`, noticeBad: true });
         }
       }, []);
 
-      const loadAgents = React.useCallback(async () => {
+      const loadAgents = React.useCallback(async (isActive = () => true) => {
         try {
-          const value = await panelCall('agents');
+          const value = await panelCall('agents', { localOnly: true });
+          if (!isActive()) return;
           setAgents({ local: Array.isArray(value?.agents) ? value.agents : [], remote: [] });
         } catch (error) {
-          // The rail still lists rooms; an agent lookup failure only empties
-          // the Agents section.
+          // Keep the last catalogue when a refresh temporarily fails.
           void error;
         }
       }, []);
 
       React.useEffect(() => {
         let live = true;
-        const tick = () => {
-          if (live) refresh();
+        let pending = false;
+        const tick = async () => {
+          if (!live || pending) return;
+          pending = true;
+          try {
+            await Promise.all([refresh(() => live), loadAgents(() => live)]);
+          } finally {
+            pending = false;
+          }
         };
         tick();
-        loadAgents();
         const stop = every(4000, tick);
         return () => {
           live = false;
@@ -3778,6 +3802,17 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         }
       };
 
+      const markMessageRead = async (messageId) => {
+        try {
+          await call('markRead', { messageId });
+          await refresh();
+          return true;
+        } catch (error) {
+          setSendNotice(`${COPY.error}: ${errorText(error)}`);
+          return false;
+        }
+      };
+
       const joinRoom = async (roomId) => {
         setJoinBusy(roomId);
         patchMeshNav({ notice: '', noticeBad: false });
@@ -3877,6 +3912,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 onText: setText,
                 onSend: send,
                 onMarkRead: markRead,
+                onMarkMessageRead: markMessageRead,
                 onRefresh: refreshAll,
                 onImport: bringInAgent,
                 onDial: dialAgent,

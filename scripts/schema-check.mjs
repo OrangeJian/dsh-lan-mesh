@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { apply } from '../index.js';
+import { MeshNode } from '../lib/service.mjs';
 import { teamToolDefinitions } from '../lib/team-tools.mjs';
 
 /**
@@ -336,6 +337,19 @@ try {
   const listed2 = await run('lan_mesh_agents', {}, 'agents');
   check('agents lists the live caller', (listed2?.agents ?? []).some((row) => row.id === LEADER && row.live === true));
   check('agents lists a stored session from another workspace', (listed2?.agents ?? []).some((row) => row.id === 'sess-stored-workspace' && row.workspace === 'other-workspace'));
+  const peerLookup = MeshNode.prototype.fetchPeerAgents;
+  let peerLookups = 0;
+  MeshNode.prototype.fetchPeerAgents = async () => { peerLookups++; return []; };
+  try {
+    liveAgents.get(LEADER).status = 'running';
+    const localCatalogue = await rpc('agents', { localOnly: true });
+    check('local agent RPC reports real running status without querying peers', peerLookups === 0 && localCatalogue.result?.value?.agents?.some(row => row.id === LEADER && row.status === 'running'));
+    await rpc('agents', {});
+    check('full agent RPC retains peer catalogue lookup', peerLookups === 1);
+  } finally {
+    MeshNode.prototype.fetchPeerAgents = peerLookup;
+    liveAgents.get(LEADER).status = 'idle';
+  }
   const broughtIn = await run('lan_mesh_agent_import', { session: 'sess-stored-workspace' }, 'agent_import session');
   check('the imported row reports live with its workspace', broughtIn?.agent?.live === true && broughtIn?.agent?.workspace === 'other-workspace');
   const madeAgent = await run('lan_mesh_agent_import', { cwd: 'C:\\work\\fresh-workspace' }, 'agent_import cwd');
