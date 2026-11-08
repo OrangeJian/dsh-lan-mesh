@@ -70,8 +70,10 @@
 ### base / head
 
 - base：`4a6cddfb8e1b9fe0ad6f8a20f365e013c0ba9a9d`（`4a6cddf fix: resolve long room reference caller identities`）
-- head：`43e572cd51554b30e4b62fbfd3a4ee2405bc8e4b`（`43e572c feat: add room skill references and human member invites`），随后追加 `9bc6afd`（文档同步）与一次 64 字符前缀歧义加固；最终 head 以 `git log -1` 为准。
-- 未合并、未发布、未推送；分支仍为 `codex/room-collaboration`。
+- head：`a1279e1`（`fix: refuse ambiguous session prefixes when inviting a member`）
+- 三个提交：`43e572c feat: add room skill references and human member invites` → `9bc6afd docs: record the batch head commit and final test counts in the roadmap` → `a1279e1 fix: refuse ambiguous session prefixes when inviting a member`
+- `git diff --stat 4a6cddf..HEAD`：12 files changed, 1604 insertions(+), 20 deletions(-)
+- 未合并、未发布、未推送；分支仍为 `codex/room-collaboration`；工作树干净。
 
 ### 修改文件
 
