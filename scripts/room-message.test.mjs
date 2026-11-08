@@ -96,3 +96,48 @@ test('HTTP reference delivery negotiates capability and rejects legacy exact rou
  await deliverToPeer({address:'127.0.0.1',port:oldPort,secret:'secret',envelope:{...envelope(),skillRefs:refs.skillRefs}});
  assert.equal(received[1].skillRefs,undefined);assert.match(received[1].text,/not-installed/);
 });
+
+test('long Host session IDs retain exact wake, attention, unread and read identity', async t => {
+  const home = await mkdtemp(join(tmpdir(), 'long-room-refs-'));
+  const previous = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = previous;
+    await rm(home, { recursive: true, force: true });
+  });
+  const prefix = 'r'.repeat(64);
+  const fullId = prefix + '-rollover-session';
+  const otherId = prefix + '-different-session';
+  const woke = [];
+  const agents = new Map([[fullId, { id: fullId, session: { id: fullId }, followup: () => woke.push(fullId) }]]);
+  const node = new MeshNode({ config: { port: 0, autoWake: true, clusterSecret: '' }, agents: { get: id => agents.get(id), list: () => [...agents.values()] } });
+  node.started = true;
+  node.identity = { nodeId: 'node-b', name: 'Receiver' };
+  const state = emptyState();
+  const targetRoom = createRoom(state, { name: 'Long IDs', leader: { nodeId: 'node-a', sessionId: 'session-a', name: 'Sender' } }, () => 'aaaaaaaaaaaa-1111-2222-3333-444444444444');
+  joinRoom(state, targetRoom.id, { nodeId: 'node-b', sessionId: fullId, name: 'Same' });
+  node.roomsDoc = state;
+  const member = targetRoom.members.find(row => row.nodeId === 'node-b');
+  assert.equal(member.sessionId, prefix);
+  const message = () => ({ ...envelope(), room: targetRoom.id, mentions: [{ memberKey: member.key, label: 'Same' }] });
+  await node.receive(message());
+  assert.deepEqual(woke, [fullId]);
+  assert.equal(node.inbox({ attentionOnly: true, sessionId: fullId }).messages.length, 1);
+  assert.equal(node.snapshot({ sessionId: fullId }).rooms.unread[targetRoom.id], 1);
+  assert.equal(node.markRoomRead(targetRoom.id, fullId), 1);
+  assert.equal(node.inbox({ attentionOnly: true, sessionId: fullId }).messages.length, 0);
+  await node.receive(message());
+  const detail = node.roomDetail({ room: targetRoom.id, sessionId: fullId });
+  assert.equal(detail.viewer.isMember, true);
+  assert.equal(node.inbox({ attentionOnly: true, sessionId: fullId }).messages.length, 0);
+  agents.set(otherId, { id: otherId, session: { id: otherId }, followup: () => woke.push(otherId) });
+  const wakeCount = woke.length;
+  await node.receive(message());
+  assert.equal(woke.length, wakeCount);
+  for (const caller of [fullId, otherId, prefix]) {
+    assert.equal(node.inbox({ attentionOnly: true, sessionId: caller }).messages.length, 0);
+    assert.equal(node.snapshot({ sessionId: caller }).rooms.unread[targetRoom.id] ?? 0, 0);
+    assert.equal(node.markRoomRead(targetRoom.id, caller), 0);
+    assert.equal(node.roomDetail({ room: targetRoom.id, sessionId: caller }).viewer.isMember, false);
+  }
+});
