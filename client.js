@@ -78,6 +78,12 @@ window.__ModuleLoader__.load({
           noSession: '未选择会话',
           myRooms: '我的房间',
           noMineRooms: '还没有加入任何房间。',
+          // pending notifications (reserved notify extension point)
+          notifyTitle: '待确认通知',
+          notifyHint: '本机有多个通知渠道，选一个再发送：',
+          notifySend: '发送',
+          notifyDismiss: '忽略',
+          notifySent: '已通知',
           joinable: '可加入的项目',
           noLeader: '还没有 leader',
           join: '加入',
@@ -235,6 +241,12 @@ window.__ModuleLoader__.load({
           selfOption: 'Me (this human)',
           myRooms: 'My rooms',
           noMineRooms: 'Not in a room yet.',
+          // pending notifications (reserved notify extension point)
+          notifyTitle: 'Notifications to confirm',
+          notifyHint: 'Several local channels found — pick one before sending:',
+          notifySend: 'Send',
+          notifyDismiss: 'Dismiss',
+          notifySent: 'Notified',
           joinable: 'Rooms you can join',
           noLeader: 'no leader yet',
           join: 'Join',
@@ -411,6 +423,13 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-railList{display:flex;flex-direction:column;gap:2px}
 .lm-railIdent{margin-top:auto;padding-top:8px;border-top:1px solid var(--dsw-alias-border-l1);border-bottom:0}
 .lm-railEmpty{font-size:12px;padding:2px 4px}
+.lm-notify{gap:6px;padding:8px 6px;border:1px solid var(--dsw-alias-state-warn);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
+.lm-notifyItem{display:flex;flex-direction:column;gap:4px;padding:4px 0;border-top:1px solid var(--dsw-alias-border-l1)}
+.lm-notifyItem:first-of-type{border-top:0}
+.lm-notifyText{font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.lm-notifyHint{font-size:11px}
+.lm-notifyChannel{text-align:left}
+.lm-notifyDismiss{align-self:flex-start;color:var(--dsw-alias-label-secondary)}
 .lm-brand{display:flex;align-items:baseline;gap:8px;padding:2px 2px 8px}
 .lm-brandTitle{font-size:14px;font-weight:700}
 .lm-brandMeta{font-size:11px;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2019,6 +2038,47 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           ? null
           : h('div', { className: props.railNoticeBad ? 'lm-error lm-note' : 'lm-ok lm-note' }, props.railNotice),
 
+        // Notifications that found several local channels wait here for a
+        // human to pick one. One channel sends automatically (no pending row).
+        (props.notify?.pending ?? []).length === 0
+          ? null
+          : h(
+              'div',
+              { className: 'lm-railSection lm-notify' },
+              h('div', { className: 'lm-sectionHead' }, COPY.notifyTitle),
+              ...(props.notify.pending ?? []).map((item) =>
+                h(
+                  'div',
+                  { key: item.id, className: 'lm-notifyItem' },
+                  h('div', { className: 'lm-notifyText' }, item.message),
+                  h('div', { className: 'lm-muted lm-notifyHint' }, COPY.notifyHint),
+                  ...(item.channels ?? []).map((channel) =>
+                    h(
+                      'button',
+                      {
+                        key: channel.id,
+                        type: 'button',
+                        className: 'lm-btn lm-btnSmall lm-notifyChannel',
+                        disabled: props.notifyBusy === item.id,
+                        onClick: () => props.onNotifyConfirm?.(item.id, channel.id),
+                      },
+                      `${COPY.notifySend} · ${channel.label}`,
+                    ),
+                  ),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'lm-btn lm-btnSmall lm-notifyDismiss',
+                      disabled: props.notifyBusy === item.id,
+                      onClick: () => props.onNotifyDismiss?.(item.id),
+                    },
+                    COPY.notifyDismiss,
+                  ),
+                ),
+              ),
+            ),
+
         h(
           'div',
           { className: 'lm-nav' },
@@ -2799,6 +2859,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [newName, setNewName] = React.useState('');
       const [newTopic, setNewTopic] = React.useState('');
       const [busy, setBusy] = React.useState('');
+      const [notifyBusy, setNotifyBusy] = React.useState('');
 
       const refresh = React.useCallback(async () => {
         try {
@@ -2855,6 +2916,31 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           await refresh();
         } catch (error) {
           notice(`${COPY.error}: ${errorText(error)}`, true);
+        }
+      };
+
+      const confirmNotify = async (id, channel) => {
+        setNotifyBusy(id);
+        try {
+          const value = await panelCall('notifyConfirm', { id, channel });
+          notice(value?.summary ?? COPY.notifySent, value?.status === 'failed');
+          await refresh();
+        } catch (error) {
+          notice(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setNotifyBusy('');
+        }
+      };
+
+      const dismissNotify = async (id) => {
+        setNotifyBusy(id);
+        try {
+          await panelCall('notifyDismiss', { id });
+          await refresh();
+        } catch (error) {
+          notice(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setNotifyBusy('');
         }
       };
 
@@ -2949,6 +3035,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         taskTotal,
         railNotice: nav.notice,
         railNoticeBad: nav.noticeBad,
+        notify: data?.notify,
+        notifyBusy,
+        onNotifyConfirm: confirmNotify,
+        onNotifyDismiss: dismissNotify,
         onRefresh: refresh,
         createOpen: nav.createOpen,
         newName,

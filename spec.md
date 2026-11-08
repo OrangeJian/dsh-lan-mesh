@@ -1,5 +1,8 @@
 # 局域网协作：全屏接管（自有侧边栏）
 
+> **状态：v0.2 历史规划文档，已被后续实现取代，仅作留档。**
+> 实际落地的是 `MeshNavigation` 状态机（`NAV_KEY = 'dsh.lanmesh.navigation'`，`enterLanMesh()` / `leaveLanMesh()`）+ `registerModeShadow('sidebar.workspaces')` 条件槽注册 + `MeshRailHost`，**不是**本文件写的 `MeshLauncher` / `MeshOverlay` / `shell.overlay` 覆盖层。当前架构见 `docs/development.md` §3，验证数字见 `README.md`「验证」一节。
+
 ## 目标
 
 点击原生侧边栏的「局域网协作」图标后，整个窗口切换为插件自己的界面：左侧是插件侧边栏（替换原生侧边栏），右侧是内容区；用户可以从侧边栏一键回到原生对话。

@@ -192,7 +192,7 @@ lan_mesh_agent_import session=session-445e81dc-62a6-4345-9050-45b691d05c28
 lan_mesh_agent_import cwd=C:\work\new-project name=前端小工
 ```
 
-这两种引入出来的 agent 都会继承本插件的 10 个 `lan_mesh_*` 工具，并且带着节点默认模型和默认 preset——没有这两样，它要么开不了口（没有工具），要么第一轮就报错（缺模型）。
+这两种引入出来的 agent 都会继承本插件的 11 个 `lan_mesh_*` 工具，并且带着节点默认模型和默认 preset——没有这两样，它要么开不了口（没有工具），要么第一轮就报错（缺模型）。
 
 > 引入 = 拿到了那个会话的**写所有权**。所以本节点关闭时会把它 dispose 掉，否则下次启动会撞上写锁。这也意味着：同一个会话不要在两台机器上同时引入。
 
@@ -296,7 +296,7 @@ lan_mesh_inbox unread_only=false limit=50
 
 ## 7. 工具速查
 
-十个工具，分三层。全部可以直接用自然语言驱动，工具名和参数如下。
+十一个工具，分四层。全部可以直接用自然语言驱动，工具名和参数如下。
 
 ### 网络层
 
@@ -325,6 +325,14 @@ lan_mesh_inbox unread_only=false limit=50
 | `lan_mesh_agent_import` | `session` 或 `cwd`（二选一）, `name`, `title` | 恢复别的 workspace 的会话 / 在指定目录新建（`title` 就是会话标题） |
 | `lan_mesh_agent_dial` | `target`(必, `nodeId/sessionId`), `text`(必), `topic` | 给远端 agent 第一句指令 |
 
+### 通知层（预留操作）
+
+| 工具 | 参数 | 说明 |
+| --- | --- | --- |
+| `lan_mesh_notify` | `action`(channels/send/confirm/dismiss), `text`, `id`, `channel` | 发通知：运行时发现本机可用渠道（微信 im 等），单渠道自动发、多渠道挂起等人确认 |
+
+通知渠道不写死：发送那一刻才去发现本地 `@xmanrui/dsh-im` 有哪些 bot×target（当前环境的微信 im 即由此自动找到），加上可选的 `notifyWebhook`。发现多个渠道时消息会挂在左栏「待确认通知」，由人选一个再发；一个都没有只记日志。房间任务被置 `done` 时会自动触发一次。
+
 错误码会直接出现在返回里，常见几个：`NOT_LEADER`（只有 leader 能派活/改名）、`AMBIGUOUS_ROOM`／`AMBIGUOUS_TASK`／`AMBIGUOUS_AGENT`（同名，请改用 id）、`UNKNOWN_ROOM`／`UNKNOWN_AGENT`、`BAD_REQUEST`（参数不对，例如相对路径 cwd）。
 
 ---
@@ -338,7 +346,7 @@ lan_mesh_inbox unread_only=false limit=50
  "payload":{"method":"snapshot","payload":{"sessionId":"..."}}}
 ```
 
-端点共 20 个：`snapshot`、`rooms`、`roomRead`、`send`、`markRead`、`sessions`、`roomCreate`、`roomJoin`、`roomLeave`、`roomRename`、`roomAssign`、`roomStatus`、`roomSay`、`roomDetail`、`agents`、`agentImport`、`workspaces`、`nickname`、`agentDial`、`agentUndial`。
+端点共 26 个：`snapshot`、`rooms`、`roomRead`、`send`、`markRead`、`sessions`、`roomCreate`、`roomJoin`、`roomLeave`、`roomKick`、`roomInvite`、`roomRename`、`roomAssign`、`roomStatus`、`roomSay`、`roomDetail`、`agents`、`agentImport`、`workspaces`、`nickname`、`agentDial`、`agentUndial`、`notifyChannels`、`notifySend`、`notifyConfirm`、`notifyDismiss`。
 
 字段契约见 [ui-contract.md](ui-contract.md)。其中两处值得记住：
 

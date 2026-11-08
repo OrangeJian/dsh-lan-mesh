@@ -62,7 +62,7 @@
 ## 3. 分层与它们各自的边界
 
 ```
-index.js      Host 入口：10 个工具、/api/lan-mesh 路由（17 个端点）、系统提示、启动
+index.js      Host 入口：11 个工具、/api/lan-mesh 路由（26 个端点）、系统提示、启动
 client.js     面板：侧栏图标 + 两栏独立界面（左栏房间、右栏成员/聊天/任务）
 lib/discovery.mjs  UDP 广播；只管「谁在线」，不碰业务
 lib/transport.mjs  HTTP、信封规范化、HMAC 签名、状态/agent 清单交换；只管线
@@ -368,6 +368,27 @@ register('the sidebar icon', () =>
 
 ---
 
+### 4.19 通知不能写死渠道：把「发通知」做成预留操作
+
+**需求**：「第二点的通知方式，可以看看预留或者跟用户主动确认通知的方式」「譬如在我现在这个环境，就可以通过微信 im 通知我」；用户随后定案：「预留通知操作就可以了，在执行通知操作的时候，自主查找本地可用的通知工具去通知就可以了，如果有多个，再跟用户进行二次确认」。
+
+**原来的做法错在哪**：`index.js` 里有一个 `notifyFeishu()`，把 `http://11.113.0.137:9011/api/v1/sendPreciseFeiyou` 和接收人 `chenzhijian` 写死在代码里。这既是硬编码（换个环境就失效、还可能把消息发到别人内网），也把「通知」和「飞书」绑死了——用户要的是「通知」这个动作，不是某个具体渠道。
+
+**改成扩展点**（`lib/notify.mjs` 的 `Notifier`）：
+
+- 通知只暴露一个抽象操作：`notify(message, scope)`。渠道**不进配置**、不在启动时固定，而是在**真正要发的那一刻**运行时发现本机有什么。
+- 发现顺序：① `ctx.get('dshIm')`（晚绑定，因为 IM 服务是在 `apply` 之后才挂上来的）→ `listBots()` + 每个 bot 的 `listTargets()`，每个 target 是一个渠道，发送走 `im.send(botId, targetId, text)`；② 可选的 `notifyWebhook` 配置（只接 `http(s)://`，POST `{text}`）。当前环境的微信 im 就是这样被自动找到的，不需要在插件里写 `wx_...` 或 `tgt_...`。
+- 结果分派：**0 个**渠道 → 记日志、不抛错（任务置 done 不能被通知拖垮）；**1 个** → 直接发；**多个** → 生成一条 pending 放进 `snapshot().notify.pending`，左栏出现「待确认通知」，人点选一个渠道后才发（`notifyConfirm`），或忽略（`notifyDismiss`）。这就是用户说的「二次确认」。
+- `listBots()` 在 dsh-im 里有两种形状（字符串数组 / `[{botId,channel}]`），`listTargets()` 可能返回数组或 `{targets}` 包装——发现逻辑必须都兼容，不能写死一种。
+
+**接线**：`index.js` 把 `MeshNode` 的 `notifyFeishu` 回调改名成通用的 `notify` + `getNotify`（供 `snapshot()` 暴露 pending）；`setTaskStatus` 在任务变 done 时调 `this.notify(...)`，仍包在 try/catch 里。新增第 11 个工具 `lan_mesh_notify`（`channels`/`send`/`confirm`/`dismiss`）与 4 个面板端点。
+
+**验证**：`notify.test.mjs` 11 用例（无渠道不抛、单渠道自动发、两种 `listBots` 形状、多渠道挂起、confirm 后清 pending、失败保留可重试、dismiss、IM 抛错被吞、非法 webhook 忽略、sendDirect、空文本）；`schema-check.mjs` 造 2 个假渠道并走框架自己的 `validateJsonSchemaValue` 验工具输出（39 → 46 项）；`panel-check.mjs` 断言待确认块渲染与点按钮真的调 `notifyConfirm`/`notifyDismiss`（→ 99 项）。
+
+**教训**：用户说「通知」时，别把它翻译成某个厂商。把动作与渠道分开，渠道在运行时发现；当发现结果不唯一时，**不要替用户选**，把决定权交回人。
+
+---
+
 ## 5. 协议设计上的几个取舍
 
 **信封签名用「规范化后的状态」而不是原始 JSON。** 状态签名最初写的是 `JSON.stringify(payload.state)`，但验签发生在 `normalizeStatePayload()`（内部会重排 key、丢未知字段）**之后**，于是诚实对端互相 401。改成 `canonicalStateJson()`（normalize + 按 room id 排序）后，字段顺序无关、多余字段无关，但改房间名仍然破签。
@@ -386,17 +407,18 @@ register('the sidebar icon', () =>
 
 ## 6. 验证体系
 
-单进程冒烟测不出上面任何一个 bug，所以建了七个脚本：
+单进程冒烟测不出上面任何一个 bug，所以建了九个脚本：
 
 | 脚本 | 测什么 | 规模 |
 | --- | --- | --- |
-| `rooms.test.mjs` | 房间纯函数：合并幂等/交换、墓碑、歧义、裁剪、改名 | 47 用例 |
+| `rooms.test.mjs` | 房间纯函数：合并幂等/交换、墓碑、歧义、裁剪、改名 | 49 用例 |
+| `notify.test.mjs` | 通知扩展点：渠道发现、单渠道自动发、多渠道挂起、confirm/dismiss、失败重试 | 11 用例 |
 | `smoke.mjs` | 双节点：身份、发现、投递、去重、持久化、安全 | 7 组 |
 | `twin-transport-check.mjs` | 状态交换与签名：规范化、push/pull、401/403 | 全绿 |
 | `rooms-smoke.mjs` | 房间端到端：建房→加入→派活→报进度→聊天→human 发言→未读→改名→重启→退出 | 全绿 |
 | `agents-smoke.mjs` | agent 端到端：清单→跨 workspace 引入→新建→联络→唤醒→工具挂载→回收 | 41 项 |
-| `schema-check.mjs` | 每个工具的 execute 输出是否满足自己声明的 schema | 39 项 |
-| `panel-check.mjs` | 面板渲染与交互：用假 Host 应答在 vm 里渲染、点按钮、打字、按键，并用故意抛错的 ctx 验证 apply 不会拖垮 boot | 60 项 |
+| `schema-check.mjs` | 每个工具的 execute 输出是否满足自己声明的 schema | 46 项 |
+| `panel-check.mjs` | 面板渲染与交互：用假 Host 应答在 vm 里渲染、点按钮、打字、按键，并用故意抛错的 ctx 验证 apply 不会拖垮 boot | 99 项 |
 
 `panel-check.mjs` 是最后一个加的，因为 `node --check` 只能证明语法对，证明不了「端点名写错了」或「读了 Host 不发的字段」。它当场抓到一个真缺陷：远端 agent 行只显示 workspace，看不出是哪台机器回的。
 
@@ -453,7 +475,7 @@ PowerShell 用非 UTF-8 编码读写往返，把 **144 处三字节 UTF-8 字符
 
 ## 8. 现状与已知边界
 
-**已做完并验证**：三层功能（网络/房间/agent）、10 个工具、17 个面板端点、两栏独立操作界面（左栏房间列表与未读角标、右栏成员在线态/气泡聊天/折叠任务区/一键跳会话、`@` 成员选择浮层、界面一律显示会话标题而非会话 id）、协议版本 2、签名与白名单、七个回归脚本全绿（含 52 项面板断言）、真机双实例端到端（含跨机 agent 用工具回信、human 身份发言、改名跨节点同步、agents 端点返回真实会话标题）。
+**已做完并验证**：三层功能（网络/房间/agent）+ 通知扩展点、11 个工具、26 个面板端点、两栏独立操作界面（左栏房间列表与未读角标、右栏成员在线态/气泡聊天/折叠任务区/一键跳会话、`@` 成员选择浮层、界面一律显示会话标题而非会话 id）、协议版本 2、签名与白名单、九个回归脚本全绿（含 99 项面板断言）、真机双实例端到端（含跨机 agent 用工具回信、human 身份发言、改名跨节点同步、agents 端点返回真实会话标题）。
 
 **已知边界**（都是有意的取舍，不是 bug）：
 

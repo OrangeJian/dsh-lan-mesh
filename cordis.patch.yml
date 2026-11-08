@@ -8,3 +8,7 @@
         clusterSecret: ''
         autoWake: true
         trustedPeers: []
+        # Optional extra notification channel. Empty = discover local IM bots
+        # (WeChat / Feishu / ...) at send time; one sends automatically, several
+        # wait for a human to pick one in the panel.
+        notifyWebhook: ''

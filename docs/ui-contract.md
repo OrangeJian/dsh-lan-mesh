@@ -30,7 +30,7 @@ role      = 'leader' | 'member'
 
 | endpoint | 参数 | 返回 |
 | --- | --- | --- |
-| `snapshot` | `{sessionId?}` | `{self, peers, inbox, storage, attention, rooms:{count, mine, all, unread}}` |
+| `snapshot` | `{sessionId?}` | `{self, peers, inbox, storage, attention, notify, rooms:{count, mine, all, unread}}` |
 | `rooms` | `{sessionId?, all?}` | `{rooms: RoomRow[]}` |
 | `roomDetail` | `{room, sessionId}` | `{room: RoomView, messages, mine, viewer}`（调用即把该房间对当前会话的关注项标为已读） |
 | `roomCreate` | `{name, topic?, sessionId, sessionName?}` | `{room, forward}` |
@@ -50,6 +50,14 @@ role      = 'leader' | 'member'
 | `nickname` | `{self?|member?, name}` | `{nicknames}`（**新增**，本地偏好） |
 | `agentDial` | `{target, text, topic?}` | 投递结果 |
 | `agentUndial` | `{target}` | `{removed}` |
+| `roomKick` | `{room, sessionId, member}` | `{room}`（仅 leader） |
+| `roomInvite` | `{room, sessionId, member}` | `{room, delivered}` |
+| `notifyChannels` | `{}` | `{channels:[{id,label,kind}], pending}` |
+| `notifySend` | `{channel, text}` | 投递结果（单渠道自动发时用） |
+| `notifyConfirm` | `{id, channel}` | `{status, summary, ok?}`（按人选定的渠道发出挂起通知） |
+| `notifyDismiss` | `{id}` | `{ok}`（忽略挂起通知） |
+
+`snapshot.notify` 是 `{pending:[{id, message, createdAt, channels:[{id,label}]}]}`。多渠道通知不会自动发，左栏「待确认通知」渲染它，点渠道按钮调 `notifyConfirm`、点忽略调 `notifyDismiss`；单渠道时 Host 直接发，不留 pending。
 
 `snapshot.rooms.unread` 是 `{[roomId]: number}`，只统计**这个会话必须看的**：`@` 命中它的消息，以及派给它的任务。agent 之间的对话不计入。
 

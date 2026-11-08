@@ -287,6 +287,20 @@ const answers = {
       all: [{ ...leaderRoom, isMember: true }, { ...memberRoom, isMember: true }, strangerRoom],
       unread: { 'room-1': 2 },
     },
+    // A notification found several local channels and waits for a human pick.
+    notify: {
+      pending: [
+        {
+          id: 'notify-1',
+          message: '任务完成：房间「Alpha room」的「Split the panel」已完成',
+          createdAt: '2026-01-01T10:10:00.000Z',
+          channels: [
+            { id: 'im:wx_1:tgt_1', label: 'wechat · 我' },
+            { id: 'webhook:default', label: 'Webhook · example.test' },
+          ],
+        },
+      ],
+    },
   },
   // A new agent is a new session inside a workspace that already exists.
   workspaces: {
@@ -410,6 +424,8 @@ const answers = {
       viewer: { sessionId: 'human', isMember: true, isLeader: false, role: 'member' },
     },
   },
+  notifyConfirm: { status: 'sent', summary: '已通过 wechat · 我 通知', ok: true },
+  notifyDismiss: { ok: true },
 };
 
 const asked = [];
@@ -674,7 +690,24 @@ const checks = [
       lastText.includes('Room worker') &&
       !lastText.includes('stored-one'),
   ],
+  // The reserved notify extension point: several local channels means the
+  // message is held for a human to pick one, instead of being sent blindly.
+  ['the rail shows notifications awaiting confirmation', count('lm-notify') === 1 && lastText.includes('待确认通知')],
+  ['the pending notification offers every channel', count('lm-notifyChannel') === 2 && lastText.includes('wechat')],
+  ['the pending notification can be dismissed', count('lm-notifyDismiss') === 1],
 ];
+
+// Picking a channel for a held notification calls the Host's confirm endpoint,
+// then refreshes the snapshot (the harness keeps the pending row, which is fine:
+// a real Host drops it after a successful send).
+await clickRail('lm-notifyChannel');
+checks.push(
+  ['confirming a notification asks notifyConfirm', asked.includes('notifyConfirm')],
+);
+await clickRail('lm-notifyDismiss');
+checks.push(
+  ['dismissing a notification asks notifyDismiss', asked.includes('notifyDismiss')],
+);
 
 // The main area opens on the inbox and draws no rail of its own: the native
 // sidebar owns that column now.

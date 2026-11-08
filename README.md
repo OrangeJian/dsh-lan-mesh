@@ -29,9 +29,10 @@
 | --- | --- |
 | 本文件 | 安装、配置、工具清单、架构、排障 |
 | [docs/usage.md](docs/usage.md) | **使用说明**：三个场景的完整操作走查、面板每个区块怎么用、工具参数逐项说明、安全怎么想 |
-| [docs/development.md](docs/development.md) | **开发过程**：选型理由、真机验证抓到的 15 个 bug、协议取舍、验证体系、事故复盘 |
+| [docs/development.md](docs/development.md) | **开发过程**：选型理由、真机验证抓到的 19 个 bug、协议取舍、验证体系、事故复盘 |
 | [docs/rooms-contract.md](docs/rooms-contract.md) | 房间层的冻结契约（各模块签名、RPC 端点表、合并语义） |
 | [docs/ui-contract.md](docs/ui-contract.md) | 面板契约（端点全集、RoomRow／RoomView／Member／Task／Message 形状、布局、客户端服务） |
+| `spec.md` / `tasks.md` | v0.2 全屏接管的**历史规划记录**，已被 `MeshNavigation` 状态机实现取代（见各文件顶部说明） |
 
 ## 功能总览
 
@@ -46,7 +47,9 @@
 - 把**别的 workspace** 里已存盘的会话在本机恢复成 live agent（不移动文件），或直接在某个绝对目录新建一个；
 - 把第一句指令投给**别人机器上**的 agent，它干完活用自己的工具回信。
 
-引入／新建出来的 agent 会自动继承本插件的 10 个工具、默认模型与默认 preset——这三点缺任何一样，它都动不了（详见 [docs/development.md](docs/development.md)）。
+引入／新建出来的 agent 会自动继承本插件的 11 个工具、默认模型与默认 preset——这三点缺任何一样，它都动不了（详见 [docs/development.md](docs/development.md)）。
+
+**通知层**——不绑定任何渠道。「通知」是一个预留操作：真正要发时运行时发现本机可用的通知工具（当前环境的微信 im 由 `@xmanrui/dsh-im` 提供，也可配置一个 webhook）。只发现一个就自动发；发现多个则挂起，由人在面板「待确认通知」里选一个再发；一个都没有就只记日志，绝不影响任务完成。详见 [docs/development.md](docs/development.md) §4.19。
 
 **面板**——侧栏「局域网协作」图标打开一块**独立操作界面**：左边常驻房间列表（我的房间带未读角标、可加入的项目、新建入口），右边是选中房间的成员行（在线状态点）、气泡式聊天、可折叠任务区，以及「点一下跳到本机那个 agent 的会话」。输入框打 `@` 弹出成员选择框；成员一律显示**会话标题**而不是 `session-xxxx`，原始地址收在悬停提示里。没选中房间时显示老的兜底通道：在线节点、点对点发消息、收件箱、按目录新建 agent。
 
@@ -63,7 +66,7 @@ dsh plugin install "C:\path\to\dsh-lan-mesh"
 plugin_manager set_plugin target=include:dsh-lan-mesh enabled=true
 ```
 
-装好后刷新 Web UI，侧栏出现「局域网协作」图标；模型侧多出 10 个 `lan_mesh_*` 工具。
+装好后刷新 Web UI，侧栏出现「局域网协作」图标；模型侧多出 11 个 `lan_mesh_*` 工具。
 
 ## 快速开始
 
@@ -114,6 +117,7 @@ plugin_manager set_plugin target=include:dsh-lan-mesh enabled=true
 | `clusterSecret` | `DSH_LAN_MESH_SECRET` | 空 | 非空时信封必须带 HMAC-SHA256 签名 |
 | `autoWake` | — | `true` | 收到消息时是否唤醒目标会话 |
 | `trustedPeers` | — | `[]` | 非空时只接受列表内 nodeId |
+| `notifyWebhook` | — | 空 | 额外通知渠道：POST `{text}` 到该 http(s) 地址。留空即可，本地 IM 渠道（微信等）会在发送时自动发现 |
 
 同一台机器上跑第二个实例时必须改端口和名字，否则两个进程会抢同一个端口、共用同一份身份文件：
 
@@ -151,19 +155,26 @@ Agent 层（把别处的 agent 拉进来干活的）：
 
 跨机器的 agent 不是长连接：`lan_mesh_agent_dial` 投一条唤醒消息过去，对端 agent 在自己机器上干完活，用 `lan_mesh_send` 把结果发回来（唤醒文本里带了回信 target）。这样断网、重启都不用重连。
 
-引入／新建出来的 agent 会同时继承本插件的 10 个 `lan_mesh_*` 工具：preset 只挂它自己那一组插件，宿主上的工具不会被继承，所以在 `setup` 里额外把工具定义注册到 agent 自己的 ctx 上。没有这一步，被唤醒的 agent 看得见消息却发不出回信。
+通知层（预留操作，不绑定渠道）：
+
+- `lan_mesh_notify` — `action=channels` 列出本机可用通知渠道；`action=send` 发一条通知（仅一个渠道时自动发，多个则挂起等待确认）；`action=confirm` 选渠道发出挂起的通知；`action=dismiss` 忽略一条挂起通知。
+
+渠道在**发送时**才运行时发现：本地 `@xmanrui/dsh-im` 的每个 bot × target 都是一个渠道（当前环境的微信 im 就是这样自动被找到的），再加上可选的 `notifyWebhook`。房间任务被置 `done` 时也会自动触发一次通知。发现 0 个渠道只记日志、1 个自动发、**多个挂起由人在左栏「待确认通知」里二次确认**——不会替你选，也不会把消息发到写死的内网地址。
+
+引入／新建出来的 agent 会同时继承本插件的 11 个 `lan_mesh_*` 工具：preset 只挂它自己那一组插件，宿主上的工具不会被继承，所以在 `setup` 里额外把工具定义注册到 agent 自己的 ctx 上。没有这一步，被唤醒的 agent 看得见消息却发不出回信。
 
 ## 架构
 
 ```
-index.js            Host 入口：10 个工具、/api/lan-mesh 面板路由、系统提示
-client.js           面板：侧栏图标 + 主面板（房间、任务、聊天、agent 清单）
+index.js            Host 入口：11 个工具、/api/lan-mesh 面板路由（26 个端点）、系统提示
+client.js           面板：侧栏图标 + 主面板（房间、任务、聊天、agent 清单、待确认通知）
 lib/discovery.mjs   UDP 广播发现（TAG dsh-lan-mesh/1，5s 公告，20s 过期）
 lib/transport.mjs   HTTP JSON 直连、信封规范化、HMAC 签名、房间状态与 agent 清单交换
 lib/service.mjs     MeshNode：节点状态 + 房间 CRUD + agent 引入/联络 + 唤醒与投递
 lib/rooms.mjs       纯函数：房间状态的创建/加入/离开/任务/合并（唯一真相）
 lib/agents.mjs      纯函数：agent 行的投影、远端清单规范化、按 id/名字解析
-lib/store.mjs       持久化：node.json / inbox.jsonl / rooms.json（原子写）
+lib/notify.mjs      Notifier：运行时发现本地通知渠道、单渠道自动发、多渠道挂起待确认
+lib/store.mjs       持久化：node.json / inbox.jsonl / rooms.json / nicknames.json（原子写）
 ```
 
 状态同步：每次房间变更后向所有 peer 拉一次状态、合并、再推回去。合并是幂等且可交换的——成员取并集、leader 按加入时间早者胜、任务按 `updatedAt` 新者胜，离开用墓碑（`left`）压制并集，所以离场事件能跨节点传播，重复同步不会产生抖动。
@@ -174,12 +185,13 @@ lib/store.mjs       持久化：node.json / inbox.jsonl / rooms.json（原子写
 
 ```powershell
 node --test scripts/rooms.test.mjs      # 房间状态纯函数，49 项
+node --test scripts/notify.test.mjs     # 通知扩展点：渠道发现 / 自动发 / 挂起 / 确认，11 项
 node scripts/smoke.mjs                  # 双节点：身份/发现/投递/去重/持久化/安全
 node scripts/twin-transport-check.mjs   # 双节点状态交换与签名
 node scripts/rooms-smoke.mjs            # 双节点房间端到端：建房→加入→派任务→报进度→聊天→重启→退出
 node scripts/agents-smoke.mjs           # 双节点 agent 端到端：清单→跨 workspace 引入→新建→联络→唤醒→回收
-node scripts/schema-check.mjs           # 每个工具的 execute 输出是否满足它自己声明的 schema
-node scripts/panel-check.mjs            # 面板渲染冒烟：用假 Host 应答把面板渲染一遍，查端点名与字段
+node scripts/schema-check.mjs           # 每个工具的 execute 输出是否满足它自己声明的 schema（46 项）
+node scripts/panel-check.mjs            # 面板渲染与交互冒烟（99 项）
 node scripts/probe-live.mjs             # 黑盒探测一个正在运行的实例
 ```
 

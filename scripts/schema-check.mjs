@@ -110,6 +110,14 @@ const stub = {
     }
     if (name === 'agents') return agentRuntime;
     if (name === 'sessionPersistence') return sessionPersistence;
+    if (name === 'dshIm') {
+      // Two local channels: notifications must be held for a human, not sent.
+      return {
+        listBots: async () => [{ botId: 'wx_check', channel: 'wechat' }, { botId: 'fs_check', channel: 'feishu' }],
+        listTargets: async () => [{ targetId: 'tgt_check', name: '我' }],
+        send: async () => ({ sent: true }),
+      };
+    }
     return undefined;
   },
   effect(fn) {
@@ -224,9 +232,15 @@ try {
   );
 
   console.log('\nagent tool outputs');
-  for (const name of ['lan_mesh_agents', 'lan_mesh_agent_import', 'lan_mesh_agent_dial']) {
+  for (const name of ['lan_mesh_agents', 'lan_mesh_agent_import', 'lan_mesh_agent_dial', 'lan_mesh_notify']) {
     check(`${name} is registered`, tools.get(name) !== undefined);
   }
+  const channels = await run('lan_mesh_notify', { action: 'channels' }, 'notify channels');
+  check('notify discovers every local channel', (channels?.channels ?? []).length === 2);
+  const held = await run('lan_mesh_notify', { action: 'send', text: '任务完成通知' }, 'notify send holds with two channels');
+  check('notify holds the message when several channels exist', held?.status === 'pending');
+  await run('lan_mesh_notify', { action: 'confirm', id: held?.id ?? '', channel: held?.channels?.[0]?.id ?? '' }, 'notify confirm');
+  await run('lan_mesh_notify', { action: 'dismiss', id: held?.id ?? '' }, 'notify dismiss');
   const listed2 = await run('lan_mesh_agents', {}, 'agents');
   check('agents lists the live caller', (listed2?.agents ?? []).some((row) => row.id === LEADER && row.live === true));
   check('agents lists a stored session from another workspace', (listed2?.agents ?? []).some((row) => row.id === 'sess-stored-workspace' && row.workspace === 'other-workspace'));

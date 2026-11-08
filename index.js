@@ -14,6 +14,7 @@
  * @module dsh-lan-mesh
  */
 import { MeshNode } from './lib/service.mjs';
+import { Notifier } from './lib/notify.mjs';
 
 export const name = 'dsh-lan-mesh';
 /** Every service is optional: a node runs even with no tools, agents or UI. */
@@ -36,8 +37,13 @@ const DEFAULTS = {
   clusterSecret: '',
   autoWake: true,
   trustedPeers: [],
-  /** Feishu/Feiyou notification receivers (user ids, comma separated). */
-  feishuReceivers: 'chenzhijian',
+  /**
+   * Optional generic webhook for out-of-band notifications. The primary
+   * channel is discovered at send time from the local `@xmanrui/dsh-im`
+   * service (WeChat, Feishu, ...); this hook is only an extra opt-in channel.
+   * Empty means "discover whatever this machine has".
+   */
+  notifyWebhook: '',
 };
 
 /**
@@ -87,10 +93,8 @@ function resolveConfig(raw) {
     trustedPeers: Array.isArray(value.trustedPeers)
       ? value.trustedPeers.filter((item) => typeof item === 'string' && item !== '')
       : DEFAULTS.trustedPeers,
-    feishuReceivers:
-      typeof value.feishuReceivers === 'string' && value.feishuReceivers.trim() !== ''
-        ? value.feishuReceivers.trim()
-        : DEFAULTS.feishuReceivers,
+    notifyWebhook:
+      typeof value.notifyWebhook === 'string' ? value.notifyWebhook.trim() : DEFAULTS.notifyWebhook,
   };
 }
 
@@ -407,38 +411,20 @@ const DELIVERED_SCHEMA = {
  * @param {object} config - resolved plugin configuration.
  */
 /**
- * Push one line to Feishu/Feiyou through the internal precise-notify API.
+ * Notification is a reserved extension point, not a hardcoded channel.
  *
- * Runs on the Host (Node 18+ has a global fetch), so the browser panel never
- * needs a second credential. Failures are swallowed: a broken notifier must
- * never take the mesh down, the caller logs the attempt.
- * @param {object} config - resolved plugin config.
- * @param {string} msg - single-line message text.
- * @param {string} [scope] - extra context appended in a diagnostic log only.
- * @returns {Promise<{ok: boolean, detail?: string}>}
+ * When something is worth telling a human (a room task is done, or an agent
+ * explicitly calls `lan_mesh_notify`), `Notifier` discovers whatever this
+ * machine has — the local `@xmanrui/dsh-im` service (WeChat / Feishu / ...)
+ * plus an optional generic webhook — and:
+ *   - 1 channel  -> sends immediately
+ *   - >1 channels -> holds the message for a human to confirm in the panel
+ *   - 0 channels -> logs and gives up
+ *
+ * Discovery happens at send time (services mount after `apply` runs), and every
+ * failure is swallowed: a missing notifier must never take the mesh down.
+ * See lib/notify.mjs.
  */
-async function notifyFeishu(config, msg, scope = '') {
-  const flat = String(msg ?? '').replace(/\r?\n/g, ' ').trim();
-  if (flat === '') return { ok: false, detail: 'empty message' };
-  const receivers = String(config.feishuReceivers ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter((item) => item !== '');
-  if (receivers.length === 0) return { ok: false, detail: 'no receivers configured' };
-  const body = { msg: flat, receiver_list: receivers };
-  try {
-    const response = await fetch('http://11.113.0.137:9011/api/v1/sendPreciseFeiyou', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json; charset=utf-8' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (response.ok !== true) return { ok: false, detail: `HTTP ${response.status}` };
-    return { ok: true, detail: `${receivers.join(',')}` };
-  } catch (error) {
-    return { ok: false, detail: String(error?.message ?? error) };
-  }
-}
 
 /** Entry point of the panel Fetch route. Kept separate so the route body stays readable. */
 async function fetchPanelRequest(httpRequest, handleEndpoint, log) {
@@ -485,6 +471,13 @@ export function apply(ctx, rawConfig) {
       // Diagnostics must never be the reason a mesh fails to start.
     }
   };
+  // Notifications are a reserved extension point: discover local channels at
+  // send time (the IM service mounts after `apply`), never hardcode one.
+  const notifier = new Notifier({
+    config,
+    getIm: () => ctx.get('dshIm'),
+    log,
+  });
   const node = new MeshNode({
     config,
     // Resolved lazily: `apply` runs before every Host service is mounted, so a
@@ -503,7 +496,10 @@ export function apply(ctx, rawConfig) {
     // Same laziness, and the array is filled further down: the closure is only
     // read when an Agent is composed, which is after this line has run.
     getToolDefinitions: () => toolDefinitions,
-    notifyFeishu: (message, scope) => notifyFeishu(config, message, scope),
+    // Generic out-of-band notifier (task done, or lan_mesh_notify). One local
+    // channel sends automatically; several wait for a human to pick one.
+    notify: (message, scope) => notifier.notify(message, scope),
+    getNotify: () => notifier.describe(),
     log,
   });
   /** Resolve the calling agent id so a wake-up reaches the right session. */
@@ -1089,6 +1085,124 @@ export function apply(ctx, rawConfig) {
             };
           },
         }),
+        registerTool({
+          name: 'lan_mesh_notify',
+          description:
+            '预留的「通知人」操作：执行时自主查找本机可用的通知渠道（微信 im、飞书、或配置的 webhook），只有一个就自动发，有多个就把消息挂起、让用户在面板里二次确认选哪个。也用来列出渠道、确认或忽略挂起通知。房间任务被置为 done 时会自动触发同样的通知。',
+          parameters: {
+            type: 'object',
+            additionalProperties: false,
+            required: [],
+            properties: {
+              action: {
+                type: 'string',
+                enum: ['send', 'channels', 'confirm', 'dismiss'],
+                description: 'send（默认）：按 text 发起通知；channels：列出本机可用渠道；confirm：对挂起通知选渠道发送；dismiss：丢弃挂起通知。',
+              },
+              text: { type: 'string', description: 'action=send 时的通知正文。' },
+              id: { type: 'string', description: 'action=confirm/dismiss 时的挂起通知编号。' },
+              channel: { type: 'string', description: 'action=confirm 时选中的渠道 id（用 channels 或挂起消息里的列表取得）。' },
+            },
+          },
+          output: {
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['summary', 'status', 'channels', 'pending'],
+              properties: {
+                summary: { type: 'string' },
+                status: { type: 'string' },
+                id: { type: 'string' },
+                ok: { type: 'boolean' },
+                error: { type: 'string' },
+                channel: { type: 'string' },
+                channels: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['id', 'label', 'kind'],
+                    properties: {
+                      id: { type: 'string' },
+                      label: { type: 'string' },
+                      kind: { type: 'string' },
+                    },
+                  },
+                },
+                pending: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['id', 'message', 'createdAt', 'channels'],
+                    properties: {
+                      id: { type: 'string' },
+                      message: { type: 'string' },
+                      createdAt: { type: 'string' },
+                      channels: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          additionalProperties: false,
+                          required: ['id', 'label'],
+                          properties: { id: { type: 'string' }, label: { type: 'string' } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            render: (_args, value) => text(value.summary),
+          },
+          async execute(args, exec) {
+            await node.start();
+            node.focusAgentId = callerId(exec);
+            const action = typeof args.action === 'string' && args.action !== '' ? args.action : 'send';
+            const view = () => ({ channels: [], pending: notifier.describe().pending });
+            let base;
+            if (action === 'channels') {
+              base = {
+                summary: `本机可用通知渠道 ${0} 个。`,
+                status: 'channels',
+                channels: await notifier.listChannels(),
+                pending: notifier.describe().pending,
+              };
+              base.summary = `本机可用通知渠道 ${base.channels.length} 个。`;
+            } else if (action === 'send') {
+              const result = await notifier.notify(String(args.text ?? ''), callerId(exec));
+              base = {
+                summary: result.summary,
+                status: result.status,
+                channels: (result.channels ?? []).map((row) => ({ ...row, kind: '' })),
+                pending: notifier.describe().pending,
+                ...(result.id === undefined ? {} : { id: result.id }),
+              };
+            } else if (action === 'confirm') {
+              const result = await notifier.confirm(String(args.id ?? ''), String(args.channel ?? ''));
+              base = {
+                summary: result.summary ?? (result.ok === false ? `确认失败：${result.error}` : '已确认。'),
+                status: result.status ?? (result.ok === false ? 'failed' : 'dismissed'),
+                ok: result.ok !== false,
+                channels: view().channels,
+                pending: notifier.describe().pending,
+                ...(result.error === undefined ? {} : { error: result.error }),
+              };
+            } else if (action === 'dismiss') {
+              const result = notifier.dismiss(String(args.id ?? ''));
+              base = {
+                summary: result.ok ? '已忽略该待确认通知。' : '没有这个待确认通知。',
+                status: result.ok ? 'dismissed' : 'failed',
+                ok: result.ok,
+                channels: view().channels,
+                pending: notifier.describe().pending,
+              };
+            } else {
+              base = { summary: `未知操作 ${action}。`, status: 'failed', channels: [], pending: notifier.describe().pending };
+            }
+            return base;
+          },
+        }),
       ];
         return () => {
           for (const dispose of disposers) dispose?.();
@@ -1278,6 +1392,14 @@ export function apply(ctx, rawConfig) {
           };
         case 'agentUndial':
           return { ok: true, value: node.undialAgent(str('target')) };
+        case 'notifyChannels':
+          return { ok: true, value: { channels: await notifier.listChannels(), pending: notifier.describe().pending } };
+        case 'notifySend':
+          return { ok: true, value: await notifier.sendDirect(str('channel'), str('text')) };
+        case 'notifyConfirm':
+          return { ok: true, value: await notifier.confirm(str('id'), str('channel')) };
+        case 'notifyDismiss':
+          return { ok: true, value: notifier.dismiss(str('id')) };
         default:
           return failed('UNKNOWN_ENDPOINT', `unknown endpoint ${endpoint}`);
       }
@@ -1308,6 +1430,7 @@ export function apply(ctx, rawConfig) {
           '- 房间相当于项目：接到项目/协作类请求时先 lan_mesh_rooms 看自己已在哪些房间；用 lan_mesh_room_member 建房或加入；',
           '- 房间的 leader 负责用 lan_mesh_room_task action=assign 分配任务，成员用 action=status 更新进度；房间内沟通用 lan_mesh_room_say，只有同房间成员会收到；',
           '- 收到别人发来的消息会以用户消息形式出现在会话里，按需回复即可；',
+          '- 需要通知人时用 lan_mesh_notify：它会自主查找本机可用通知渠道（微信 im 等），只有一个就自动发，多个则挂起让用户在面板二次确认；房间任务被置 done 时会自动触发；',
           '- 只把要对方处理的内容发出去，不要把本机路径、密钥或未公开的上下文一并发送。',
         ].join('\n'),
         interpolate: false,
