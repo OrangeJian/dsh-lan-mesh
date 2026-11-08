@@ -123,6 +123,8 @@ const remoteAgent = member('node-b', 'session-9', 'beta-worker', 'member', true,
 // the remote agent's title on purpose: two sessions titled the same must not be
 // indistinguishable in the mention picker.
 const offlinePeer = member('node-c', 'session-7', 'sleepy-peer', 'member', false, 'Beta rollout');
+remoteAgent.nodeName = 'Work laptop';
+offlinePeer.nodeName = 'Home desktop';
 // A session on this node that was pulled into a room but is absent from the
 // agent catalogue: the rail has to build it from the room member instead.
 const roomWorker = member('node-a', 'session-4', 'room-worker', 'member', true, 'Room worker');
@@ -825,11 +827,11 @@ checks.push(
   // Two sessions sharing a title are told apart by a session-id suffix, and
   // only those two rows grow one.
   [
-    'duplicate titles get a session id suffix in the picker',
-    mentionRowLabels().includes('Beta rollout · session-9') &&
-      mentionRowLabels().includes('Beta rollout · session-7'),
+    'cross-machine duplicate titles get machine names in the picker',
+    mentionRowLabels().includes('Beta rollout · Work laptop') &&
+      mentionRowLabels().includes('Beta rollout · Home desktop'),
   ],
-  ['a unique title stays unsuffixed', mentionRowLabels().includes('Panel polish')],
+  ['a unique title also identifies its machine', mentionRowLabels().includes('Panel polish · node-a')],
 );
 
 // A prefix narrows the list; the caret keeps the menu anchored to the token.
@@ -838,7 +840,10 @@ checks.push(['a prefix narrows the picker', count('lm-mentionItem') === 2 && las
 
 // Enter takes the highlighted row and rewrites the token to the title.
 const accepted = await press('lm-composerInput', 'Enter');
+const selectedMention = stateSlots.flatMap((slot) => Array.isArray(slot) ? slot : [])
+  .find((item) => item?.memberKey === 'node-c/session-7');
 checks.push(
+  ['selected mention retains member identity separately from text', selectedMention?.label === 'Beta rollout'],
   ['enter accepts the highlighted member', accepted === true],
   ['accepting rewrites the token to the title', count('lm-mentionItem') === 0],
   [
@@ -846,6 +851,26 @@ checks.push(
     lastNodes.some((entry) => hasClass(entry, 'lm-composerInput') && entry.props.value === '@Beta rollout '),
   ],
 );
+
+// Removing a selected token must remove its identity even if identical text
+// remains elsewhere in the draft.
+await typeInto('lm-composerInput', '');
+await typeInto('lm-composerInput', '@Beta rollout @bet', 18);
+await press('lm-composerInput', 'Enter');
+await typeInto('lm-composerInput', '@Beta rollout ');
+checks.push(['editing out the selected token drops its identity',
+  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+
+// Same-machine duplicates need session IDs as a final discriminator.
+remoteAgent.nodeName = offlinePeer.nodeName = 'Shared workstation';
+offlinePeer.nodeId = 'node-b';
+await typeInto('lm-composerInput', '@');
+checks.push(['same-machine duplicate titles append session IDs',
+  mentionRowLabels().includes('Beta rollout · Shared workstation · session-9') &&
+  mentionRowLabels().includes('Beta rollout · Shared workstation · session-7')]);
+offlinePeer.nodeId = 'node-c';
+remoteAgent.nodeName = 'Work laptop';
+offlinePeer.nodeName = 'Home desktop';
 
 // Escape dismisses without touching the draft.
 await typeInto('lm-composerInput', '@b', 2);

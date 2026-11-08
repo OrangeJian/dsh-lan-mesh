@@ -754,25 +754,38 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
     /**
      * A labelling function for the mention picker.
      *
-     * Two sessions can carry the same title ("新会话"), so when a plain label
-     * appears more than once the label gets a short session id appended. Only
-     * the colliding rows grow a suffix, and only inside the picker.
+     * Every candidate names its machine. Two sessions on that machine can carry
+     * the same title ("新会话"), so those rows also append a short session id.
      * @param {object[]} members - room members.
      * @returns {(member: object) => string} label per member.
      */
     function mentionLabels(members) {
       const rows = Array.isArray(members) ? members : [];
-      const seen = new Map();
-      for (const member of rows) {
-        const label = labelOf(member);
-        if (label === '') continue;
-        seen.set(label, (seen.get(label) ?? 0) + 1);
-      }
       return (member) => {
         const label = labelOf(member);
-        if (label === '' || (seen.get(label) ?? 0) < 2) return label;
-        return `${label} · ${shortId(member.sessionId ?? '')}`;
+        if (label === '') return label;
+        const machine = member.nodeName || member.nodeId || '';
+        const duplicates = rows.filter((row) => labelOf(row) === label &&
+          (row.nodeName || row.nodeId || '') === machine);
+        return `${label} · ${machine}${duplicates.length > 1 ? ` · ${shortId(member.sessionId ?? '')}` : ''}`;
       };
+    }
+
+    /** Keep identities only for unchanged mention spans across a draft edit. */
+    function editedMentions(mentions, before, after) {
+      let start = 0;
+      while (start < before.length && start < after.length && before[start] === after[start]) start++;
+      let oldEnd = before.length;
+      let newEnd = after.length;
+      while (oldEnd > start && newEnd > start && before[oldEnd - 1] === after[newEnd - 1]) {
+        oldEnd--;
+        newEnd--;
+      }
+      return mentions.flatMap((item) => {
+        if (item.end <= start) return [item];
+        if (item.start >= oldEnd) return [{ ...item, start: item.start + newEnd - oldEnd, end: item.end + newEnd - oldEnd }];
+        return [];
+      });
     }
 
     /**
@@ -1121,6 +1134,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [mentionOff, setMentionOff] = React.useState(false);
       /** Highlighted row of the `@` completion list. */
       const [mentionPick, setMentionPick] = React.useState(0);
+      /** Selected identities; readable labels are never routing authority. */
+      const [draftMentions, setDraftMentions] = React.useState([]);
       /** Member being renamed locally, plus the draft for the nickname. */
       const [nickMember, setNickMember] = React.useState(null);
       const [nickDraft, setNickDraft] = React.useState('');
@@ -1220,8 +1235,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       // `@` completion: the token being typed is whatever follows the last `@`
       // before the caret, so typing anywhere else never opens the list.
       const mention = mentionOff ? undefined : mentionAt(draft, caret);
-      // Rows show a disambiguated label; the sent text keeps the plain title,
-      // because `@` is an annotation, not an address.
+      // Rows show disambiguated labels; the draft keeps readable text and keys
+      // separately so selecting a duplicate never changes its target identity.
       const mentionLabel = mentionLabels(members);
       const memberMatches = mention === undefined ? [] : matchMention(members, mention.query, mentionLabel);
       // Include "@all" in the popup when the query is empty or matches "all".
@@ -1239,6 +1254,12 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           : `${labelOf(member)} `;
         const next = `${draft.slice(0, mention.start)}@${insert}${draft.slice(mention.start + mention.length)}`;
         setDraft(next);
+        const retained = editedMentions(draftMentions, draft, next);
+        if (member.__all !== true && member.key) {
+          retained.push({ memberKey: member.key, label: labelOf(member), start: mention.start,
+            end: mention.start + insert.length });
+        }
+        setDraftMentions(retained);
         setCaret(mention.start + insert.length + 1);
         setMentionOff(false);
       };
@@ -1290,6 +1311,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           if (failed.length > 0) flash(`${COPY.deliverFailed}: ${failed[0].name ?? ''} ${failed[0].error ?? ''}`, true);
           else flash('', false);
           setDraft('');
+          setDraftMentions([]);
           setAttachedFile(null);
           // Quick-task flow: if the user ticked the "as task" box, turn the
           // message into a task right after it was sent. The title is the
@@ -1303,7 +1325,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             // Pull the first @mention out of the text: "@name" at a word boundary.
             const mentionMatch = text.match(/@(\S+)/);
             let assigneeHandle = '';
-            if (mentionMatch !== null) {
+            if (draftMentions.length > 0) {
+              assigneeHandle = draftMentions[0].memberKey;
+            } else if (mentionMatch !== null) {
               const mentioned = mentionMatch[1];
               if (mentioned === 'all' || mentioned === 'everyone') {
                 assigneeHandle = members.find((m) => m.role === 'leader')?.key ?? '';
@@ -1842,6 +1866,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
               placeholder: COPY.sayHint,
               onChange: (event) => {
                 setDraft(event.target.value);
+                setDraftMentions((current) => editedMentions(current, draft, event.target.value));
                 setCaret(event.target.selectionStart ?? event.target.value.length);
                 if (mentionOff) setMentionOff(false);
               },
