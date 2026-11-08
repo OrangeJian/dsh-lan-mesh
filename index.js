@@ -308,6 +308,88 @@ function renderAgentAction(value) {
   return value.summary;
 }
 
+/** Bound on one room skill catalogue; a panel is not a skills browser. */
+const MAX_ROOM_SKILLS = 200;
+/** Bound on every free-text field the skill catalogue hands to the panel. */
+const MAX_ROOM_SKILL_TEXT = 320;
+
+/**
+ * Summarize one skill for the Room skill picker.
+ *
+ * The picker only needs to *name* a skill and say where it came from, so this
+ * projection deliberately drops everything a Room could not honestly use: the
+ * instruction file path, the provider handle, the resource base, and the body.
+ * A Room reference is a hint about a capability, never a way to read one.
+ * @param {object} skill - one `ctx.skills.list()` summary.
+ * @param {{ nodeId: string, nodeName: string }} source - this node.
+ * @returns {{ name: string, description: string, sourceNodeId: string, sourceNodeName: string } | undefined}
+ */
+function roomSkillRow(skill, source) {
+  const name = typeof skill?.name === 'string' ? skill.name.trim() : '';
+  if (name === '') return undefined;
+  // Only what a human may deliberately invoke: a model-only skill has no
+  // business appearing in a menu a person picks from.
+  if (skill?.invocation?.userInvocable !== true) return undefined;
+  const description = typeof skill?.description === 'string' ? skill.description.trim() : '';
+  return {
+    name: name.slice(0, MAX_ROOM_SKILL_TEXT),
+    description: description.slice(0, MAX_ROOM_SKILL_TEXT),
+    sourceNodeId: source.nodeId,
+    sourceNodeName: source.nodeName,
+  };
+}
+
+/**
+ * Read this node's public skill catalogue for the Room composer.
+ *
+ * Resolved lazily on every request rather than captured during `apply`: the
+ * skill registry is mounted by another plugin, so a reference taken at apply
+ * time would be permanently `undefined` whenever this plugin activates first.
+ * Omitting `scope` is deliberate — it reads the global layer alone, which is
+ * exactly the set a Room (which has no agent session) can honestly advertise.
+ * `get`/`invoke` are never called: listing a skill must never load its body,
+ * let alone run it.
+ * @param {{ get?: (name: string) => unknown }} ctx - plugin context.
+ * @param {object} node - the mesh node, for its identity.
+ * @returns {Promise<{ status: string, skills: object[], reason?: string }>}
+ */
+async function readRoomSkills(ctx, node) {
+  const identity = typeof node?.describe === 'function' ? node.describe() : {};
+  const source = {
+    nodeId: typeof identity?.nodeId === 'string' ? identity.nodeId : '',
+    nodeName: typeof identity?.name === 'string' ? identity.name : '',
+  };
+  const registry = typeof ctx?.get === 'function' ? ctx.get('skills') : undefined;
+  if (registry === undefined || registry === null || typeof registry.list !== 'function') {
+    // A missing registry is a normal deployment, not an error: the composer
+    // then simply has no skills to offer and must say so instead of inventing
+    // a catalogue or refusing to open the room.
+    return { status: 'unavailable', skills: [], reason: 'the skill registry is not available on this node' };
+  }
+  let listed;
+  try {
+    listed = await registry.list({});
+  } catch (error) {
+    return { status: 'unavailable', skills: [], reason: String(error?.message ?? error) };
+  }
+  if (!Array.isArray(listed)) return { status: 'unavailable', skills: [], reason: 'the skill registry returned no catalogue' };
+  const rows = [];
+  const seen = new Set();
+  for (const skill of listed) {
+    const row = roomSkillRow(skill, source);
+    if (row === undefined) continue;
+    // Two providers can win the same name in different layers; the registry
+    // already resolves that, so a duplicate here is the same skill twice.
+    const key = JSON.stringify([row.sourceNodeId, row.name]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(row);
+    if (rows.length >= MAX_ROOM_SKILLS) break;
+  }
+  rows.sort((left, right) => left.name.localeCompare(right.name));
+  return { status: 'ready', skills: rows };
+}
+
 /**
  * Member shape shared by every room output schema.
  *
@@ -1418,6 +1500,12 @@ export function apply(ctx, rawConfig) {
           return { ok: true, value: await notifier.confirm(str('id'), str('channel')) };
         case 'notifyDismiss':
           return { ok: true, value: notifier.dismiss(str('id')) };
+        case 'roomSkills':
+          // The Room composer's skill picker reads this node's public catalogue.
+          // It is a read-only projection: no skill is installed, loaded, or run
+          // by looking at it, and a node without a skill registry answers
+          // `unavailable` instead of failing the room.
+          return { ok: true, value: await readRoomSkills(ctx, node) };
         default:
           return failed('UNKNOWN_ENDPOINT', `unknown endpoint ${endpoint}`);
       }

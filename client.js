@@ -152,6 +152,23 @@ window.__ModuleLoader__.load({
           inviteAction: '拉进来',
           inviteNone: '本节点没有可拉进来的会话',
           invited: '已拉进房',
+          inviteForbidden: '只有房间成员可以拉会话进来',
+          // room skill references: a reference names a capability, it never
+          // installs or runs one.
+          skill: '技能',
+          skillPicker: '插入技能引用',
+          skillHint: '引用一个本机技能，它只是提示，不会自动安装或执行',
+          skillSearch: '搜索技能',
+          skillNone: '没有匹配的技能',
+          skillUnavailable: '本机技能目录不可用',
+          skillMenuEmpty: '本机没有可引用的技能',
+          skillSelected: '已引用',
+          skillRemove: '移除引用',
+          skillMissing: '本机未安装此技能',
+          skillSourceOf: '来自',
+          skillRefsLabel: '引用的技能',
+          skillRefsAria: '本条消息引用的技能',
+          skillPlain: '普通文本，不作为技能引用',
           // agents
           agents: 'Agent',
           agentsLocal: '本节点的 agent',
@@ -313,6 +330,22 @@ window.__ModuleLoader__.load({
           inviteAction: 'Invite',
           inviteNone: 'No session on this node to invite',
           invited: 'Invited',
+          inviteForbidden: 'Only room members can invite a session',
+          // room skill references
+          skill: 'Skills',
+          skillPicker: 'Insert a skill reference',
+          skillHint: 'Reference one of this node’s skills — a hint, never an install or a run',
+          skillSearch: 'Search skills',
+          skillNone: 'No matching skill',
+          skillUnavailable: 'This node’s skill catalogue is unavailable',
+          skillMenuEmpty: 'This node has no skills to reference',
+          skillSelected: 'Referenced',
+          skillRemove: 'Remove reference',
+          skillMissing: 'Not installed on this node',
+          skillSourceOf: 'from',
+          skillRefsLabel: 'Referenced skills',
+          skillRefsAria: 'Skills referenced by this message',
+          skillPlain: 'Plain text, not a skill reference',
           agents: 'Agents',
           agentsLocal: 'Agents on this node',
           agentsRemote: 'Agents on other machines',
@@ -510,6 +543,39 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-mentionItem:hover{background:var(--dsw-alias-bg-layer-1)}
 .lm-mentionItemActive{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l2)}
 .lm-mentionName{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Skill picker: the same popup shape as @completion, but each row also names
+   the node the skill came from, because two machines can both offer "deploy"
+   and a reference is useless if the reader cannot tell which one was meant. */
+.lm-skillMenu{display:flex;flex-direction:column;gap:2px;max-height:220px;overflow-y:auto;padding:4px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;margin-bottom:6px}
+.lm-skillSearchRow{padding:2px 2px 4px}
+.lm-skillSearch{width:100%;box-sizing:border-box;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:4px 8px;outline:0}
+.lm-skillItem{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font:inherit;font-size:12px;text-align:left;color:var(--dsw-alias-label-primary);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 7px;cursor:pointer}
+.lm-skillItem:hover{background:var(--dsw-alias-bg-layer-1)}
+.lm-skillItemActive{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l2)}
+.lm-skillName{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.lm-skillSource{font-size:11px;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.lm-skillDesc{font-size:11px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.lm-skillEmpty{padding:4px 7px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+/* Selected references sit above the textarea as removable chips. */
+.lm-skillChips{display:flex;flex-wrap:wrap;gap:5px;padding:0 12px}
+.lm-skillChip{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:2px 4px 2px 8px;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:var(--dsw-alias-bg-layer-2);font-size:11px;color:var(--dsw-alias-label-secondary)}
+.lm-skillChipName{color:var(--dsw-alias-label-primary);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm-skillChipSource{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+.lm-skillChipRemove{flex:none;font:inherit;font-size:12px;line-height:1;border:0;border-radius:999px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;padding:2px 5px}
+.lm-skillChipRemove:hover{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}
+.lm-skillBtn{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px 0 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:13px;font-weight:500;line-height:20px;cursor:pointer}
+.lm-skillBtn:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.lm-skillBtnOn,.lm-skillBtnOn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+/* A received reference is a label, never a button: nothing to install, run,
+   or click through — it just says which capability the sender meant. */
+.lm-skillRefs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px}
+.lm-skillRef{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:var(--dsw-alias-bg-layer-2);font-size:11px;color:var(--dsw-alias-label-secondary)}
+.lm-skillRefName{color:var(--dsw-alias-label-primary);font-weight:600}
+.lm-skillRefMissing{border-style:dashed;color:var(--dsw-alias-label-tertiary)}
+.lm-skillRefMissing .lm-skillRefName{color:var(--dsw-alias-label-secondary);font-weight:500}
+.lm-skillRefsLabel{font-size:11px;color:var(--dsw-alias-label-tertiary)}
+.lm-skillRefSource{color:var(--dsw-alias-label-tertiary)}
+.lm-skillRefBadge{margin-left:3px;padding:0 4px;border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-tertiary);font-size:10px}
 .lm-roomRow{display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid transparent;border-radius:8px;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .lm-roomRow:hover{background:var(--dsw-alias-bg-layer-2)}
 .lm-roomRowActive{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l2)}
@@ -797,6 +863,105 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         if (retained.end < after.length && !/\s/.test(after[retained.end])) return [];
         return [retained];
       });
+    }
+
+    /**
+     * The `/` token being typed, if the caret sits in one.
+     *
+     * A slash only opens the skill menu at the very start of what is being
+     * written, because that is where a command is typed; `/` in the middle of
+     * a sentence is ordinary prose ("and/or") and must stay that way.
+     * @param {string} text - composer contents.
+     * @param {number} caret - caret offset in `text`.
+     * @returns {{ start: number, length: number, query: string } | undefined}
+     */
+    function slashAt(text, caret) {
+      const body = typeof text === 'string' ? text : '';
+      const at = typeof caret === 'number' && caret >= 0 && caret <= body.length ? caret : body.length;
+      // Rewind to the beginning of the current line.
+      let lineStart = body.lastIndexOf('\n', at - 1) + 1;
+      const head = body.slice(lineStart, at);
+      // The token must be the first thing on its line, with no space before it.
+      if (!head.startsWith('/')) return undefined;
+      if (/\s/.test(head.slice(1))) return undefined;
+      const query = head.slice(1);
+      return { start: lineStart, length: query.length + 1, query };
+    }
+
+    /**
+     * Skills whose name or description contains the typed prefix.
+     *
+     * A name prefix outranks a description hit, then the shorter name wins so
+     * `/de` offers "deploy" before "deploy-notes".
+     * @param {object[]} skills - catalogue rows.
+     * @param {string} query - text after `/`.
+     * @returns {object[]} matches, best first.
+     */
+    function matchSkill(skills, query) {
+      const needle = String(query ?? '').trim().toLowerCase();
+      const rows = Array.isArray(skills) ? skills : [];
+      return rows
+        .filter((row) => typeof row?.name === 'string' && row.name !== '')
+        .filter((row) => {
+          if (needle === '') return true;
+          const name = row.name.toLowerCase();
+          const description = typeof row.description === 'string' ? row.description.toLowerCase() : '';
+          return name.includes(needle) || description.includes(needle);
+        })
+        .sort((left, right) => {
+          const leftName = left.name.toLowerCase();
+          const rightName = right.name.toLowerCase();
+          const leftStarts = needle !== '' && leftName.startsWith(needle) ? 0 : 1;
+          const rightStarts = needle !== '' && rightName.startsWith(needle) ? 0 : 1;
+          if (leftStarts !== rightStarts) return leftStarts - rightStarts;
+          if (leftName.length !== rightName.length) return leftName.length - rightName.length;
+          return leftName.localeCompare(rightName);
+        });
+    }
+
+    /**
+     * How the picker names one skill: its name plus the node it came from.
+     *
+     * Two machines can both offer `deploy`, and a reference that cannot say
+     * which one it meant is worse than no reference at all, so the source node
+     * is always shown rather than only when it looks ambiguous.
+     * @param {object} skill - catalogue row.
+     * @returns {string}
+     */
+    function skillSourceLabel(skill) {
+      const name = typeof skill?.sourceNodeName === 'string' ? skill.sourceNodeName : '';
+      if (name !== '') return name;
+      const id = typeof skill?.sourceNodeId === 'string' ? skill.sourceNodeId : '';
+      return id;
+    }
+
+    /**
+     * Whether a received reference is present in this node's catalogue.
+     *
+     * A reference is metadata about what the sender meant. It is available
+     * when this node lists the same skill from the same node — never inferred
+     * from the name alone, since two nodes may ship different skills that
+     * happen to share one.
+     * @param {object[]} skills - this node's catalogue rows.
+     * @param {{ name?: string, sourceNodeId?: string }} ref - received reference.
+     * @returns {boolean}
+     */
+    function skillRefAvailable(skills, ref) {
+      const rows = Array.isArray(skills) ? skills : [];
+      const name = typeof ref?.name === 'string' ? ref.name : '';
+      if (name === '') return false;
+      const source = typeof ref?.sourceNodeId === 'string' ? ref.sourceNodeId : '';
+      return rows.some((row) => row?.name === name && (source === '' || row?.sourceNodeId === source));
+    }
+
+    /**
+     * One message's skill references, filtered to the well-formed ones.
+     * @param {object} message - room message.
+     * @returns {object[]}
+     */
+    function skillRefsOf(message) {
+      const rows = Array.isArray(message?.skillRefs) ? message.skillRefs : [];
+      return rows.filter((row) => row !== null && typeof row === 'object' && typeof row.name === 'string' && row.name !== '');
     }
 
     /**
@@ -1094,6 +1259,38 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
        const bubbleContents = [];
        if (body !== null) bubbleContents.push(body);
        if (attachment !== null) bubbleContents.push(attachment);
+       // Skill references ride beside the text, never inside it: the body keeps
+       // the exact words the sender typed, and the chips say which capabilities
+       // they pointed at. A missing skill stays visible — the reader must see
+       // what was meant even when this node cannot offer it.
+       const refs = skillRefsOf(message);
+       if (refs.length > 0) {
+         const catalogue = Array.isArray(props.skills) ? props.skills : [];
+         bubbleContents.push(
+           h(
+             'div',
+             { className: 'lm-skillRefs', role: 'group', 'aria-label': COPY.skillRefsAria },
+             h('span', { className: 'lm-skillRefsLabel' }, `${COPY.skillRefsLabel}:`),
+             ...refs.map((ref, index) => {
+               const missing = !skillRefAvailable(catalogue, ref);
+               const source = String(ref.sourceNodeName ?? '') || String(ref.sourceNodeId ?? '');
+               return h(
+                 'span',
+                 {
+                   key: `${ref.sourceNodeId ?? ''}/${ref.name}/${index}`,
+                   className: missing ? 'lm-skillRef lm-skillRefMissing' : 'lm-skillRef',
+                   title: missing
+                     ? `${ref.name} · ${COPY.skillMissing}${source === '' ? '' : ` · ${COPY.skillSourceOf} ${source}`}`
+                     : `${ref.name}${source === '' ? '' : ` · ${COPY.skillSourceOf} ${source}`}`,
+                 },
+                 h('span', { className: 'lm-skillRefName' }, String(ref.name)),
+                 source === '' ? null : h('span', { className: 'lm-skillRefSource' }, `${COPY.skillSourceOf} ${source}`),
+                 missing ? h('span', { className: 'lm-skillRefBadge' }, COPY.skillMissing) : null,
+               );
+             }),
+           ),
+         );
+       }
        // Who spoke decides the tint: a person and an agent read differently at
        // a glance, and the rule follows the session, so a message synced from
        // another machine keeps its speaker's colour.
@@ -1160,6 +1357,18 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [quickTask, setQuickTask] = React.useState(false);
       /** Attached file: { name, type, size, data (base64 data URL) } or null. */
       const [attachedFile, setAttachedFile] = React.useState(null);
+      /**
+       * This node's public skill catalogue, as the Host reported it.
+       * `status` is 'idle' before the first read, then 'ready' or 'unavailable'
+       * — a node without a skill registry must say so rather than look empty.
+       */
+      const [skillCatalogue, setSkillCatalogue] = React.useState({ status: 'idle', skills: [], reason: '' });
+      /** Confirmed skill references for the message being written. */
+      const [draftSkills, setDraftSkills] = React.useState([]);
+      /** Whether the shared skill menu is open, and its query/highlight. */
+      const [skillMenuOpen, setSkillMenuOpen] = React.useState(false);
+      const [skillQuery, setSkillQuery] = React.useState('');
+      const [skillPick, setSkillPick] = React.useState(0);
       const chatRef = React.useRef(null);
 
       const flash = React.useCallback((text, bad) => {
@@ -1195,6 +1404,40 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           stop();
         };
       }, [load]);
+
+      /**
+       * Read this node's skill catalogue once per room visit.
+       *
+       * The catalogue is a property of the node, not of the room, so it is read
+       * on demand the first time the picker is opened and kept for the rest of
+       * the visit. A failure leaves the composer working and the picker honest:
+       * `unavailable` is a state the user can read, not an empty list that
+       * would look like "this node has no skills".
+       */
+      const skillState = React.useRef({ loading: false, loaded: false });
+      const loadSkills = React.useCallback(async () => {
+        if (skillState.current.loading === true) return;
+        skillState.current.loading = true;
+        try {
+          const value = await call('roomSkills', {});
+          const status = value?.status === 'ready' ? 'ready' : 'unavailable';
+          setSkillCatalogue({
+            status,
+            skills: Array.isArray(value?.skills) ? value.skills : [],
+            reason: typeof value?.reason === 'string' ? value.reason : '',
+          });
+        } catch (error) {
+          setSkillCatalogue({ status: 'unavailable', skills: [], reason: errorText(error) });
+        } finally {
+          skillState.current.loading = false;
+          skillState.current.loaded = true;
+        }
+      }, [call]);
+      React.useEffect(() => {
+        // Read it with the room, so a received reference can already say
+        // whether this node has that skill without waiting for a click.
+        loadSkills();
+      }, [loadSkills]);
 
       const view = detail.room ?? props.room ?? {};
       const viewer = detail.viewer ?? { isMember: true, isLeader: props.room?.isLeader === true, role: '' };
@@ -1278,6 +1521,82 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         setMentionOff(false);
       };
 
+      // ——— skill references ———
+      // A reference is created only by picking a row from this menu. Text that
+      // merely looks like a slash command stays text, so typing "/deploy" in a
+      // sentence never becomes a claim about a capability.
+      const available = Array.isArray(skillCatalogue.skills) ? skillCatalogue.skills : [];
+      const slash = mentionOff ? undefined : slashAt(draft, caret);
+      // The `/` menu and the toolbar button share one list: `skillMenuOpen`
+      // may be true with no slash token at all (the button opened it).
+      const skillMenuVisible = skillMenuOpen || slash !== undefined;
+      const effectiveQuery = slash !== undefined ? slash.query : skillQuery;
+      const skillMatches = skillMenuVisible ? matchSkill(available, effectiveQuery) : [];
+      React.useEffect(() => {
+        setSkillPick(0);
+      }, [effectiveQuery, skillMenuVisible]);
+
+      /** Close the menu and clear the query the button/search box left behind. */
+      const closeSkillMenu = () => {
+        setSkillMenuOpen(false);
+        setSkillQuery('');
+        setSkillPick(0);
+      };
+
+      /**
+       * Turn one picked skill into a confirmed reference.
+       *
+       * Picking removes the `/query` text it replaced, so the message reads as
+       * prose plus a chip instead of a half-typed command, and appends the
+       * reference to the draft's skill list. The chip is the only record: the
+       * text does not encode the reference.
+       * @param {object} skill - catalogue row chosen from the menu.
+       */
+      const applySkill = (skill) => {
+        if (skill === null || skill === undefined) return;
+        const already = draftSkills.some(
+          (row) => row.name === skill.name && row.sourceNodeId === skill.sourceNodeId,
+        );
+        if (!already) {
+          setDraftSkills((current) => [
+            ...current,
+            {
+              name: String(skill.name),
+              sourceNodeId: String(skill.sourceNodeId ?? ''),
+              sourceNodeName: String(skill.sourceNodeName ?? ''),
+            },
+          ]);
+        }
+        if (slash !== undefined) {
+          // Drop the token the menu consumed; keep the caret where it began.
+          const next = `${draft.slice(0, slash.start)}${draft.slice(slash.start + slash.length)}`;
+          setDraft(next);
+          setCaret(slash.start);
+          setDraftMentions((current) => editedMentions(current, draft, next, {
+            start: slash.start, oldEnd: slash.start + slash.length, newEnd: slash.start,
+          }));
+        }
+        closeSkillMenu();
+      };
+
+      /** Drop one confirmed reference; the message text is left untouched. */
+      const removeSkill = (skill) => {
+        setDraftSkills((current) =>
+          current.filter((row) => !(row.name === skill.name && row.sourceNodeId === skill.sourceNodeId)),
+        );
+      };
+
+      /** The toolbar button: open the whole catalogue, no slash needed. */
+      const toggleSkillMenu = () => {
+        if (skillMenuVisible) {
+          closeSkillMenu();
+          return;
+        }
+        if (skillCatalogue.status === 'idle') loadSkills();
+        setSkillQuery('');
+        setSkillMenuOpen(true);
+      };
+
       // ——— file attachment ———
       const onFilePicked = (event) => {
         const input = event.target;
@@ -1319,6 +1638,16 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         try {
           const sayArgs = { room: roomId, sessionId, text };
           if (draftMentions.length > 0 && !/@all(?:\s|$)/i.test(text)) sayArgs.mentions = draftMentions.map(({ memberKey, label }) => ({ memberKey, label }));
+          // Only confirmed picks become references. `skillRefs` is metadata for
+          // the reader, never an instruction to this node: nothing is loaded,
+          // installed, or invoked on the strength of one.
+          if (draftSkills.length > 0) {
+            sayArgs.skillRefs = draftSkills.map(({ name, sourceNodeId, sourceNodeName }) => ({
+              name,
+              sourceNodeId,
+              sourceNodeName,
+            }));
+          }
           if (attachedFile !== null) sayArgs.file = attachedFile;
           const value = await call('roomSay', sayArgs);
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
@@ -1327,6 +1656,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           else flash('', false);
           setDraft('');
           setDraftMentions([]);
+          setDraftSkills([]);
           setAttachedFile(null);
           // Quick-task flow: if the user ticked the "as task" box, turn the
           // message into a task right after it was sent. The title is the
@@ -1452,7 +1782,14 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         }
       };
 
-      /** The leader pulls one local agent session into this room. */
+      /**
+       * Pull one local agent session into this room.
+       *
+       * The server decides whether the caller may do this (the room leader, or a
+       * human member of this room); the button is only shown to those viewers.
+       * Nothing about the caller's identity is sent as evidence — `sessionId` is
+       * the same identity every other room call uses.
+       */
       const doInvite = async () => {
         if (inviteSession === '') {
           flash(COPY.inviteNone, true);
@@ -1631,9 +1968,11 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   ),
                 ),
                 // The leader can pull a local session in without waiting for it to
-                // discover the room on its own. Only this node's own sessions are
-                // offered, since a peer's membership belongs to the peer.
-                isLeader
+                // discover the room on its own, and so can any human member of the
+                // room. Only this node's own sessions are offered, since a peer's
+                // membership belongs to the peer. The server re-derives both facts —
+                // this is a convenience, never the authorization.
+                isLeader === true || viewer.isMember === true
                   ? h(
                       'div',
                       { className: 'lm-inviteRow' },
@@ -1809,6 +2148,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   kind,
                   senderLabel,
                   selfLabel: selfLabel,
+                  skills: available,
                 });
               }),
         ),
@@ -1852,6 +2192,82 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   );
                 }),
               ),
+          // The `/` menu and the toolbar button render the same list, so a pick
+          // from either path produces the identical reference.
+          skillMenuVisible
+            ? h(
+                'div',
+                { className: 'lm-skillMenu' },
+                h(
+                  'div',
+                  { className: 'lm-skillSearchRow' },
+                  h('input', {
+                    className: 'lm-skillSearch',
+                    value: effectiveQuery,
+                    placeholder: COPY.skillSearch,
+                    onChange: (event) => {
+                      // Editing the search box keeps the menu open even when it
+                      // was opened by the button rather than by a `/` token.
+                      setSkillQuery(event.target.value);
+                      setSkillMenuOpen(true);
+                    },
+                  }),
+                ),
+                skillCatalogue.status === 'unavailable'
+                  ? h('div', { className: 'lm-skillEmpty' }, COPY.skillUnavailable)
+                  : skillMatches.length === 0
+                    ? h('div', { className: 'lm-skillEmpty' }, COPY.skillMenuEmpty)
+                    : null,
+                ...skillMatches.slice(0, 8).map((skill, index) => {
+                  const source = skillSourceLabel(skill);
+                  return h(
+                    'button',
+                    {
+                      key: `${skill.sourceNodeId ?? ''}/${skill.name}`,
+                      type: 'button',
+                      className: index === skillPick ? 'lm-skillItem lm-skillItemActive' : 'lm-skillItem',
+                      // Same rule as the mention menu: the textarea must not
+                      // lose its caret to a blur before the pick lands.
+                      onMouseDown: (event) => {
+                        event.preventDefault?.();
+                        applySkill(skill);
+                      },
+                    },
+                    h('span', { className: 'lm-skillName' }, `/${skill.name}`),
+                    source === '' ? null : h('span', { className: 'lm-skillSource' }, `${COPY.skillSourceOf} ${source}`),
+                    typeof skill.description === 'string' && skill.description !== ''
+                      ? h('span', { className: 'lm-skillDesc' }, skill.description)
+                      : null,
+                  );
+                }),
+              )
+            : null,
+          draftSkills.length === 0
+            ? null
+            : h(
+                'div',
+                { className: 'lm-skillChips' },
+                ...draftSkills.map((skill) => {
+                  const source = skillSourceLabel(skill);
+                  return h(
+                    'span',
+                    { key: `${skill.sourceNodeId}/${skill.name}`, className: 'lm-skillChip' },
+                    h('span', { className: 'lm-skillChipName' }, `/${skill.name}`),
+                    source === '' ? null : h('span', { className: 'lm-skillChipSource' }, `${COPY.skillSourceOf} ${source}`),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'lm-skillChipRemove',
+                        title: COPY.skillRemove,
+                        'aria-label': `${COPY.skillRemove} /${skill.name}`,
+                        onClick: () => removeSkill(skill),
+                      },
+                      '×',
+                    ),
+                  );
+                }),
+              ),
           attachedFile === null
             ? null
             : h(
@@ -1888,6 +2304,34 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
               onKeyUp: (event) => setCaret(event.target.selectionStart ?? 0),
               onClick: (event) => setCaret(event.target.selectionStart ?? 0),
               onKeyDown: (event) => {
+                // The skill menu takes the keys first when it is open: Enter
+                // must confirm a reference rather than send a half-typed `/`.
+                if (skillMenuVisible) {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setSkillPick((current) => (current + 1) % Math.max(Math.min(skillMatches.length, 8), 1));
+                    return;
+                  }
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const size = Math.max(Math.min(skillMatches.length, 8), 1);
+                    setSkillPick((current) => (current + size - 1) % size);
+                    return;
+                  }
+                  if ((event.key === 'Enter' || event.key === 'Tab') && skillMatches.length > 0) {
+                    // Only a real row is consumable. With nothing to pick, Enter
+                    // falls through to sending, because a half-typed `/foo` is
+                    // ordinary text and the menu simply had no answer for it.
+                    event.preventDefault();
+                    applySkill(skillMatches[skillPick] ?? skillMatches[0]);
+                    return;
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeSkillMenu();
+                    return;
+                  }
+                }
                 if (matches.length > 0) {
                   if (event.key === 'ArrowDown') {
                     event.preventDefault();
@@ -1933,6 +2377,19 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   className: 'lm-fileInput',
                   onChange: onFilePicked,
                 }),
+              ),
+              // Skill picker button: the same menu `/` opens, so the capability
+              // is discoverable without knowing the slash convention.
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: skillMenuVisible ? 'lm-skillBtn lm-skillBtnOn' : 'lm-skillBtn',
+                  'aria-pressed': skillMenuVisible,
+                  title: COPY.skillHint,
+                  onClick: toggleSkillMenu,
+                },
+                h('span', null, `/${COPY.skill}`),
               ),
               // Quick-task toggle: the leader can turn the next message into a
               // task with one click. The assignee is derived from the first @mention.

@@ -416,6 +416,23 @@ const answers = {
           receivedAt: '2026-01-01T10:03:00.000Z',
           read: true,
         },
+        {
+          // Historical skill references: one this node can resolve, one it
+          // cannot. Both must render, and only the second says "not installed".
+          id: 'm4',
+          kind: 'room-message',
+          room: 'room-1',
+          from: { nodeId: 'node-b', name: 'beta-worker', sessionId: 'session-9' },
+          to: 'node-a',
+          text: 'try these',
+          receivedAt: '2026-01-01T10:04:00.000Z',
+          structuredMentions: [],
+          skillRefs: [
+            { name: 'digest', sourceNodeId: 'node-a', sourceNodeName: 'Local node' },
+            { name: 'ghost-skill', sourceNodeId: 'node-z', sourceNodeName: 'Unreachable' },
+          ],
+          read: true,
+        },
       ],
       mine: [],
       viewer: { sessionId: 'human', isMember: true, isLeader: true, role: 'leader' },
@@ -429,6 +446,35 @@ const answers = {
   },
   notifyConfirm: { status: 'sent', summary: '已通过 wechat · 我 通知', ok: true },
   notifyDismiss: { ok: true },
+  // A successful send: with no delivery failures the composer clears itself,
+  // which is what the reference-clearing assertions below observe.
+  roomSay: { delivered: [] },
+  // The node's public skill catalogue. Two rows deliberately share a name to
+  // stand in for the case where the source node is the only thing telling two
+  // identically named skills apart.
+  roomSkills: {
+    status: 'ready',
+    skills: [
+      {
+        name: 'deploy',
+        description: 'Ship the current branch',
+        sourceNodeId: 'node-a',
+        sourceNodeName: 'Local node',
+      },
+      {
+        name: 'deploy',
+        description: 'Ship from the far machine',
+        sourceNodeId: 'node-b',
+        sourceNodeName: 'Far machine',
+      },
+      {
+        name: 'digest',
+        description: 'Summarise the day',
+        sourceNodeId: 'node-a',
+        sourceNodeName: 'Local node',
+      },
+    ],
+  },
 };
 
 const asked = [];
@@ -767,14 +813,34 @@ checks.push(
   ['the chat pane is the scroll target', lastNodes.some((entry) => hasClass(entry, 'lm-chat') && entry.props?.ref !== undefined)],
   // The body goes through the shell's Markdown renderer, and each bubble names
   // its sender in bold so two dense messages never blur into one another.
-  ['both message bodies render as markdown', count('stubMarkdown') === 2],
-  ['every bubble names its sender in bold', count('lm-bubbleWho') === 2],
+  ['both message bodies render as markdown', count('stubMarkdown') === 3],
+  ['every bubble names its sender in bold', count('lm-bubbleWho') === 3],
   // The speaker kind decides the tint: a remote agent and the local person must
   // not read as the same bubble.
   ['a person speaks in the human tint', count('lm-bubbleHuman') === 1],
-  ['a synced agent speaks in the agent tint', count('lm-bubbleAgent') === 1],
+  ['a synced agent speaks in the agent tint', count('lm-bubbleAgent') === 2],
   ['own message is the only mine bubble', count('lm-bubbleMine') === 1 && lastText.includes('mine here')],
   ['own room messages use the configured identity', lastText.includes('建哥')],
+  // A message's skill references come back from the stored transcript, so a
+  // reopened room still shows what the sender pointed at.
+  [
+    'historical messages restore their skill references',
+    count('lm-skillRef') === 2 &&
+      lastText.includes('digest') &&
+      lastText.includes('ghost-skill'),
+  ],
+  // One of the two references is not in this node's catalogue: it must say so
+  // rather than vanish, and the other must not be mistaken for it.
+  [
+    'a reference this node cannot resolve is marked, the other is not',
+    count('lm-skillRefMissing') === 1 &&
+      lastNodes.some((entry) => hasClass(entry, 'lm-skillRef') && entry.props?.title?.includes('Unreachable')),
+  ],
+  // The chip always names the source node: two nodes may both ship `deploy`.
+  [
+    'a restored reference names its source node',
+    lastText.includes('来自 Local node') && lastText.includes('来自 Unreachable'),
+  ],
 );
 
 // The member row is collapsed by default to keep the room focused on the
@@ -798,6 +864,8 @@ checks.push(
   // v0.2.1: the leader may kick peers (never the human, never itself, and only
   // when this pane actually owns the leader role).
   ['leader sees a kick button per peer', count('lm-kickBtn') === 2],
+  // v0.2.1: the leader may pull a local session into the room it leads.
+  ['the leader sees the invite row', count('lm-inviteRow') === 1],
   // The kick button belongs to the chip of a remote peer, never to the chip of
   // the human member (a human session is not something a leader may eject).
   [
@@ -914,6 +982,118 @@ checks.push(
 await typeInto('lm-composerInput', 'mail@bet', 8);
 checks.push(['an at sign inside a word is not a mention', count('lm-mentionItem') === 0]);
 
+// ——— skill references ———
+// Typing "/" at the start of a line opens the same catalogue the toolbar
+// button opens. The catalogue came from the Host, not from the client.
+await typeInto('lm-composerInput', '/', 1);
+const skillRowLabels = () =>
+  lastNodes
+    .filter((entry) => hasClass(entry, 'lm-skillName'))
+    .map((entry) => (entry.children ?? []).map(String).join(''));
+checks.push(
+  ['the Host skill catalogue is requested once the room opens', asked.includes('roomSkills')],
+  ['typing a slash opens the skill picker', count('lm-skillItem') === 3],
+  // Two nodes offer a skill named `deploy`. Both rows must be listed: folding
+  // them would silently pick one machine on the user's behalf.
+  [
+    'identically named skills from two nodes are not folded',
+    skillRowLabels().filter((text) => text === '/deploy').length === 2,
+  ],
+  [
+    'every skill row names the node it came from',
+    lastText.includes('来自 Local node') && lastText.includes('来自 Far machine'),
+  ],
+  // The composer's own toolbar carries the same affordance, so a user who does
+  // not know the slash convention still finds it.
+  ['the composer toolbar carries the skill button', count('lm-skillBtn') === 1],
+);
+
+// Enter confirms a reference: the token leaves the text and a chip appears.
+await press('lm-composerInput', 'Enter');
+const pickedSkill = stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : []))
+  .find((item) => item?.name === 'deploy');
+checks.push(
+  ['confirming a skill creates a reference with its source node', pickedSkill?.sourceNodeId === 'node-a'],
+  ['confirming a skill closes the picker', count('lm-skillItem') === 0],
+  ['the confirmed skill renders as a chip', count('lm-skillChip') === 1 && lastText.includes('来自 Local node')],
+  // The menu consumed the token: the message reads as prose, not as a command.
+  [
+    'the confirmed token is removed from the draft',
+    lastNodes.some((entry) => hasClass(entry, 'lm-composerInput') && entry.props.value === ''),
+  ],
+);
+
+// Sending carries the reference metadata alongside the text.
+await typeInto('lm-composerInput', 'ship it');
+await click('lm-sendBtn');
+const skillRequest = requested.filter((row) => row.endpoint === 'roomSay').at(-1);
+checks.push(
+  [
+    'sending serializes the confirmed skill reference',
+    skillRequest?.payload.skillRefs?.length === 1 &&
+      skillRequest.payload.skillRefs[0].name === 'deploy' &&
+      skillRequest.payload.skillRefs[0].sourceNodeId === 'node-a' &&
+      skillRequest.payload.skillRefs[0].sourceNodeName === 'Local node',
+  ],
+  // A reference is a hint: it must never travel as an instruction to run.
+  [
+    'a skill reference carries no execution instruction',
+    Object.keys(skillRequest?.payload?.skillRefs?.[0] ?? {}).sort().join(',') === 'name,sourceNodeId,sourceNodeName',
+  ],
+  ['sending clears the confirmed references', !stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
+);
+
+// A reference can be dropped again before sending, and dropping it removes the
+// metadata rather than only the chip.
+await typeInto('lm-composerInput', '/', 1);
+await press('lm-composerInput', 'Enter');
+await click('lm-skillChipRemove');
+checks.push(
+  ['a confirmed skill can be removed', count('lm-skillChip') === 0],
+  ['removing a skill clears its reference', !stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
+);
+
+// Typed text that merely looks like a command stays text. The list may have
+// matched nothing; the message must still send as ordinary prose.
+await typeInto('lm-composerInput', '/not-a-skill', 12);
+await press('lm-composerInput', 'Escape');
+await typeInto('lm-composerInput', '/plain/word', 11);
+await click('lm-sendBtn');
+const plainRequest = requested.filter((row) => row.endpoint === 'roomSay').at(-1);
+checks.push(
+  ['typed slash text is not a skill reference', plainRequest?.payload.skillRefs === undefined],
+  ['typed slash text still reaches the room verbatim', plainRequest?.payload.text === '/plain/word'],
+);
+
+// The toolbar button opens the very same menu, with the search box focused on
+// an empty query rather than on a slash token.
+await click('lm-skillBtn');
+checks.push([
+  'the toolbar button opens the shared skill menu',
+  count('lm-skillItem') === 3 && count('lm-skillSearch') === 1,
+]);
+// The search box narrows the same list the slash token filters.
+await typeInto('lm-skillSearch', 'dig');
+checks.push(['searching narrows the skill menu', count('lm-skillItem') === 1 && skillRowLabels()[0] === '/digest']);
+await press('lm-composerInput', 'Escape');
+checks.push(['escape closes the skill menu', count('lm-skillItem') === 0]);
+
+// A node without a skill registry says so; it never pretends to have none.
+const healthyCatalogue = answers.roomSkills;
+answers.roomSkills = { status: 'unavailable', skills: [], reason: 'the skill registry is not available on this node' };
+// The catalogue is read once when the room mounts, so this needs its own mount.
+await switchTo(Component);
+await click('lm-skillBtn');
+checks.push([
+  'an unavailable catalogue is reported as unavailable, not as empty',
+  lastText.includes('本机技能目录不可用') && count('lm-skillItem') === 0,
+]);
+answers.roomSkills = healthyCatalogue;
+// Remounting dropped the pane's local state, so the member row the following
+// checks read has to be expanded again.
+await switchTo(Component);
+await click('lm-badgeBtn');
+
 // The member shortcut must actually reach the client services.
 const panelsBeforeOpen = selectPanelCalls.length;
 await click('lm-openSession');
@@ -985,6 +1165,9 @@ checks.push(
   ['non-leader sees no rename button', count('lm-renameBtn') === 0],
   ['non-leader may leave the room', count('lm-leaveBtn') === 1],
   ['non-leader sees no kick button', count('lm-kickBtn') === 0],
+  // A human member who is not the leader may still pull a local session in; the
+  // panel only mirrors the server rule, it never decides it.
+  ['a human member still sees the invite row', count('lm-inviteRow') === 1],
   ['empty conversation says so', lastText.includes('房间里还没有消息')],
 );
 

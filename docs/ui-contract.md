@@ -40,7 +40,8 @@ role      = 'leader' | 'member'
 | `roomRead` | `{room, sessionId}` | `{flipped}`（**新增**，只翻转真正该看的） |
 | `roomAssign` | `{room, sessionId, assignee, title, detail?}` | `{room, task, delivered}` |
 | `roomStatus` | `{room, sessionId, task, status, note?}` | `{room, task}` |
-| `roomSay` | `{room, sessionId, text}` | `{room, delivered}` |
+| `roomSay` | `{room, sessionId, text, mentions?, skillRefs?, file?}` | `{room, delivered}` |
+| `roomSkills` | `{}` | `{status:'ready',skills:[SkillRow]}` 或 `{status:'unavailable',skills:[],reason}`（**新增**，只读本机技能目录） |
 | `send` | `{target, text, topic?}` | 投递结果 |
 | `markRead` | `{}` | inbox |
 | `sessions` | `{}` | `{sessions:[{id, title, name, rooms}]}` |
@@ -100,8 +101,40 @@ role      = 'leader' | 'member'
 ### Message
 
 ```ts
-{ id, receivedAt, read: boolean, from: {nodeId, name, sessionId, title}, to, kind, topic, room, text, mentions: string[] }
+{ id, receivedAt, read: boolean, from: {nodeId, name, sessionId, title}, to, kind, topic, room, text,
+  mentions: string[], structuredMentions?: {memberKey, label}[], skillRefs?: SkillRef[] }
 ```
+
+`structuredMentions` 与 `skillRefs` 都只在发送方显式带过时出现，缺失即"旧消息"，
+渲染时按纯文本处理。两者都不改变 `text` 的内容——`text` 始终是原样发出的正文，
+旧节点忽略元数据也照样能读。
+
+### SkillRef
+
+```ts
+{ name: string, sourceNodeId: string, sourceNodeName: string }
+```
+
+一个技能引用只是**来源明确的提示**，不是指令、不是安装请求、不是执行授权：
+
+- `name` 是技能名（不带 `/`），`sourceNodeId`/`sourceNodeName` 是那台机器的节点标识
+  与显示名。三字段就够了；版本与环境**没有**表达，也不在本批次范围内。
+- 去重键是 `(sourceNodeId, name)`——同名不同来源是两条不同的引用，绝不折叠。
+- 接收方本机没有同名同源技能时，**仍然展示**，加"未安装"标记，且不提供任何动作。
+  收到引用的 Agent 可以自行决定用不用本机某个技能，但系统绝不隐式安装或执行。
+- 上限 32 条；`name` ≤128、`sourceNodeId` ≤64、`sourceNodeName` ≤128，禁止控制字符
+  （校验在 `lib/room-message.mjs`，越界直接拒绝整条消息）。
+
+### SkillRow（`roomSkills` 返回）
+
+```ts
+{ name: string, description: string, sourceNodeId: string, sourceNodeName: string }
+```
+
+`roomSkills` 是**只读投影**，只列本机公开目录里 `userInvocable` 的技能，按 name 排序，
+最多 200 条。它绝不返回技能文件路径、`resourceBase`、`provider` 或指令正文——
+白名单只挑上面四个字段。技能注册表不可用时返回 `{status:'unavailable', skills:[], reason}`
+而不是空目录，否则会读成"这台机器没有技能"。该端点从不调用 `get()`/`invoke()`。
 
 `kind` ∈ `'room-message'`（房间聊天）`| 'room-task'`（派活通知）`| 'note'`（点对点）。
 聊天窗口渲染时 **按 `kind === 'room-message'` 过滤**，派活通知单独用任务区展示。
@@ -151,6 +184,29 @@ role      = 'leader' | 'member'
   （`@` 只是标注，不是地址）。
 - **不显示原始 id**：所有成员/会话一律 `title → name → shortId` 逐级兜底，
   `nodeId/sessionId` 只作为悬停 `title` 属性出现。唯一的例外是上面那个重名消歧后缀。
+
+- **技能引用**：两种入口打开**同一个**菜单——输入框里打 `/`（行首或空白后，`/`
+  之前不能有空白，`a/b` 这种路径不触发），或点工具栏上的 `/技能` 按钮。菜单是一个
+  可搜索列表，每行显示 `/<技能名>`、技能所属节点名、以及一句描述，最多 8 行；
+  `↑`/`↓` 移动、`Enter`/`Tab` 确认、`Esc` 关闭。
+
+  菜单里的**确认动作**才产生引用：选中后技能变成一个 chip 显示在输入框上方，正文里
+  那个 `/` token 被消费掉。**没有经过菜单确认的 `/foo` 永远只是普通文本**——它会原样
+  发给房间，不产生任何元数据，也不会被解释成技能。chip 上的 `×` 删除引用；
+  删掉 chip 不会改动正文，正文里本来就没有 token。
+
+  引用按 `(sourceNodeId, name)` 区分，所以两台机器上的同名技能在菜单里是两行、
+  发送后是两条引用，**绝不折叠**。每行都写出来源节点名，这是避免同名歧义的唯一
+  依据（不靠技能名、不靠顺序）。
+
+  发送时 `skillRefs` 随消息一起走（见 §3）。接收方渲染时把引用显示在气泡底部，
+  标注"引用的技能"和来源节点；**本机没有这个技能的引用仍然显示**，加虚线和
+  "本机未安装此技能"标记，且不提供点击动作——引用是提示，不是安装或执行请求。
+  Agent 读到引用后可以自己决定用不用本机某个技能，但没有任何隐式安装或隐式执行。
+
+  技能目录只列**本机**的：`roomSkills` 返回本机公开目录，不跨节点拉取远端目录
+  （跨节点技能目录需要协议层另行批准）。目录不可用时菜单显示"本机技能目录不可用"，
+  而不是一个空列表。
 
 ## 5. 前端可用的客户端服务
 

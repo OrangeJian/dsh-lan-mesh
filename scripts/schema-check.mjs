@@ -99,9 +99,14 @@ const sessionPersistence = {
 liveAgents.set(LEADER, { id: LEADER, status: 'idle', followup() {} });
 
 let panelFetch;
+// The skill registry is mounted by the Host base, not by this plugin, so the
+// stub owns it. `null` models a profile without the skill layer at all: the
+// endpoint must degrade to `unavailable` instead of inventing a catalogue.
+let skillsRegistry = null;
 const stub = {
   logger: { warn() {}, info() {}, debug() {} },
   get(name) {
+    if (name === 'skills') return skillsRegistry === null ? undefined : skillsRegistry;
     if (name === 'tools') {
       return {
         register: (definition) => {
@@ -181,6 +186,22 @@ async function run(name, args, label, options = {}) {
   return value;
 }
 
+/**
+ * Drive one panel endpoint through the registered fetch route, so the request
+ * travels the same envelope the browser uses instead of calling internals.
+ * @param {string} method - endpoint name.
+ * @param {object} payload - endpoint payload.
+ * @returns {Promise<object>} the decoded `server-response` body.
+ */
+async function rpc(method, payload) {
+  const response = await panelFetch(new Request('http://mesh.invalid/', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ type: 'client-request', rpcId: `${method}-rpc`, payload: { method, payload } }),
+  }));
+  return response.json();
+}
+
 try {
   for (const definition of teamToolDefinitions(Object.fromEntries(['Create', 'Dispatch', 'Status', 'Report', 'Reconcile'].map(action => [`team${action}`, async () => ({ executionId: 'schema-test' })])))) {
     framework.assertSupportedJsonSchema(definition.parameters);
@@ -227,6 +248,42 @@ try {
   const inbox = await run('lan_mesh_inbox', { unread_only: false }, 'reference inbox');
   check('inbox output preserves exact references', inbox?.messages.some(message => message.structuredMentions?.[0]?.memberKey === mention.memberKey && message.skillRefs?.[0]?.name === skillRef.name));
   await run('lan_mesh_room_member', { action: 'leave', room: roomId }, 'room_member leave', { sessionId: PEER });
+
+  console.log('\nroom skill catalogue endpoint');
+  const selfNodeId = (created?.room?.members ?? []).find(member => member.sessionId === LEADER)?.nodeId ?? '';
+  // No skill layer in this profile: the panel must say so rather than show an
+  // empty catalogue, which would read as "this node has no skills".
+  const noRegistry = await rpc('roomSkills', {});
+  check('a profile without a skill layer reports unavailable', noRegistry.result?.ok === true && noRegistry.result.value?.status === 'unavailable', JSON.stringify(noRegistry).slice(0, 200));
+  check('an unavailable catalogue carries no invented rows', Array.isArray(noRegistry.result?.value?.skills) && noRegistry.result.value.skills.length === 0);
+  skillsRegistry = {
+    async list() {
+      return [
+        // Sorted output is the endpoint's job; the double entry proves the
+        // (sourceNodeId, name) de-duplication key.
+        { name: 'deploy', description: 'Ship the branch', invocation: { modelInvocable: true, userInvocable: true }, path: 'C:/secret/deploy/SKILL.md', resourceBase: 'C:/secret/deploy' },
+        { name: 'deploy', description: 'Ship the branch again', invocation: { modelInvocable: true, userInvocable: true }, path: 'C:/secret/deploy/SKILL.md' },
+        { name: 'internal-only', description: 'not for humans', invocation: { modelInvocable: true, userInvocable: false }, path: 'C:/secret/internal/SKILL.md' },
+        { name: 'digest', description: 'Summarise the day', invocation: { modelInvocable: true, userInvocable: true } },
+      ];
+    },
+  };
+  const catalogue = await rpc('roomSkills', {});
+  const rows = catalogue.result?.value?.skills ?? [];
+  check('an available catalogue is reported as ready', catalogue.result?.value?.status === 'ready', JSON.stringify(catalogue).slice(0, 200));
+  check('only user-invocable skills are advertised', rows.length === 2 && rows.every(row => row.name !== 'internal-only'), rows.map(row => row.name).join(','));
+  check('identically named skills are not folded twice over', rows.filter(row => row.name === 'deploy').length === 1);
+  check('skill rows are ordered by name', rows.map(row => row.name).join(',') === 'deploy,digest');
+  check('skill rows name the node that owns them', selfNodeId !== '' && rows.every(row => row.sourceNodeId === selfNodeId && typeof row.sourceNodeName === 'string'));
+  check('skill rows expose no filesystem path', !JSON.stringify(rows).includes('secret') && !JSON.stringify(rows).includes('SKILL.md'), JSON.stringify(rows).slice(0, 200));
+  check('skill rows carry only the advertised fields', rows.every(row => Object.keys(row).sort().join(',') === 'description,name,sourceNodeId,sourceNodeName'), JSON.stringify(Object.keys(rows[0] ?? {})));
+  skillsRegistry = { async list() { throw new Error('registry exploded'); } };
+  const broken = await rpc('roomSkills', {});
+  check('a throwing registry degrades to unavailable', broken.result?.value?.status === 'unavailable' && broken.result.value.skills.length === 0, JSON.stringify(broken).slice(0, 200));
+  skillsRegistry = { async list() { return 'not-an-array'; } };
+  const malformed = await rpc('roomSkills', {});
+  check('a malformed registry result degrades to unavailable', malformed.result?.value?.status === 'unavailable', JSON.stringify(malformed).slice(0, 200));
+  skillsRegistry = null;
 
   console.log('\nerror paths are rejections, not malformed values');
   await run(
