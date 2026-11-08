@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { apply } from '../index.js';
+import { teamToolDefinitions } from '../lib/team-tools.mjs';
 
 /**
  * The framework exports its own validator, so this script does not have to
@@ -180,6 +181,12 @@ async function run(name, args, label, options = {}) {
 }
 
 try {
+  for (const definition of teamToolDefinitions(Object.fromEntries(['Create', 'Dispatch', 'Status', 'Report', 'Reconcile'].map(action => [`team${action}`, async () => ({ executionId: 'schema-test' })])))) {
+    framework.assertSupportedJsonSchema(definition.parameters);
+    framework.assertSupportedJsonSchema(definition.output.schema);
+    const value = await definition.execute({}, { agent: { id: LEADER } });
+    check(`${definition.name} schema and output are supported`, framework.validateJsonSchemaValue(definition.output.schema, value).length === 0);
+  }
   apply(stub, { port: 45907, discoveryPort: 45937, displayName: 'schema-check', autoWake: false });
 
   console.log('registration');
