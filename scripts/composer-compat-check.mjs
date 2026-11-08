@@ -38,7 +38,7 @@ for (const name of names) {
 const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'));
 assert.equal(pkg.scripts['check:composer-compat'], 'node scripts/composer-compat-check.mjs');
 const client = readFileSync(join(repo, 'client.js'), 'utf8');
-for (const [, id] of client.matchAll(/(?:require\s*\(|from\s*)['"](@deepseek-ai\/[^'"]+)['"]/g)) {
+for (const [, id] of client.matchAll(/(?:require\s*\(\s*|import\s*\(\s*|import\s+|from\s*)['"](@deepseek-ai\/[^'"]+)['"]/g)) {
   assert(/^@deepseek-ai\/[^/]+(?:\/client)?$/.test(id), `private Room import: ${id}`);
   // Optional primitives are supplied by the browser module loader, not Node.
   // Only the four required client entry points above are resolution gates.
