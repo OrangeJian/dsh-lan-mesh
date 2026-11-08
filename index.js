@@ -326,13 +326,13 @@ const MAX_ROOM_SKILL_TEXT = 320;
  */
 function roomSkillRow(skill, source) {
   const name = typeof skill?.name === 'string' ? skill.name.trim() : '';
-  if (name === '') return undefined;
+  if (name === '' || name.length > 128 || /[\u0000-\u001f]/u.test(name)) return undefined;
   // Only what a human may deliberately invoke: a model-only skill has no
   // business appearing in a menu a person picks from.
   if (skill?.invocation?.userInvocable !== true) return undefined;
   const description = typeof skill?.description === 'string' ? skill.description.trim() : '';
   return {
-    name: name.slice(0, MAX_ROOM_SKILL_TEXT),
+    name,
     description: description.slice(0, MAX_ROOM_SKILL_TEXT),
     sourceNodeId: source.nodeId,
     sourceNodeName: source.nodeName,
@@ -359,7 +359,12 @@ async function readRoomSkills(ctx, node) {
     nodeId: typeof identity?.nodeId === 'string' ? identity.nodeId : '',
     nodeName: typeof identity?.name === 'string' ? identity.name : '',
   };
-  const registry = typeof ctx?.get === 'function' ? ctx.get('skills') : undefined;
+  let registry;
+  try {
+    registry = typeof ctx?.get === 'function' ? ctx.get('skills') : undefined;
+  } catch {
+    return { status: 'unavailable', skills: [], reason: 'the skill registry is not available on this node' };
+  }
   if (registry === undefined || registry === null || typeof registry.list !== 'function') {
     // A missing registry is a normal deployment, not an error: the composer
     // then simply has no skills to offer and must say so instead of inventing

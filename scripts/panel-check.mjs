@@ -1042,6 +1042,7 @@ await typeInto('lm-composerInput', 'ship it');
 await click('lm-sendBtn');
 const skillRequest = requested.filter((row) => row.endpoint === 'roomSay').at(-1);
 checks.push(
+  ['skill references retain readable tokens for legacy recipients', skillRequest?.payload.text.includes('/deploy')],
   [
     'sending serializes the confirmed skill reference',
     skillRequest?.payload.skillRefs?.length === 1 &&

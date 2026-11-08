@@ -103,10 +103,14 @@ let panelFetch;
 // stub owns it. `null` models a profile without the skill layer at all: the
 // endpoint must degrade to `unavailable` instead of inventing a catalogue.
 let skillsRegistry = null;
+let skillsLookupThrows = false;
 const stub = {
   logger: { warn() {}, info() {}, debug() {} },
   get(name) {
-    if (name === 'skills') return skillsRegistry === null ? undefined : skillsRegistry;
+    if (name === 'skills') {
+      if (skillsLookupThrows) throw new Error('skill service unavailable');
+      return skillsRegistry === null ? undefined : skillsRegistry;
+    }
     if (name === 'tools') {
       return {
         register: (definition) => {
@@ -268,6 +272,15 @@ try {
       ];
     },
   };
+  const validRegistry = skillsRegistry;
+  skillsRegistry = { async list() { return [
+    { name: 'x'.repeat(129), invocation: { userInvocable: true } },
+    { name: 'bad\nname', invocation: { userInvocable: true } },
+    { name: 'valid-name', description: 'safe', invocation: { userInvocable: true } },
+  ]; } };
+  const boundedCatalogue = await rpc('roomSkills', {});
+  check('catalogue only offers names accepted by reference protocol', boundedCatalogue.result?.value?.skills?.length === 1 && boundedCatalogue.result.value.skills[0].name === 'valid-name');
+  skillsRegistry = validRegistry;
   const catalogue = await rpc('roomSkills', {});
   const rows = catalogue.result?.value?.skills ?? [];
   check('an available catalogue is reported as ready', catalogue.result?.value?.status === 'ready', JSON.stringify(catalogue).slice(0, 200));
@@ -284,6 +297,11 @@ try {
   const malformed = await rpc('roomSkills', {});
   check('a malformed registry result degrades to unavailable', malformed.result?.value?.status === 'unavailable', JSON.stringify(malformed).slice(0, 200));
   skillsRegistry = null;
+
+  skillsLookupThrows = true;
+  const lookupFailure = await rpc('roomSkills', {});
+  check('a failing skill service lookup degrades to unavailable', lookupFailure.result?.value?.status === 'unavailable');
+  skillsLookupThrows = false;
 
   console.log('\nerror paths are rejections, not malformed values');
   await run(

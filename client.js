@@ -1646,7 +1646,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const removeAttachedFile = () => setAttachedFile(null);
 
       const doSay = async () => {
-        const text = draft.trim();
+        const readableSkills = draftSkills.map((skill) => `/${skill.name}`)
+          .filter((token) => !draft.split(/\s+/u).includes(token));
+        const text = [draft.trim(), ...readableSkills].filter(Boolean).join('\n');
         if (text === '' && attachedFile === null) {
           flash(COPY.needMessage, true);
           return;
