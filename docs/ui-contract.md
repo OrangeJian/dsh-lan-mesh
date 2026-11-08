@@ -136,7 +136,7 @@ role      = 'leader' | 'member'
 - **`owner` 判定**：先比 `from.sessionId`（等于当前会话，或 `human`），旧行回退到标题/名字/「本节点只有一个成员」。显示名会重复也会被改，身份不能拿显示名判。
 - 轮询：选中房间 2 秒一次 `roomDetail` + 4 秒一次 `snapshot`；agent 清单与工作区列表手动刷新（不进轮询）。
 - 每个成员的「私聊」按钮：把右栏切到单发模式，用 `send` 端点，`target = `${nodeId}/${sessionId}``。
-- **昵称**：成员行的铅笔按钮调 `nickname {member, name}`，身份卡的输入框 `onBlur` 调 `nickname {self:true, name}`。昵称只存在本机（`nicknames.json`），`#titleOf` 里昵称优先于会话标题。
+- **昵称 / 身份**：成员行的铅笔按钮调 `nickname {member, name}`，这类对他人的昵称只存在本机。身份卡的输入框 `onBlur` 调 `nickname {self:true, name}`；本机身份会同步到已加入项目的成员记录，并用于新消息的发送者名称。
 - 会话跳转：成员行上的「打开会话」按钮与左栏的 agent 行都只调用
   `ctx.uiWorkspace.openSession(sessionId)`——原生会话占据 main 区，而左栏本身是
   `sidebar.workspaces` 槽里的组件，仍在原地，所以不会「跳出」插件页。

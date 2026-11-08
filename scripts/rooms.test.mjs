@@ -378,6 +378,20 @@ test('mergeStates is commutative for members added on both sides', () => {
   assert.equal(leftFirst.rooms[room.id].members.length, 3);
 });
 
+test('mergeStates carries a newer member identity to peers', () => {
+  const { state: left, room } = oneRoom();
+  const right = normalizeState(exportState(left));
+  const renamed = right.rooms[room.id].members.find((member) => member.key === SELF.nodeId + '/' + SELF.sessionId);
+  renamed.name = '建哥';
+  renamed.nameUpdatedAt = LATER;
+  right.rooms[room.id].leader.name = '建哥';
+  right.rooms[room.id].leader.nameUpdatedAt = LATER;
+
+  const merged = mergeStates(left, exportState(right)).state;
+  assert.equal(merged.rooms[room.id].members[0].name, '建哥');
+  assert.equal(merged.rooms[room.id].leader.name, '建哥');
+});
+
 test('mergeStates takes the newest task state regardless of merge order', () => {
   const { state: left, room } = oneRoom();
   const task = assignTask(left, room.id, { title: 'shared', assignee: PEER, assigner: SELF }, uuidFactory(), AT);
