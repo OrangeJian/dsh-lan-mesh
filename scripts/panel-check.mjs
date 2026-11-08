@@ -429,11 +429,19 @@ const answers = {
 };
 
 const asked = [];
+const requested = [];
 const fetch = async (route, init) => {
   const body = JSON.parse(init.body);
   const endpoint = body.payload.method;
   const payload = body.payload.payload ?? {};
   asked.push(endpoint);
+  requested.push({ endpoint, payload });
+  if (endpoint === 'roomJoin') {
+    const joined = { ...strangerRoom, isMember: true, role: 'member' };
+    answers.snapshot.rooms.mine.push(joined);
+    answers.snapshot.rooms.all = answers.snapshot.rooms.all.map(room => room.id === joined.id ? joined : room);
+    return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: { room: joined, added: true } } }) };
+  }
   if (answers[endpoint] === undefined) throw new Error(`unexpected endpoint ${endpoint}`);
   const value = endpoint === 'roomDetail' ? answers.roomDetail[payload.room] : answers[endpoint];
   return {
@@ -1018,6 +1026,17 @@ checks.push([
   'the rail exit clears the lanmesh chrome marker',
   document.documentElement.dataset.lanMeshMode === undefined,
 ]);
+
+// Joining from the actual native-sidebar host must forward the callback, use
+// the human identity and refresh the joined project list.
+await switchTo(RailHost);
+await clickRail('lm-joinBtn');
+const joinRequest = requested.find(entry => entry.endpoint === 'roomJoin');
+checks.push(
+  ['rail join sends the selected project and human identity', joinRequest?.payload.room === 'room-2' && joinRequest?.payload.sessionId === 'human'],
+  ['joined project moves out of the joinable list', count('lm-joinBtn') === 0 && count('lm-roomRow') === 3],
+  ['successful join opens the mesh panel', document.documentElement.dataset.lanMeshMode === 'lanmesh'],
+);
 
 // A hostile context proves the entry cannot fail the Web boot: cordis throws on
 // an undeclared service, and the whole app dies when apply() rejects.

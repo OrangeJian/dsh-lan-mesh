@@ -3025,6 +3025,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         },
         rooms,
         joinable,
+        onJoin: joinRoom,
+        joinBusy: busy,
         agents: railAgentsOf(agents.local, rooms, self?.nodeId ?? ''),
         unreadMap,
         activeId: nav.roomId,
