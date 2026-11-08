@@ -70,7 +70,7 @@
 ### base / head
 
 - base：`4a6cddfb8e1b9fe0ad6f8a20f365e013c0ba9a9d`（`4a6cddf fix: resolve long room reference caller identities`）
-- head：`43e572cd51554b30e4b62fbfd3a4ee2405bc8e4b`（`43e572c feat: add room skill references and human member invites`）
+- head：`43e572cd51554b30e4b62fbfd3a4ee2405bc8e4b`（`43e572c feat: add room skill references and human member invites`），随后追加 `9bc6afd`（文档同步）与一次 64 字符前缀歧义加固；最终 head 以 `git log -1` 为准。
 - 未合并、未发布、未推送；分支仍为 `codex/room-collaboration`。
 
 ### 修改文件
@@ -82,7 +82,7 @@
 | `lib/service.mjs` | `addRoomMember` 授权改为「leader 或本房间人类成员」，其余事实（调用者身份、成员资格、目标会话归属）全部服务端派生，客户端 `memberNodeId`/`human`/`role` 声明一律忽略 |
 | `scripts/panel-check.mjs` | 新增 23 项技能选择器/引用渲染断言与 2 项邀请行断言（共 136 项） |
 | `scripts/schema-check.mjs` | 新增 `roomSkills` 真实 RPC 校验（unavailable/ready/同名不折叠/不泄露路径/字段白名单/抛错与畸形降级，共 66 项） |
-| `scripts/room-invite.test.mjs` | 新建，8 条邀请权限测试 |
+| `scripts/room-invite.test.mjs` | 新建，10 条邀请权限测试（含 64 字符前缀歧义拒绝） |
 | `docs/ui-contract.md` | `roomSay` 形参补 `mentions?`/`skillRefs?`；新增 `roomSkills` 端点、`SkillRef`/`SkillRow` 类型、§4「技能引用」交互段 |
 | `ROADMAP.md` | M2 置为「本批次完成（待 Codex 独立验收）」，M1 保持「设备验收未完成（全部场景未验收）」，M3–M6 标注本批次不做 |
 | `docs/handoffs/m1-three-device-acceptance.md` | 新建，M1 真实三设备验收准备清单（12 项场景全部「未验收」） |
@@ -91,12 +91,12 @@
 
 | 命令 | 结果 |
 |---|---|
-| `npm test` | `tests 114 / pass 114 / fail 0`（exit 0） |
+| `npm test` | `tests 116 / pass 116 / fail 0`（exit 0） |
 | `node scripts/panel-check.mjs` | `panel check: 136/136 assertions passed` / `panel check ok`（exit 0） |
 | `$env:DSH_TOOLS_MODULE=<dsh-tools/lib/index.js 的 file:// URL>; node scripts/schema-check.mjs` | `schema check ok — 66/66`（exit 0） |
 | `npm run check:composer-compat` | `PASS composer compatibility: DSH 0.2.2-rc.1, 4 public client entry points; no private-import requirement`（exit 0） |
 | `node scripts/twin-transport-check.mjs` | `twin transport ok`（exit 0） |
-| `node --test scripts/room-invite.test.mjs` | `tests 8 / pass 8 / fail 0`（exit 0） |
+| `node --test scripts/room-invite.test.mjs` | `tests 10 / pass 10 / fail 0`（exit 0） |
 
 沙箱注意事项：`npm test` 在受限文件/进程沙箱下会以 `Error: spawn EPERM`（`errno: -4048`，`syscall: 'spawn'`）失败，因为 `node --test` 需要为每个测试文件派生子进程并捕获管道。这是沙箱边界，不是测试失败；在允许进程派生的环境下直接通过。`schema-check.mjs` 必须显式注入 `DSH_TOOLS_MODULE`，否则会报 `cannot locate the framework schema validator`（脚本设计如此，未硬编码机器路径）。
 
@@ -120,7 +120,9 @@
 4. **`skillRefs` 无版本**：引用中没有记录技能版本或环境。文档中明确保留为下一批议题。
 5. **邀请权限的边界**：人类成员可以拉入本节点任意可达会话（含已存盘可恢复的会话），但没有「这个会话是否应该进这个项目」的额外策略。若需要按 workspace 或角色限制，需要新的设计。
 6. **Agent 加入房间不授予 Team 执行权限**：本批次保持了这一边界，`addRoomMember` 不写 Team 账本，但这一点只有代码约定，没有独立的回归测试断言。
-7. **`addRoomMember` 的错误码**：权限失败统一返回 `NOT_LEADER`，目标会话非法返回 `BAD_REQUEST`。错误码沿用了旧语义（`NOT_LEADER` 现在覆盖「非 leader 且非人类成员」），前端只展示消息文本，不影响行为，但如果外部有按错误码分支的调用方需要同步。
+7. **`addRoomMember` 的错误码**：权限失败统一返回 `NOT_LEADER`，目标会话非法返回 `BAD_REQUEST`，64 字符前缀歧义返回 `AMBIGUOUS_ROOM`。错误码沿用了旧语义（`NOT_LEADER` 现在覆盖「非 leader 且非人类成员」），前端只展示消息文本，不影响行为，但如果外部有按错误码分支的调用方需要同步。
+8. **调用者身份是自称的（协议级，未修）**：`request.sessionId` 是一个字符串，`#selfMember` 直接据此推导身份。本机任意 Agent 会话只要传 `sessionId:'human'`，就会被当成人类成员，从而通过「仅 leader 或人类成员」的检查——前提是房间里确实有 `nodeId/human` 这个成员。这是现有 Mesh 协议的固有假设（panel 与 tool 层都用 sessionId 字符串标识调用者），不是本次改动引入的，也**不能**在插件内修好：需要 Host 提供经过认证的调用者身份。按交接包要求，本条记录建议并等待确认，未擅自改协议。
+9. **目录上限造成的可用性边界**：`catalogueAgents({ peers: false })` 经 `lib/agents.mjs:17` 的 `MAX_AGENT_ROWS = 200` 截断，本机会话排在 200 之外时会被判「不存在或不可访问」。这是可用性边界，不是权限放大。
 
 ### 设计偏差
 

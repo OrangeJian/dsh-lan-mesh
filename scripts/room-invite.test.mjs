@@ -264,3 +264,58 @@ test('the original leader path still works for an agent leader', async (t) => {
   assert.equal(result.added, true);
   assert.ok(result.room.members.some((member) => member.sessionId === 'worker-1'));
 });
+
+test('two sessions sharing the 64-char member-key prefix are refused rather than merged', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'room-invite-prefix-'));
+  const previous = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = previous;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  const { state, roomId } = seededState();
+  // agent-team recycle ids reuse the first 64 chars; the room layer truncates
+  // member session ids to exactly that, so both rows would land on one key.
+  const shared = 'r'.repeat(64);
+  const node = makeNode({
+    nodeId: 'node-local',
+    nodeName: 'Local node',
+    state,
+    agents: [
+      { id: `${shared}-session-one`, status: 'idle' },
+      { id: `${shared}-session-two`, status: 'idle' },
+    ],
+  });
+
+  await assert.rejects(
+    node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: `${shared}-session-one` }),
+    (error) => error.code === 'AMBIGUOUS_ROOM' && /ambiguous/.test(error.message),
+  );
+  assert.equal(node.roomsDoc.rooms[roomId].members.some((member) => member.sessionId === shared), false);
+});
+
+test('a stored session with the same 64-char prefix as a live one is also refused', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'room-invite-prefix-stored-'));
+  const previous = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = previous;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  const { state, roomId } = seededState();
+  const shared = 'q'.repeat(64);
+  const node = makeNode({
+    nodeId: 'node-local',
+    nodeName: 'Local node',
+    state,
+    agents: [{ id: `${shared}-live`, status: 'idle' }],
+    stored: [{ id: `${shared}-stored`, cwd: 'C:/work' }],
+  });
+
+  await assert.rejects(
+    node.addRoomMember({ room: roomId, sessionId: 'human', memberSessionId: `${shared}-live` }),
+    (error) => error.code === 'AMBIGUOUS_ROOM',
+  );
+});
