@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { apply } from '../index.js';
+import { MeshNode } from '../lib/service.mjs';
 import { teamToolDefinitions } from '../lib/team-tools.mjs';
 
 /**
@@ -98,9 +99,19 @@ const sessionPersistence = {
 };
 liveAgents.set(LEADER, { id: LEADER, status: 'idle', followup() {} });
 
+let panelFetch;
+// The skill registry is mounted by the Host base, not by this plugin, so the
+// stub owns it. `null` models a profile without the skill layer at all: the
+// endpoint must degrade to `unavailable` instead of inventing a catalogue.
+let skillsRegistry = null;
+let skillsLookupThrows = false;
 const stub = {
   logger: { warn() {}, info() {}, debug() {} },
   get(name) {
+    if (name === 'skills') {
+      if (skillsLookupThrows) throw new Error('skill service unavailable');
+      return skillsRegistry === null ? undefined : skillsRegistry;
+    }
     if (name === 'tools') {
       return {
         register: (definition) => {
@@ -131,7 +142,7 @@ const stub = {
     // `connection` (the panel route; absent here, exercised by rooms-smoke).
     const scope = {
       tools: names.includes('tools') ? this.get('tools') : undefined,
-      connection: undefined,
+      connection: names.includes('connection') ? { fetch: { register: definition => { panelFetch = definition.fetch; return () => {}; } } } : undefined,
       effect: (fn) => this.effect(fn),
     };
     callback(scope);
@@ -180,6 +191,22 @@ async function run(name, args, label, options = {}) {
   return value;
 }
 
+/**
+ * Drive one panel endpoint through the registered fetch route, so the request
+ * travels the same envelope the browser uses instead of calling internals.
+ * @param {string} method - endpoint name.
+ * @param {object} payload - endpoint payload.
+ * @returns {Promise<object>} the decoded `server-response` body.
+ */
+async function rpc(method, payload) {
+  const response = await panelFetch(new Request('http://mesh.invalid/', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ type: 'client-request', rpcId: `${method}-rpc`, payload: { method, payload } }),
+  }));
+  return response.json();
+}
+
 try {
   for (const definition of teamToolDefinitions(Object.fromEntries(['Create', 'Dispatch', 'Status', 'Report', 'Reconcile'].map(action => [`team${action}`, async () => ({ executionId: 'schema-test' })])))) {
     framework.assertSupportedJsonSchema(definition.parameters);
@@ -215,8 +242,67 @@ try {
   const assigned = await run('lan_mesh_room_task', { action: 'assign', room: roomId, assignee: 'Peer', title: 'verify the projection', detail: 'compare shapes' }, 'room_task assign');
   const taskId = assigned?.task?.id ?? '';
   await run('lan_mesh_room_task', { action: 'status', room: roomId, task: taskId, status: 'doing', note: 'on it' }, 'room_task status', { sessionId: PEER });
-  await run('lan_mesh_room_say', { room: roomId, text: 'hello room' }, 'room_say');
+  const mention = { memberKey: again.room.members.find(member => member.sessionId === PEER).key, label: 'Peer' };
+  const skillRef = { name: 'missing-skill', sourceNodeId: 'remote-source', sourceNodeName: 'Remote' };
+  const referenceArgs = { room: roomId, text: '@Peer /missing-skill hello room', mentions: [mention], skillRefs: [skillRef] };
+  check('room_say parameters expose references', framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters, referenceArgs).length === 0, framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters, referenceArgs).join('; '));
+  await run('lan_mesh_room_say', referenceArgs, 'room_say');
+  const rpcResponse = await panelFetch(new Request('http://mesh.invalid/', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'ref-rpc',payload:{method:'roomSay',payload:{...referenceArgs,sessionId:LEADER}}})}));
+  const rpcBody = await rpcResponse.json();
+  check('roomSay RPC accepts structured metadata', rpcBody.result?.ok === true, JSON.stringify(rpcBody).slice(0,300));
+  const inbox = await run('lan_mesh_inbox', { unread_only: false }, 'reference inbox');
+  check('inbox output preserves exact references', inbox?.messages.some(message => message.structuredMentions?.[0]?.memberKey === mention.memberKey && message.skillRefs?.[0]?.name === skillRef.name));
   await run('lan_mesh_room_member', { action: 'leave', room: roomId }, 'room_member leave', { sessionId: PEER });
+
+  console.log('\nroom skill catalogue endpoint');
+  const selfNodeId = (created?.room?.members ?? []).find(member => member.sessionId === LEADER)?.nodeId ?? '';
+  // No skill layer in this profile: the panel must say so rather than show an
+  // empty catalogue, which would read as "this node has no skills".
+  const noRegistry = await rpc('roomSkills', {});
+  check('a profile without a skill layer reports unavailable', noRegistry.result?.ok === true && noRegistry.result.value?.status === 'unavailable', JSON.stringify(noRegistry).slice(0, 200));
+  check('an unavailable catalogue carries no invented rows', Array.isArray(noRegistry.result?.value?.skills) && noRegistry.result.value.skills.length === 0);
+  skillsRegistry = {
+    async list() {
+      return [
+        // Sorted output is the endpoint's job; the double entry proves the
+        // (sourceNodeId, name) de-duplication key.
+        { name: 'deploy', description: 'Ship the branch', invocation: { modelInvocable: true, userInvocable: true }, path: 'C:/secret/deploy/SKILL.md', resourceBase: 'C:/secret/deploy' },
+        { name: 'deploy', description: 'Ship the branch again', invocation: { modelInvocable: true, userInvocable: true }, path: 'C:/secret/deploy/SKILL.md' },
+        { name: 'internal-only', description: 'not for humans', invocation: { modelInvocable: true, userInvocable: false }, path: 'C:/secret/internal/SKILL.md' },
+        { name: 'digest', description: 'Summarise the day', invocation: { modelInvocable: true, userInvocable: true } },
+      ];
+    },
+  };
+  const validRegistry = skillsRegistry;
+  skillsRegistry = { async list() { return [
+    { name: 'x'.repeat(129), invocation: { userInvocable: true } },
+    { name: 'bad\nname', invocation: { userInvocable: true } },
+    { name: 'valid-name', description: 'safe', invocation: { userInvocable: true } },
+  ]; } };
+  const boundedCatalogue = await rpc('roomSkills', {});
+  check('catalogue only offers names accepted by reference protocol', boundedCatalogue.result?.value?.skills?.length === 1 && boundedCatalogue.result.value.skills[0].name === 'valid-name');
+  skillsRegistry = validRegistry;
+  const catalogue = await rpc('roomSkills', {});
+  const rows = catalogue.result?.value?.skills ?? [];
+  check('an available catalogue is reported as ready', catalogue.result?.value?.status === 'ready', JSON.stringify(catalogue).slice(0, 200));
+  check('only user-invocable skills are advertised', rows.length === 2 && rows.every(row => row.name !== 'internal-only'), rows.map(row => row.name).join(','));
+  check('identically named skills are not folded twice over', rows.filter(row => row.name === 'deploy').length === 1);
+  check('skill rows are ordered by name', rows.map(row => row.name).join(',') === 'deploy,digest');
+  check('skill rows name the node that owns them', selfNodeId !== '' && rows.every(row => row.sourceNodeId === selfNodeId && typeof row.sourceNodeName === 'string'));
+  check('skill rows expose no filesystem path', !JSON.stringify(rows).includes('secret') && !JSON.stringify(rows).includes('SKILL.md'), JSON.stringify(rows).slice(0, 200));
+  check('skill rows carry only the advertised fields', rows.every(row => Object.keys(row).sort().join(',') === 'description,name,sourceNodeId,sourceNodeName'), JSON.stringify(Object.keys(rows[0] ?? {})));
+  skillsRegistry = { async list() { throw new Error('registry exploded'); } };
+  const broken = await rpc('roomSkills', {});
+  check('a throwing registry degrades to unavailable', broken.result?.value?.status === 'unavailable' && broken.result.value.skills.length === 0, JSON.stringify(broken).slice(0, 200));
+  skillsRegistry = { async list() { return 'not-an-array'; } };
+  const malformed = await rpc('roomSkills', {});
+  check('a malformed registry result degrades to unavailable', malformed.result?.value?.status === 'unavailable', JSON.stringify(malformed).slice(0, 200));
+  skillsRegistry = null;
+
+  skillsLookupThrows = true;
+  const lookupFailure = await rpc('roomSkills', {});
+  check('a failing skill service lookup degrades to unavailable', lookupFailure.result?.value?.status === 'unavailable');
+  skillsLookupThrows = false;
 
   console.log('\nerror paths are rejections, not malformed values');
   await run(
@@ -251,6 +337,19 @@ try {
   const listed2 = await run('lan_mesh_agents', {}, 'agents');
   check('agents lists the live caller', (listed2?.agents ?? []).some((row) => row.id === LEADER && row.live === true));
   check('agents lists a stored session from another workspace', (listed2?.agents ?? []).some((row) => row.id === 'sess-stored-workspace' && row.workspace === 'other-workspace'));
+  const peerLookup = MeshNode.prototype.fetchPeerAgents;
+  let peerLookups = 0;
+  MeshNode.prototype.fetchPeerAgents = async () => { peerLookups++; return []; };
+  try {
+    liveAgents.get(LEADER).status = 'running';
+    const localCatalogue = await rpc('agents', { localOnly: true });
+    check('local agent RPC reports real running status without querying peers', peerLookups === 0 && localCatalogue.result?.value?.agents?.some(row => row.id === LEADER && row.status === 'running'));
+    await rpc('agents', {});
+    check('full agent RPC retains peer catalogue lookup', peerLookups === 1);
+  } finally {
+    MeshNode.prototype.fetchPeerAgents = peerLookup;
+    liveAgents.get(LEADER).status = 'idle';
+  }
   const broughtIn = await run('lan_mesh_agent_import', { session: 'sess-stored-workspace' }, 'agent_import session');
   check('the imported row reports live with its workspace', broughtIn?.agent?.live === true && broughtIn?.agent?.workspace === 'other-workspace');
   const madeAgent = await run('lan_mesh_agent_import', { cwd: 'C:\\work\\fresh-workspace' }, 'agent_import cwd');

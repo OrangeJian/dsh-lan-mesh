@@ -11,6 +11,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MeshNode } from '../lib/service.mjs';
+import { signStatePayload } from '../lib/transport.mjs';
 import {
   ROOM_STATE_VERSION,
   MAX_ROOM_NAME,
@@ -55,6 +60,79 @@ const LATER = '2026-10-29T01:00:00.000Z';
 const SELF = { nodeId: 'node-aaaa1111', sessionId: 'sess-1', name: 'alice' };
 const PEER = { nodeId: 'node-bbbb2222', sessionId: 'sess-2', name: 'bob' };
 const OTHER = { nodeId: 'node-cccc3333', sessionId: 'sess-3', name: 'carol' };
+
+test('machine names survive room creation and normalized export including legacy members', () => {
+  const state = emptyState();
+  const room = createRoom(state, { name: 'Machines', leader: { ...SELF, nodeName: ' Alice laptop ' } }, uuidFactory(), AT);
+  joinRoom(state, room.id, PEER, AT);
+  const restored = normalizeState(JSON.parse(JSON.stringify(exportState(state)))).rooms[room.id];
+  assert.equal(restored.leader.nodeName, 'Alice laptop');
+  assert.equal(restored.members[0].nodeName, 'Alice laptop');
+  assert.equal(restored.members[0].nodeNameUpdatedAt, AT);
+  assert.equal(restored.members[1].key, 'node-bbbb2222/sess-2');
+});
+
+test('newer machine name wins independently of member name in both merge orders', () => {
+  const { state, room } = oneRoom();
+  room.leader.nodeName = room.members[0].nodeName = 'Old laptop';
+  room.leader.nodeNameUpdatedAt = room.members[0].nodeNameUpdatedAt = AT;
+  const newer = structuredClone(state);
+  for (const member of [newer.rooms[room.id].leader, ...newer.rooms[room.id].members]) {
+    member.nodeName = 'New laptop';
+    member.nodeNameUpdatedAt = LATER;
+  }
+  for (const merged of [mergeStates(state, newer), mergeStates(newer, state)]) {
+    assert.equal(merged.state.rooms[room.id].leader.nodeName, 'New laptop');
+    assert.equal(merged.state.rooms[room.id].members[0].nodeName, 'New laptop');
+    assert.equal(merged.state.rooms[room.id].members[0].name, 'alice');
+  }
+  assert.equal(mergeStates(state, newer).changed, true);
+});
+
+test('machine display metadata preserves legacy state signatures', () => {
+  const { state, room } = oneRoom();
+  const payload = { from: { nodeId: SELF.nodeId }, state };
+  const legacySignature = signStatePayload(payload, 'secret');
+  for (const member of [room.leader, ...room.members]) {
+    member.nodeName = 'Laptop';
+    member.nodeNameUpdatedAt = LATER;
+  }
+  assert.equal(signStatePayload(payload, 'secret'), legacySignature);
+  room.members[0].sessionId = 'different-session';
+  assert.notEqual(signStatePayload(payload, 'secret'), legacySignature);
+});
+
+test('service projects discovered names and persists local machine renames on sync', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'room-machine-'));
+  const oldHome = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  t.after(async () => {
+    if (oldHome === undefined) delete process.env.DSH_HOME;
+    else process.env.DSH_HOME = oldHome;
+    await rm(home, { recursive: true, force: true });
+  });
+  const { state, room } = oneRoom();
+  joinRoom(state, room.id, { ...PEER, nodeName: 'Saved remote' }, AT);
+  const node = new MeshNode({ config: { port: 0 } });
+  node.started = true;
+  node.identity = { nodeId: SELF.nodeId, name: 'Local laptop' };
+  node.roomsDoc = state;
+  node.discovery = { list: () => [{ nodeId: PEER.nodeId, name: 'Discovered remote' }] };
+  let view = node.roomDetail({ room: room.id }).room;
+  assert.equal(view.members[0].nodeName, 'Local laptop');
+  assert.equal(view.members[1].nodeName, 'Discovered remote');
+  node.discovery = undefined;
+  await node.syncRooms();
+  assert.equal(room.members[0].nodeName, 'Local laptop');
+  assert.equal(room.leader.nodeName, 'Local laptop');
+  const firstStamp = room.members[0].nodeNameUpdatedAt;
+  node.identity.name = 'Renamed laptop';
+  await node.syncRooms();
+  assert.equal(room.members[0].nodeName, 'Renamed laptop');
+  assert.ok(room.members[0].nodeNameUpdatedAt > firstStamp);
+  view = node.roomDetail({ room: room.id }).room;
+  assert.equal(view.members[1].nodeName, 'Saved remote');
+});
 
 /**
  * Build a state with one room created by {@link SELF}.

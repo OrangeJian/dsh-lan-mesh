@@ -123,6 +123,8 @@ const remoteAgent = member('node-b', 'session-9', 'beta-worker', 'member', true,
 // the remote agent's title on purpose: two sessions titled the same must not be
 // indistinguishable in the mention picker.
 const offlinePeer = member('node-c', 'session-7', 'sleepy-peer', 'member', false, 'Beta rollout');
+remoteAgent.nodeName = 'Work laptop';
+offlinePeer.nodeName = 'Home desktop';
 // A session on this node that was pulled into a room but is absent from the
 // agent catalogue: the rail has to build it from the room member instead.
 const roomWorker = member('node-a', 'session-4', 'room-worker', 'member', true, 'Room worker');
@@ -262,6 +264,12 @@ const answers = {
           receivedAt: '2026-01-01T10:09:00.000Z',
           read: false,
         },
+        {
+          id: 'i7', kind: 'note',
+          from: { nodeId: 'node-b', sessionId: 'human', title: 'Remote human' },
+          text: 'a remote human note', read: false,
+          receivedAt: '2026-01-01T10:10:00.000Z',
+        },
       ],
     },
     // Only what the person must act on: one unread mention and one task.
@@ -328,7 +336,7 @@ const answers = {
         name: 'echo-worker',
         live: true,
         imported: true,
-        status: 'idle',
+        status: 'running',
         cwd: 'C:\\w\\proj',
         workspace: 'proj',
         rooms: ['room-1'],
@@ -414,6 +422,26 @@ const answers = {
           receivedAt: '2026-01-01T10:03:00.000Z',
           read: true,
         },
+        {
+          // Historical skill references, all three states at once: one this node
+          // holds from the same source, one it holds only as a different skill
+          // that shares the name, and one it does not have at all. All three must
+          // render, and only the last may say "not installed".
+          id: 'm4',
+          kind: 'room-message',
+          room: 'room-1',
+          from: { nodeId: 'node-b', name: 'beta-worker', sessionId: 'session-9' },
+          to: 'node-a',
+          text: 'try these',
+          receivedAt: '2026-01-01T10:04:00.000Z',
+          structuredMentions: [],
+          skillRefs: [
+            { name: 'digest', sourceNodeId: 'node-a', sourceNodeName: 'Local node' },
+            { name: 'digest', sourceNodeId: 'node-b', sourceNodeName: 'Far machine' },
+            { name: 'ghost-skill', sourceNodeId: 'node-z', sourceNodeName: 'Unreachable' },
+          ],
+          read: true,
+        },
       ],
       mine: [],
       viewer: { sessionId: 'human', isMember: true, isLeader: true, role: 'leader' },
@@ -427,16 +455,54 @@ const answers = {
   },
   notifyConfirm: { status: 'sent', summary: '已通过 wechat · 我 通知', ok: true },
   notifyDismiss: { ok: true },
+  // A successful send: with no delivery failures the composer clears itself,
+  // which is what the reference-clearing assertions below observe.
+  roomSay: { delivered: [] },
+  // The node's public skill catalogue. Two rows deliberately share a name to
+  // stand in for the case where the source node is the only thing telling two
+  // identically named skills apart.
+  roomSkills: {
+    status: 'ready',
+    skills: [
+      {
+        name: 'deploy',
+        description: 'Ship the current branch',
+        sourceNodeId: 'node-a',
+        sourceNodeName: 'Local node',
+      },
+      {
+        name: 'deploy',
+        description: 'Ship from the far machine',
+        sourceNodeId: 'node-b',
+        sourceNodeName: 'Far machine',
+      },
+      {
+        name: 'digest',
+        description: 'Summarise the day',
+        sourceNodeId: 'node-a',
+        sourceNodeName: 'Local node',
+      },
+    ],
+  },
 };
 
 const asked = [];
 const requested = [];
+let agentsGate;
 const fetch = async (route, init) => {
   const body = JSON.parse(init.body);
   const endpoint = body.payload.method;
   const payload = body.payload.payload ?? {};
   asked.push(endpoint);
   requested.push({ endpoint, payload });
+  if (endpoint === 'markRead') {
+    for (const message of answers.snapshot.inbox.messages) {
+      if (!payload.messageId || payload.messageId === message.id) message.read = true;
+    }
+    answers.snapshot.inbox.unread = answers.snapshot.inbox.messages.filter(message => !message.read && !(message.from?.nodeId === 'node-a' && (!message.from.sessionId || message.from.sessionId === 'human'))).length;
+    return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: answers.snapshot.inbox } }) };
+  }
+  if (endpoint === 'agents' && agentsGate) await agentsGate;
   if (endpoint === 'roomJoin') {
     const joined = { ...strangerRoom, isMember: true, role: 'member' };
     answers.snapshot.rooms.mine.push(joined);
@@ -455,6 +521,8 @@ const fetch = async (route, init) => {
   };
 };
 
+const intervals = new Map();
+let intervalId = 0;
 const context = vm.createContext({
   window,
   document,
@@ -464,8 +532,8 @@ const context = vm.createContext({
   fetch,
   console,
   // The panel polls; the harness drives refreshes by hand.
-  setInterval: () => 0,
-  clearInterval: () => {},
+  setInterval: (fn, ms) => { const id = ++intervalId; intervals.set(id, { fn, ms }); return id; },
+  clearInterval: (id) => intervals.delete(id),
 });
 vm.runInContext(source, context);
 const loaded = window.__loaded;
@@ -536,6 +604,7 @@ let lastText = '';
 
 /** Two components use separate hook position spaces, like two real components. */
 const resetHooks = () => {
+  for (const slot of effectSlots) slot?.cleanup?.();
   stateSlots.length = 0;
   effectSlots.length = 0;
   refSlots.length = 0;
@@ -662,6 +731,8 @@ const clickRail = (token, at = 0) => clickOn(RailHost, token, at);
 await switchTo(RailHost);
 
 const checks = [
+  ['rail spins only for the running catalogue row', count('lm-agentSpinner') === 1 && lastNodes.some(n => hasClass(n, 'lm-agentSpinner') && n.props['aria-label'] === '运行中')],
+  ['rail requests only local agents', requested.filter(r => r.endpoint === 'agents').every(r => r.payload.localOnly === true)],
   ['registered on the keyed main slot', registration?.name === 'main' && registration?.key === 'dsh-lan-mesh'],
   ['registers the sidebar entry', sidebar?.definition?.id === 'dsh-lan-mesh'],
   ['registers the rail in the native sidebar', railEntry?.definition?.name === 'sidebar.workspaces'],
@@ -706,6 +777,27 @@ const checks = [
   ['the pending notification can be dismissed', count('lm-notifyDismiss') === 1],
 ];
 
+// Drive the rail's actual timer. Slow calls cannot queue another poll, and a
+// subsequent local catalogue change must replace the running indicator.
+const railTimer = [...intervals.values()].find(timer => timer.ms === 4000);
+const beforePoll = asked.filter(e => e === 'agents').length;
+let releaseAgents;
+agentsGate = new Promise(resolve => { releaseAgents = resolve; });
+railTimer.fn();
+railTimer.fn();
+checks.push(['slow catalogue polls never overlap', asked.filter(e => e === 'agents').length === beforePoll + 1]);
+releaseAgents();
+agentsGate = undefined;
+await settleRail();
+answers.agents.agents[0].status = 'idle';
+railTimer.fn();
+await settleRail();
+checks.push(['four-second poll clears a finished agent spinner', count('lm-agentSpinner') === 0]);
+answers.agents.agents[0].status = 'running';
+railTimer.fn();
+await settleRail();
+checks.push(['four-second poll detects a running agent', count('lm-agentSpinner') === 1]);
+
 // Picking a channel for a held notification calls the Host's confirm endpoint,
 // then refreshes the snapshot (the harness keeps the pending row, which is fine:
 // a real Host drops it after a successful send).
@@ -721,6 +813,9 @@ checks.push(
 // The main area opens on the inbox and draws no rail of its own: the native
 // sidebar owns that column now.
 await switchTo(Component);
+const afterUnmount = asked.filter(e => e === 'agents').length;
+railTimer.fn();
+checks.push(['unmount removes and disables the rail poll', ![...intervals.values()].includes(railTimer) && asked.filter(e => e === 'agents').length === afterUnmount]);
 checks.push(
   ['the panel opens on the inbox', count('lm-msg') === 4 && !lastText.includes('发给')],
   ['the panel leaves the sidebar to the native slot', count('lm-rail') === 0],
@@ -765,14 +860,45 @@ checks.push(
   ['the chat pane is the scroll target', lastNodes.some((entry) => hasClass(entry, 'lm-chat') && entry.props?.ref !== undefined)],
   // The body goes through the shell's Markdown renderer, and each bubble names
   // its sender in bold so two dense messages never blur into one another.
-  ['both message bodies render as markdown', count('stubMarkdown') === 2],
-  ['every bubble names its sender in bold', count('lm-bubbleWho') === 2],
+  ['both message bodies render as markdown', count('stubMarkdown') === 3],
+  ['every bubble names its sender in bold', count('lm-bubbleWho') === 3],
   // The speaker kind decides the tint: a remote agent and the local person must
   // not read as the same bubble.
   ['a person speaks in the human tint', count('lm-bubbleHuman') === 1],
-  ['a synced agent speaks in the agent tint', count('lm-bubbleAgent') === 1],
+  ['a synced agent speaks in the agent tint', count('lm-bubbleAgent') === 2],
   ['own message is the only mine bubble', count('lm-bubbleMine') === 1 && lastText.includes('mine here')],
   ['own room messages use the configured identity', lastText.includes('建哥')],
+  // A message's skill references come back from the stored transcript, so a
+  // reopened room still shows what the sender pointed at.
+  [
+    'historical messages restore their skill references',
+    count('lm-skillRef') === 3 &&
+      lastText.includes('digest') &&
+      lastText.includes('ghost-skill'),
+  ],
+  // Same name, different source: this node does have a `digest`, but not the one
+  // the far machine pointed at, so it must be neither "identical" nor "missing".
+  [
+    'a same-named skill from another node is neither matched nor called missing',
+    count('lm-skillRefNamesake') === 1 &&
+      lastNodes.some(
+        (entry) => hasClass(entry, 'lm-skillRefNamesake') && entry.props?.title?.includes('不一定是同一个'),
+      ),
+  ],
+  // One of the three references is genuinely absent here: it must say so rather
+  // than vanish.
+  [
+    'a reference this node cannot resolve is marked, the others are not',
+    count('lm-skillRefMissing') === 1 &&
+      lastNodes.some((entry) => hasClass(entry, 'lm-skillRef') && entry.props?.title?.includes('Unreachable')),
+  ],
+  // The chip always names the source node: two nodes may both ship `deploy`.
+  [
+    'a restored reference names its source node',
+    lastText.includes('来自 Local node') &&
+      lastText.includes('来自 Far machine') &&
+      lastText.includes('来自 Unreachable'),
+  ],
 );
 
 // The member row is collapsed by default to keep the room focused on the
@@ -792,10 +918,14 @@ checks.push(
   // matching dsh-agent-team's composer instead of a bare form row.
   ['composer renders as a single card', count('lm-composerCard') === 1],
   ['composer toolbar carries the attach button', count('lm-attachBtn') === 1],
+  ['skill picker is an accessible icon button', lastNodes.some(n => hasClass(n, 'lm-skillBtn') && n.props['aria-label'] === '插入技能引用' && n.children.some(c => c?.type === 'svg'))],
+  ['leader can mark a message as task', lastNodes.some(n => hasClass(n, 'lm-taskPill') && n.props.disabled === false)],
   ['room pane has a back button', count('lm-backBtn') === 1],
   // v0.2.1: the leader may kick peers (never the human, never itself, and only
   // when this pane actually owns the leader role).
   ['leader sees a kick button per peer', count('lm-kickBtn') === 2],
+  // v0.2.1: the leader may pull a local session into the room it leads.
+  ['the leader sees the invite row', count('lm-inviteRow') === 1],
   // The kick button belongs to the chip of a remote peer, never to the chip of
   // the human member (a human session is not something a leader may eject).
   [
@@ -825,11 +955,11 @@ checks.push(
   // Two sessions sharing a title are told apart by a session-id suffix, and
   // only those two rows grow one.
   [
-    'duplicate titles get a session id suffix in the picker',
-    mentionRowLabels().includes('Beta rollout · session-9') &&
-      mentionRowLabels().includes('Beta rollout · session-7'),
+    'cross-machine duplicate titles get machine names in the picker',
+    mentionRowLabels().includes('Beta rollout · Work laptop') &&
+      mentionRowLabels().includes('Beta rollout · Home desktop'),
   ],
-  ['a unique title stays unsuffixed', mentionRowLabels().includes('Panel polish')],
+  ['a unique title also identifies its machine', mentionRowLabels().includes('Panel polish · node-a')],
 );
 
 // A prefix narrows the list; the caret keeps the menu anchored to the token.
@@ -838,7 +968,10 @@ checks.push(['a prefix narrows the picker', count('lm-mentionItem') === 2 && las
 
 // Enter takes the highlighted row and rewrites the token to the title.
 const accepted = await press('lm-composerInput', 'Enter');
+const selectedMention = stateSlots.flatMap((slot) => Array.isArray(slot) ? slot : [])
+  .find((item) => item?.memberKey === 'node-c/session-7');
 checks.push(
+  ['selected mention retains member identity separately from text', selectedMention?.label === 'Beta rollout'],
   ['enter accepts the highlighted member', accepted === true],
   ['accepting rewrites the token to the title', count('lm-mentionItem') === 0],
   [
@@ -846,6 +979,53 @@ checks.push(
     lastNodes.some((entry) => hasClass(entry, 'lm-composerInput') && entry.props.value === '@Beta rollout '),
   ],
 );
+
+await click('lm-sendBtn');
+const exactRequest = requested.filter(row => row.endpoint === 'roomSay').at(-1);
+checks.push(['composer serializes only exact selected identity and label', exactRequest?.payload.mentions?.[0]?.memberKey === 'node-c/session-7' && !('start' in exactRequest.payload.mentions[0])]);
+await typeInto('lm-composerInput', '@bet');
+await press('lm-composerInput', 'Enter');
+const selectedText = lastNodes.find(entry => hasClass(entry, 'lm-composerInput')).props.value;
+await typeInto('lm-composerInput', selectedText + '@all');
+await press('lm-composerInput', 'Enter');
+checks.push(['choosing all clears individual reference identities', !stateSlots.some(slot => Array.isArray(slot) && slot.some(item => item?.memberKey))]);
+await click('lm-sendBtn');
+const allRequest = requested.filter(row => row.endpoint === 'roomSay').at(-1);
+checks.push(['broadcast alongside selected individual sends readable all without exact filter', /@all(?:\s|$)/.test(allRequest?.payload.text ?? '') && allRequest?.payload.mentions === undefined]);
+
+// Removing a selected token must remove its identity even if identical text
+// remains elsewhere in the draft.
+await typeInto('lm-composerInput', '');
+await typeInto('lm-composerInput', '@Beta rollout @bet', 18);
+await press('lm-composerInput', 'Enter');
+await typeInto('lm-composerInput', '@Beta rollout ');
+checks.push(['editing out the selected token drops its identity',
+  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+
+// Same-machine duplicates need session IDs as a final discriminator.
+await typeInto('lm-composerInput', '');
+await typeInto('lm-composerInput', '@bet');
+await press('lm-composerInput', 'Enter');
+await typeInto('lm-composerInput', '@Beta rollout @Beta rollout ');
+await typeInto('lm-composerInput', '@Beta rollout ');
+checks.push(['deleting the selected first duplicate never transfers identity to typed text',
+  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+await typeInto('lm-composerInput', '');
+await typeInto('lm-composerInput', '@bet');
+await press('lm-composerInput', 'Enter');
+await typeInto('lm-composerInput', '@Beta rolloutX ');
+checks.push(['appending to the mention label invalidates selected identity',
+  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+
+remoteAgent.nodeName = offlinePeer.nodeName = 'Shared workstation';
+offlinePeer.nodeId = 'node-b';
+await typeInto('lm-composerInput', '@');
+checks.push(['same-machine duplicate titles append session IDs',
+  mentionRowLabels().includes('Beta rollout · Shared workstation · session-9') &&
+  mentionRowLabels().includes('Beta rollout · Shared workstation · session-7')]);
+offlinePeer.nodeId = 'node-c';
+remoteAgent.nodeName = 'Work laptop';
+offlinePeer.nodeName = 'Home desktop';
 
 // Escape dismisses without touching the draft.
 await typeInto('lm-composerInput', '@b', 2);
@@ -861,6 +1041,119 @@ checks.push(
 // An "@" glued to a word is an email address, not a mention.
 await typeInto('lm-composerInput', 'mail@bet', 8);
 checks.push(['an at sign inside a word is not a mention', count('lm-mentionItem') === 0]);
+
+// ——— skill references ———
+// Typing "/" at the start of a line opens the same catalogue the toolbar
+// button opens. The catalogue came from the Host, not from the client.
+await typeInto('lm-composerInput', '/', 1);
+const skillRowLabels = () =>
+  lastNodes
+    .filter((entry) => hasClass(entry, 'lm-skillName'))
+    .map((entry) => (entry.children ?? []).map(String).join(''));
+checks.push(
+  ['the Host skill catalogue is requested once the room opens', asked.includes('roomSkills')],
+  ['typing a slash opens the skill picker', count('lm-skillItem') === 3],
+  // Two nodes offer a skill named `deploy`. Both rows must be listed: folding
+  // them would silently pick one machine on the user's behalf.
+  [
+    'identically named skills from two nodes are not folded',
+    skillRowLabels().filter((text) => text === '/deploy').length === 2,
+  ],
+  [
+    'every skill row names the node it came from',
+    lastText.includes('来自 Local node') && lastText.includes('来自 Far machine'),
+  ],
+  // The composer's own toolbar carries the same affordance, so a user who does
+  // not know the slash convention still finds it.
+  ['the composer toolbar carries the skill button', count('lm-skillBtn') === 1],
+);
+
+// Enter confirms a reference: the token leaves the text and a chip appears.
+await press('lm-composerInput', 'Enter');
+const pickedSkill = stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : []))
+  .find((item) => item?.name === 'deploy');
+checks.push(
+  ['confirming a skill creates a reference with its source node', pickedSkill?.sourceNodeId === 'node-a'],
+  ['confirming a skill closes the picker', count('lm-skillItem') === 0],
+  ['the confirmed skill renders as a chip', count('lm-skillChip') === 1 && lastText.includes('来自 Local node')],
+  // The menu consumed the token: the message reads as prose, not as a command.
+  [
+    'the confirmed token is removed from the draft',
+    lastNodes.some((entry) => hasClass(entry, 'lm-composerInput') && entry.props.value === ''),
+  ],
+);
+
+// Sending carries the reference metadata alongside the text.
+await typeInto('lm-composerInput', 'ship it');
+await click('lm-sendBtn');
+const skillRequest = requested.filter((row) => row.endpoint === 'roomSay').at(-1);
+checks.push(
+  ['skill references retain readable tokens for legacy recipients', skillRequest?.payload.text.includes('/deploy')],
+  [
+    'sending serializes the confirmed skill reference',
+    skillRequest?.payload.skillRefs?.length === 1 &&
+      skillRequest.payload.skillRefs[0].name === 'deploy' &&
+      skillRequest.payload.skillRefs[0].sourceNodeId === 'node-a' &&
+      skillRequest.payload.skillRefs[0].sourceNodeName === 'Local node',
+  ],
+  // A reference is a hint: it must never travel as an instruction to run.
+  [
+    'a skill reference carries no execution instruction',
+    Object.keys(skillRequest?.payload?.skillRefs?.[0] ?? {}).sort().join(',') === 'name,sourceNodeId,sourceNodeName',
+  ],
+  ['sending clears the confirmed references', !stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
+);
+
+// A reference can be dropped again before sending, and dropping it removes the
+// metadata rather than only the chip.
+await typeInto('lm-composerInput', '/', 1);
+await press('lm-composerInput', 'Enter');
+await click('lm-skillChipRemove');
+checks.push(
+  ['a confirmed skill can be removed', count('lm-skillChip') === 0],
+  ['removing a skill clears its reference', !stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
+);
+
+// Typed text that merely looks like a command stays text. The list may have
+// matched nothing; the message must still send as ordinary prose.
+await typeInto('lm-composerInput', '/not-a-skill', 12);
+await press('lm-composerInput', 'Escape');
+await typeInto('lm-composerInput', '/plain/word', 11);
+await click('lm-sendBtn');
+const plainRequest = requested.filter((row) => row.endpoint === 'roomSay').at(-1);
+checks.push(
+  ['typed slash text is not a skill reference', plainRequest?.payload.skillRefs === undefined],
+  ['typed slash text still reaches the room verbatim', plainRequest?.payload.text === '/plain/word'],
+);
+
+// The toolbar button opens the very same menu, with the search box focused on
+// an empty query rather than on a slash token.
+await click('lm-skillBtn');
+checks.push([
+  'the toolbar button opens the shared skill menu',
+  count('lm-skillItem') === 3 && count('lm-skillSearch') === 1,
+]);
+// The search box narrows the same list the slash token filters.
+await typeInto('lm-skillSearch', 'dig');
+checks.push(['searching narrows the skill menu', count('lm-skillItem') === 1 && skillRowLabels()[0] === '/digest']);
+await press('lm-composerInput', 'Escape');
+checks.push(['escape closes the skill menu', count('lm-skillItem') === 0]);
+
+// A node without a skill registry says so; it never pretends to have none.
+const healthyCatalogue = answers.roomSkills;
+answers.roomSkills = { status: 'unavailable', skills: [], reason: 'the skill registry is not available on this node' };
+// The catalogue is read once when the room mounts, so this needs its own mount.
+await switchTo(Component);
+await click('lm-skillBtn');
+checks.push([
+  'an unavailable catalogue is reported as unavailable, not as empty',
+  lastText.includes('本机技能目录不可用') && count('lm-skillItem') === 0,
+]);
+answers.roomSkills = healthyCatalogue;
+// Remounting dropped the pane's local state, so the member row the following
+// checks read has to be expanded again.
+await switchTo(Component);
+await click('lm-badgeBtn');
 
 // The member shortcut must actually reach the client services.
 const panelsBeforeOpen = selectPanelCalls.length;
@@ -933,6 +1226,10 @@ checks.push(
   ['non-leader sees no rename button', count('lm-renameBtn') === 0],
   ['non-leader may leave the room', count('lm-leaveBtn') === 1],
   ['non-leader sees no kick button', count('lm-kickBtn') === 0],
+  // A human member who is not the leader may still pull a local session in; the
+  // panel only mirrors the server rule, it never decides it.
+  ['a human member still sees the invite row', count('lm-inviteRow') === 1],
+  ['member sees the disabled task entry with an explanation', lastNodes.some(n => hasClass(n, 'lm-taskPill') && n.props.disabled === true && n.props.title.includes('只有 leader'))],
   ['empty conversation says so', lastText.includes('房间里还没有消息')],
 );
 
@@ -960,7 +1257,8 @@ checks.push(
     'inbox lists only the unread messages',
     count('lm-msg') === 4 &&
       lastText.includes('a long note') &&
-      lastText.includes('my own note') &&
+      !lastText.includes('my own note') &&
+      lastText.includes('a remote human note') &&
       lastText.includes('the local agent answered me') &&
       lastText.includes('beta needs a decision on the header'),
   ],
@@ -973,7 +1271,7 @@ checks.push(
     'inbox names the sender instead of the recipient',
     senderLabels().includes('Beta rollout') && senderLabels().includes('echo-worker') && !lastText.includes('发给'),
   ],
-  ['inbox marks only the human own copy as mine', count('lm-msgOut') === 1 && senderLabels().includes('我')],
+  ['inbox excludes local human and names remote human correctly', count('lm-msgOut') === 0 && senderLabels().includes('Remote human')],
   [
     'inbox tags room messages with their room',
     count('lm-msgRoomTag') === 2 && lastText.includes('#Alpha room'),
@@ -998,12 +1296,29 @@ checks.push([
 ]);
 
 // Clicking a room row must open that room, not just mark it read.
+await click('lm-msg', 0);
+checks.push([
+  'clicking a private inbox message marks only that message and keeps the inbox open',
+  count('lm-msg') === 3 && !lastText.includes('a remote human note') && count('lm-chat') === 0
+    && requested.some(request => request.endpoint === 'markRead' && request.payload.messageId === 'i7'),
+]);
 await click('lm-msgJump');
 if (!asked.includes('roomDetail')) throw new Error('the inbox jump never asked for roomDetail');
+if (!requested.some(request => request.endpoint === 'markRead' && request.payload.messageId === 'i4')) throw new Error('room inbox click did not mark the clicked non-mention message read');
+if (!answers.snapshot.inbox.messages.find(message => message.id === 'i4').read) throw new Error('room message remained unread after clicking');
 checks.push([
   'clicking an inbox room message opens that room',
   count('lm-chat') === 1 && lastText.includes('hello from beta'),
 ]);
+await switchTo(RailHost);
+await clickRail('lm-nav-inbox');
+await switchTo(Component);
+checks.push(['returning to inbox keeps the clicked room message read', !lastText.includes('the local agent answered me') && count('lm-msg') === 2]);
+const markAllButton = lastNodes.find(entry => entry.type === 'button' && (entry.children ?? []).includes('全部标为已读'));
+if (!markAllButton) throw new Error('missing mark all read button');
+await markAllButton.props.onClick();
+await settle();
+checks.push(['mark all read clears the remaining inbox and count', count('lm-msg') === 0 && answers.snapshot.inbox.unread === 0]);
 
 // A rail Agent row opens the native conversation in the main area. The rail
 // itself lives in the sidebar, so it stays exactly where it is.

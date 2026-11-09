@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "check:composer-compat": "node scripts/composer-compat-check.mjs",
     "test": "node --test scripts/*.test.mjs",
     "test:team": "node --test scripts/team-*.test.mjs",
     "test:team:smoke": "node scripts/team-smoke.mjs"

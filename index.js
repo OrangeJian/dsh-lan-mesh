@@ -308,6 +308,93 @@ function renderAgentAction(value) {
   return value.summary;
 }
 
+/** Bound on one room skill catalogue; a panel is not a skills browser. */
+const MAX_ROOM_SKILLS = 200;
+/** Bound on every free-text field the skill catalogue hands to the panel. */
+const MAX_ROOM_SKILL_TEXT = 320;
+
+/**
+ * Summarize one skill for the Room skill picker.
+ *
+ * The picker only needs to *name* a skill and say where it came from, so this
+ * projection deliberately drops everything a Room could not honestly use: the
+ * instruction file path, the provider handle, the resource base, and the body.
+ * A Room reference is a hint about a capability, never a way to read one.
+ * @param {object} skill - one `ctx.skills.list()` summary.
+ * @param {{ nodeId: string, nodeName: string }} source - this node.
+ * @returns {{ name: string, description: string, sourceNodeId: string, sourceNodeName: string } | undefined}
+ */
+function roomSkillRow(skill, source) {
+  const name = typeof skill?.name === 'string' ? skill.name.trim() : '';
+  if (name === '' || name.length > 128 || /[\u0000-\u001f]/u.test(name)) return undefined;
+  // Only what a human may deliberately invoke: a model-only skill has no
+  // business appearing in a menu a person picks from.
+  if (skill?.invocation?.userInvocable !== true) return undefined;
+  const description = typeof skill?.description === 'string' ? skill.description.trim() : '';
+  return {
+    name,
+    description: description.slice(0, MAX_ROOM_SKILL_TEXT),
+    sourceNodeId: source.nodeId,
+    sourceNodeName: source.nodeName,
+  };
+}
+
+/**
+ * Read this node's public skill catalogue for the Room composer.
+ *
+ * Resolved lazily on every request rather than captured during `apply`: the
+ * skill registry is mounted by another plugin, so a reference taken at apply
+ * time would be permanently `undefined` whenever this plugin activates first.
+ * Omitting `scope` is deliberate — it reads the global layer alone, which is
+ * exactly the set a Room (which has no agent session) can honestly advertise.
+ * `get`/`invoke` are never called: listing a skill must never load its body,
+ * let alone run it.
+ * @param {{ get?: (name: string) => unknown }} ctx - plugin context.
+ * @param {object} node - the mesh node, for its identity.
+ * @returns {Promise<{ status: string, skills: object[], reason?: string }>}
+ */
+async function readRoomSkills(ctx, node) {
+  const identity = typeof node?.describe === 'function' ? node.describe() : {};
+  const source = {
+    nodeId: typeof identity?.nodeId === 'string' ? identity.nodeId : '',
+    nodeName: typeof identity?.name === 'string' ? identity.name : '',
+  };
+  let registry;
+  try {
+    registry = typeof ctx?.get === 'function' ? ctx.get('skills') : undefined;
+  } catch {
+    return { status: 'unavailable', skills: [], reason: 'the skill registry is not available on this node' };
+  }
+  if (registry === undefined || registry === null || typeof registry.list !== 'function') {
+    // A missing registry is a normal deployment, not an error: the composer
+    // then simply has no skills to offer and must say so instead of inventing
+    // a catalogue or refusing to open the room.
+    return { status: 'unavailable', skills: [], reason: 'the skill registry is not available on this node' };
+  }
+  let listed;
+  try {
+    listed = await registry.list({});
+  } catch (error) {
+    return { status: 'unavailable', skills: [], reason: String(error?.message ?? error) };
+  }
+  if (!Array.isArray(listed)) return { status: 'unavailable', skills: [], reason: 'the skill registry returned no catalogue' };
+  const rows = [];
+  const seen = new Set();
+  for (const skill of listed) {
+    const row = roomSkillRow(skill, source);
+    if (row === undefined) continue;
+    // Two providers can win the same name in different layers; the registry
+    // already resolves that, so a duplicate here is the same skill twice.
+    const key = JSON.stringify([row.sourceNodeId, row.name]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(row);
+    if (rows.length >= MAX_ROOM_SKILLS) break;
+  }
+  rows.sort((left, right) => left.name.localeCompare(right.name));
+  return { status: 'ready', skills: rows };
+}
+
 /**
  * Member shape shared by every room output schema.
  *
@@ -315,6 +402,8 @@ function renderAgentAction(value) {
  * one would render a green dot for everyone. Remote members report their node's
  * reachability, local ones whether their session is running.
  */
+const MENTIONS_SCHEMA = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['memberKey', 'label'], properties: { memberKey: { type: 'string' }, label: { type: 'string' } } } };
+const SKILL_REFS_SCHEMA = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['name', 'sourceNodeId', 'sourceNodeName'], properties: { name: { type: 'string' }, sourceNodeId: { type: 'string' }, sourceNodeName: { type: 'string' } } } };
 const MEMBER_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -324,6 +413,7 @@ const MEMBER_SCHEMA = {
     sessionId: { type: 'string' },
     name: { type: 'string' },
     title: { type: 'string' },
+    nodeName: { type: 'string' },
     role: { type: 'string', enum: ['leader', 'member'] },
     key: { type: 'string' },
     live: { type: 'boolean' },
@@ -690,6 +780,8 @@ export function apply(ctx, rawConfig) {
                       kind: { type: 'string' },
                       topic: { type: 'string' },
                       text: { type: 'string' },
+                      structuredMentions: MENTIONS_SCHEMA,
+                      skillRefs: SKILL_REFS_SCHEMA,
                     },
                   },
                 },
@@ -715,6 +807,8 @@ export function apply(ctx, rawConfig) {
                 kind: item.kind,
                 topic: item.topic,
                 text: item.text,
+                ...(item.structuredMentions === undefined ? {} : { structuredMentions: item.structuredMentions }),
+                ...(item.skillRefs === undefined ? {} : { skillRefs: item.skillRefs }),
               })),
             };
           },
@@ -904,6 +998,8 @@ export function apply(ctx, rawConfig) {
             properties: {
               room: { type: 'string', description: '房间名或房间 id。' },
               text: { type: 'string', description: '要发送的正文，纯文本。' },
+              mentions: MENTIONS_SCHEMA,
+              skillRefs: SKILL_REFS_SCHEMA,
             },
           },
           output: {
@@ -927,6 +1023,8 @@ export function apply(ctx, rawConfig) {
               room: String(args.room ?? ''),
               sessionId,
               text: String(args.text ?? ''),
+              mentions: args.mentions,
+              skillRefs: args.skillRefs,
             });
             const remote = Array.isArray(result.delivered) ? result.delivered : [];
             const remoteNote =
@@ -1286,8 +1384,8 @@ export function apply(ctx, rawConfig) {
             value: await node.send({ target: str('target'), text: str('text'), topic: opt('topic') }),
           };
         case 'markRead':
-          node.markAllRead();
-          return { ok: true, value: node.inbox({ limit: 100 }) };
+          await node.markAllRead(opt('messageId'));
+          return { ok: true, value: node.humanInbox() };
         case 'roomRead':
           return { ok: true, value: { flipped: node.markRoomRead(str('room'), opt('sessionId')) } };
         case 'sessions':
@@ -1324,11 +1422,16 @@ export function apply(ctx, rawConfig) {
             value: await node.removeMember({ room: str('room'), sessionId: str('sessionId'), member: str('member') }),
           };
         case 'roomInvite':
+          // The panel route is registered on the owner-only connection channel,
+          // so reaching this handler already proves the caller is the local
+          // person; `via` carries that fact instead of a sessionId the payload
+          // could forge. An agent invites through its own tool call, which never
+          // comes through here.
           return {
             ok: true,
             value: await node.addRoomMember({
               room: str('room'),
-              sessionId: str('sessionId'),
+              via: 'panel',
               memberSessionId: str('memberSessionId'),
               memberNodeId: opt('memberNodeId'),
             }),
@@ -1368,12 +1471,12 @@ export function apply(ctx, rawConfig) {
         case 'roomSay':
           return {
             ok: true,
-            value: await node.sayInRoom({ room: str('room'), sessionId: str('sessionId'), text: str('text') }),
+            value: await node.sayInRoom({ room: str('room'), sessionId: str('sessionId'), text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, file: request.file }),
           };
         case 'roomDetail':
           return { ok: true, value: await node.roomDetail({ room: str('room'), sessionId: str('sessionId') }) };
         case 'agents':
-          return { ok: true, value: await node.catalogueAgents() };
+          return { ok: true, value: await node.catalogueAgents({ peers: request.localOnly === true ? false : undefined }) };
         case 'agentImport':
           return {
             ok: true,
@@ -1407,6 +1510,12 @@ export function apply(ctx, rawConfig) {
           return { ok: true, value: await notifier.confirm(str('id'), str('channel')) };
         case 'notifyDismiss':
           return { ok: true, value: notifier.dismiss(str('id')) };
+        case 'roomSkills':
+          // The Room composer's skill picker reads this node's public catalogue.
+          // It is a read-only projection: no skill is installed, loaded, or run
+          // by looking at it, and a node without a skill registry answers
+          // `unavailable` instead of failing the room.
+          return { ok: true, value: await readRoomSkills(ctx, node) };
         default:
           return failed('UNKNOWN_ENDPOINT', `unknown endpoint ${endpoint}`);
       }
@@ -1453,7 +1562,7 @@ export function apply(ctx, rawConfig) {
     return () => {
       live = false;
       void live;
-      void node.close();
+      return node.close();
     };
   });
 }
