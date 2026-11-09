@@ -9,6 +9,8 @@
 
 开发预览：[Agent Team M1 使用说明](docs/team-m1-usage.md)。新增独立执行账本、派发确认、租约及结果核对，默认关闭；自动编排和验收界面尚未实现。新源码也修复了“项目早于对端启动，导致可加入列表为空”的补同步问题，更新后需重载插件。
 
+2026-11-10 开发交接：M3 附件实现已提交，**最终审查未通过，尚未完成**。负责人要求转交 DSH 继续；先处理 [M3 整改清单](docs/handoffs/dsh-m3-review-findings.md)，再使用 [后续开发提示词](docs/handoffs/dsh-after-m3-prompt.md) 推进。已有自动化通过记录不能代替这些遗漏的回归和真实设备验收。
+
 ## 截图
 
 > 截图待补。按下面每条说明截图，放进 `docs/screenshots/`，再把对应的 `<!-- SCREENSHOT -->` 占位行换成 `![描述](docs/screenshots/xxx.png)` 即可。
