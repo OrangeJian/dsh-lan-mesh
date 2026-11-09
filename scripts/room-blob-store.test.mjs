@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { Readable, PassThrough } from 'node:stream';
 import { RoomBlobStore } from '../lib/room-blob-store.mjs';
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const ref = (bytes, extra = {}) => ({ blobId: hash(bytes), name: 'note.txt', mediaType: 'text/plain', size: Buffer.byteLength(bytes), ownerNodeId: 'node-a', ...extra });
@@ -159,7 +161,7 @@ test('aborted stream releases its reservation and leaves no temporary files', as
 test('an unknown digest collision is never overwritten or collected', async t => {
   const { dir, store } = await fixture(t, { orphanGraceMs: 0 });
   await writeFile(join(dir, hash('hello')), 'other');
-  await assert.rejects(put(store, 'hello'), /corrupt/i);
+  await assert.rejects(put(store, 'hello'), /conflict/i);
   assert.equal(await store.has(hash('hello')), false);
   await store.collectOrphans(Date.now() + 5000);
   assert.equal(await readFile(join(dir, hash('hello')), 'utf8'), 'other');
@@ -193,4 +195,71 @@ test('restart recovers uncommitted publication intents without exposing or losin
   await assert.rejects(reopened.openRead(hash('hello')), /not found/i);
   assert.deepEqual((await reopened.collectOrphans(Date.now() + 1000)).sort(), [hash('hello'), hash('world')].sort());
   assert.equal(await readFile(join(dir, hash('unknown')), 'utf8'), 'unknown');
+});
+
+test('valid unknown digest files are rejected rather than adopted and later collected', async t => {
+  const { dir, store } = await fixture(t, { orphanGraceMs: 0 });
+  const id = hash('hello');
+  await writeFile(join(dir, id), 'hello');
+  const before = await readFile(join(dir, 'metadata.json'), 'utf8');
+  await assert.rejects(put(store, 'hello'), /conflict/i);
+  assert.equal(await store.has(id), false);
+  assert.equal(await readFile(join(dir, 'metadata.json'), 'utf8'), before);
+  assert.deepEqual(await store.collectOrphans(Date.now() + 1000), []);
+  assert.equal(await readFile(join(dir, id), 'utf8'), 'hello');
+  assert.deepEqual((await readdir(dir)).sort(), [id, 'metadata.json'].sort());
+});
+
+test('concurrent publisher rejects staging left by failed commit and failed rollback unlink', async t => {
+  const { dir, store } = await fixture(t, { orphanGraceMs: 0 });
+  const id = hash('hello');
+  const streams = [new PassThrough(), new PassThrough()];
+  const uploads = streams.map((stream, i) => store.put(stream, ref('hello', { ownerNodeId: `node-${i}` })));
+  // Both leases must precede A's failed publication, otherwise B fails earlier.
+  await store.has(id);
+  const originalRename = fsPromises.rename;
+  const originalUnlink = fsPromises.unlink;
+  let metadataRenames = 0;
+  let unlinkFailed = false;
+  const renameMock = t.mock.method(fsPromises, 'rename', async (from, to) => {
+    if (to === join(dir, 'metadata.json') && ++metadataRenames === 2) throw new Error('injected commit failure');
+    return originalRename(from, to);
+  });
+  const unlinkMock = t.mock.method(fsPromises, 'unlink', async path => {
+    if (path === join(dir, id) && !unlinkFailed) {
+      unlinkFailed = true;
+      throw new Error('injected rollback unlink failure');
+    }
+    return originalUnlink(path);
+  });
+  syncBuiltinESMExports();
+  try {
+    const failedA = assert.rejects(uploads[0], /injected rollback unlink failure/);
+    streams[0].end('hello');
+    await failedA;
+    assert.equal(await store.has(id), false);
+    const staged = JSON.parse(await readFile(join(dir, 'metadata.json'), 'utf8')).blobs[id];
+    assert.equal(staged.staging, true);
+    // Restore the I/O faults: B must still reject based on the durable state.
+    renameMock.mock.restore();
+    unlinkMock.mock.restore();
+    syncBuiltinESMExports();
+    const rejectedB = assert.rejects(uploads[1], /pending collection/i);
+    streams[1].end('hello');
+    await rejectedB;
+    assert.equal(await store.has(id), false);
+    await assert.rejects(store.openRead(id), /not found/i);
+    await assert.rejects(store.pin(id, 'message'), /not found/i);
+    assert.deepEqual(await store.collectOrphans(Date.now() + 1000), [id]);
+    const committed = await put(store, 'hello');
+    assert.equal(await contents(store, committed.blobId), 'hello');
+    await store.pin(id, 'message');
+    assert.deepEqual(await store.collectOrphans(Date.now() + 1000), []);
+  } finally {
+    renameMock.mock.restore();
+    unlinkMock.mock.restore();
+    syncBuiltinESMExports();
+    streams.forEach(stream => stream.destroy());
+    await Promise.allSettled(uploads);
+  }
 });

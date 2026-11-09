@@ -53,3 +53,18 @@ The first restricted full-suite attempt was interrupted after system temporary-d
 - Conservative in-flight reservations can reject simultaneous same-digest new uploads even though the eventual committed bytes deduplicate. Successful committed duplicates require no additional quota.
 - Metadata corruption is rejected rather than repaired. Failed interrupted GC remains hidden and quota-conservative until a subsequent collection succeeds.
 - No sender plus Leader replication, network endpoint/authentication, browser/UI integration, or host configuration is claimed by this task.
+
+## Fix round 1 (2026-11-10, base `8d8d79b`)
+
+Both reviewer P2 findings were reproduced before modifying production code:
+
+1. A valid, unregistered digest-named file was previously verified and adopted by put, making an unknown user file eligible for later GC. Publication now requires an existing committed manifest entry before accepting an existing destination. An unregistered destination is rejected with a conflict error regardless of its bytes; neither the file nor manifest changes. The existing invalid-content collision test now expects this earlier conflict rejection.
+2. Two same-digest uploads could both obtain leases, after which A's final metadata commit and rollback unlink failed, leaving hidden staging metadata and bytes. B previously reused that state and returned a reference that has/read/pin rejected. Publication now rechecks staging/deleting and size inside the serialization queue, before inspecting or publishing the destination. A pending hidden state rejects B; normal GC can recover the staging entry and a subsequent fresh put succeeds and supports read/pin.
+
+Added two regression tests. The concurrent failure test uses real files/streams with narrowly scoped injected failures for the second metadata rename and first digest unlink, then restores both filesystem methods before B continues. It asserts the actual persistent staging state, B's rejection, absence of a readable/pinnable commit, and successful GC/retry/read/pin recovery. It does not merely assert mock invocation. Builtin ESM exports are synchronized and both fault overrides restored in finally; no production test hooks were added.
+
+RED: `node --test scripts/room-blob-store.test.mjs` exited 1 with **13 pass, 2 fail**. Both new tests reported `Missing expected rejection`, proving the original implementation accepted the unknown file and falsely succeeded after the concurrent staging failure.
+
+GREEN: the same focused command exited 0 with **15/15**. The full `npm test` command outside managed network restrictions exited 0 with **135/135**, zero failures/skips/cancellations. Output retained locally at `.superpowers/sdd/2026-11-08-room-attachments/task-1-fix-round-1-npm-test.log`. `git diff --check` and staged diff checks passed.
+
+Self-review: ownership is now established by committed metadata, not matching bytes; hidden states are checked at reservation and publication boundaries. Existing ordinary dedup, concurrent successful same-content uploads, quota reservations, active leases, pin persistence, and recovery tests remain green. Public interfaces and prior single-owner/directory limitations are unchanged. Only the store, its focused tests, and this report changed; no UI/protocol changes.
