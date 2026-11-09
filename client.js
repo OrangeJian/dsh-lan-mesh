@@ -143,7 +143,8 @@ window.__ModuleLoader__.load({
           taskFailed: '创建任务失败',
           // file sharing
           attachFile: '添加附件',
-          fileTooLarge: '文件过大，单条消息最多支持约 180KB 的附件',
+          fileTooLarge: '附件超过当前 Host 的数量或大小限制',
+          attachmentUploading:'上传中…',attachmentReady:'已上传',attachmentRetry:'重试',attachmentUnavailable:'附件暂不可用',attachmentDirectory:'不支持上传文件夹',attachmentLimitsMissing:'暂未获取附件限制，请刷新后重试',
           fileName: '文件名',
           fileSize: '大小',
           download: '下载',
@@ -323,7 +324,8 @@ window.__ModuleLoader__.load({
           taskFailed: 'Failed to create task',
           // file sharing
           attachFile: 'Attach file',
-          fileTooLarge: 'File too large — max ~180 KB per message',
+          fileTooLarge: 'Attachments exceed the current Host limits',
+          attachmentUploading:'Uploading…',attachmentReady:'Ready',attachmentRetry:'Retry',attachmentUnavailable:'Attachment unavailable',attachmentDirectory:'Directories are not supported',attachmentLimitsMissing:'Attachment limits unavailable; refresh and retry',
           fileName: 'File name',
           fileSize: 'Size',
           download: 'Download',
@@ -522,7 +524,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-bubbleSystem{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l2)}
 .lm-bubbleMine{border-color:var(--dsw-alias-brand-primary)}
 .lm-bubblePlain{white-space:pre-wrap}
-.lm-composer{display:flex;flex-direction:column;align-items:center;padding:0 16px 12px}
+.lm-composer{border:0;margin:0;min-width:0;display:flex;flex-direction:column;align-items:center;padding:0 16px 12px}
 /* Composer card, matching dsh-agent-team's composer.module.css: the shell's
    input fill, a hairline drawn by the elevation stroke rather than a border,
    22px radius, and a 780px cap so a wide panel keeps a readable line length. */
@@ -1222,6 +1224,20 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       * @param {object} props - message plus ownership flag and optional sender label.
       * @returns {object} bubble element.
       */
+    function AttachmentCard({refData:ref,roomId}) {
+      const [error,setError]=React.useState('');
+      const [retry,setRetry]=React.useState(0);
+      const url='/api/lan-mesh/attachments?'+new URLSearchParams({room:roomId,blobId:ref.blobId});
+      const download=async()=>{
+        try {const response=await fetch(url,{credentials:'same-origin'});if(!response.ok)throw Error(await response.text());const blob=await response.blob();const link=document.createElement('a');const objectURL=URL.createObjectURL(blob);link.href=objectURL;link.download=ref.name;link.click();URL.revokeObjectURL(objectURL);setError('');}
+        catch(e){setError(COPY.attachmentUnavailable+' — '+errorText(e));}
+      };
+      return h('div',{className:'lm-attachment'},
+        /^image\/(png|jpeg|gif|webp|avif|bmp)$/i.test(ref.mediaType)&&!error?h('a',{href:url+'&preview=1',target:'_blank',rel:'noopener'},h('img',{key:retry,src:url+'&preview=1',alt:ref.name,onError:()=>setError(COPY.attachmentUnavailable),style:{maxWidth:160,maxHeight:120}})):null,
+        h('span',null,ref.name+' · '+formatFileSize(ref.size)),h('button',{type:'button',onClick:download},COPY.download),
+        error?h('span',{role:'alert'},error,h('button',{type:'button',onClick:()=>{setError('');setRetry(n=>n+1);}},COPY.attachmentRetry)):null);
+    }
+
      function ChatBubble(props) {
        const message = props.message;
        // Own messages show "我" / "me" instead of the user's own name — every
@@ -1273,6 +1289,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
        const bubbleContents = [];
        if (body !== null) bubbleContents.push(body);
        if (attachment !== null) bubbleContents.push(attachment);
+       for(const ref of message.attachments??[])bubbleContents.push(h(AttachmentCard,{key:ref.blobId,refData:ref,roomId:props.roomId}));
        // Skill references ride beside the text, never inside it: the body keeps
        // the exact words the sender typed, and the chips name the capabilities
        // they pointed at along with the node that owns each one. A reference
@@ -1342,6 +1359,43 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
      * @param {object} props - room row, session, rpc caller, change/exit hooks.
      * @returns {object} pane element.
      */
+    function createAttachmentDraft({room, limits, onChange}) {
+      let rows=[], live=true; const jobs=new Set();
+      const notify=()=>{if(live)onChange([...rows]);};
+      const upload=async row=>{
+        row.controller=new AbortController();row.status='uploading';row.error='';notify();
+        try {
+          const bytes=await row.file.arrayBuffer();
+          if(!live||!rows.includes(row))return;
+          const hash=await crypto.subtle.digest('SHA-256',bytes);
+          if(!live||!rows.includes(row))return;
+          const blobId=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+          const query=new URLSearchParams({room,blobId,name:row.file.name,size:String(row.file.size)});
+          const response=await fetch('/api/lan-mesh/attachments?'+query,{method:'POST',credentials:'same-origin',headers:{'content-type':row.mediaType},body:row.file,signal:row.controller.signal});
+          if(!response.ok)throw new Error(await response.text()||'Upload failed');
+          const ref=await response.json();
+          if(live&&rows.includes(row)){row.ref=ref;row.status='ready';notify();}
+        }catch(error){if(live&&rows.includes(row)){row.status='error';row.error=String(error.message||error);notify();}}
+      };
+      const start=row=>{const job=upload(row);jobs.add(job);job.finally(()=>jobs.delete(job));};
+      const remove=id=>{const row=rows.find(r=>r.id===id);if(!row)return;row.controller?.abort();if(row.preview)URL.revokeObjectURL(row.preview);rows=rows.filter(r=>r!==row);notify();};
+      return {
+        get rows(){return rows;},
+        add(files){
+          const list=Array.from(files);if(!list.length)return;
+          if(!limits)throw new Error(COPY.attachmentLimitsMissing);
+          if(rows.length+list.length>limits.maxAttachments||list.some(f=>!Number.isSafeInteger(f.size)||f.size<0||f.size>limits.maxFileBytes||f.isDirectory||f.webkitRelativePath)||rows.reduce((n,r)=>n+r.file.size,0)+list.reduce((n,f)=>n+f.size,0)>Math.min(limits.maxMessageBytes,limits.maxTotalBytes??Infinity))throw new Error(COPY.fileTooLarge);
+          const next=list.map(file=>({id:crypto.randomUUID(),file,mediaType:file.type||'application/octet-stream',preview:/^image\/(png|jpeg|gif|webp|avif|bmp)$/i.test(file.type)?URL.createObjectURL(file):'',status:'uploading'}));
+          rows.push(...next);notify();next.forEach(start);
+        },remove,retry(id){const row=rows.find(r=>r.id===id);if(row?.status==='error')start(row);},
+        ready(){return rows.every(r=>r.status==='ready');},
+        clear(){[...rows].forEach(r=>remove(r.id));},
+        dispose(){live=false;[...rows].forEach(r=>remove(r.id));},
+        async settled(){await Promise.all([...jobs]);}
+      };
+    }
+    // Attachment draft end
+
     function RoomPane(props) {
       const roomId = String(props.room?.id ?? '');
       const sessionId = props.sessionId;
@@ -1378,8 +1432,18 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       /** Quick-task: when checked, the next message also becomes a task
        *  assigned to the first @mentioned member (or everyone if @all). */
       const [quickTask, setQuickTask] = React.useState(false);
-      /** Attached file: { name, type, size, data (base64 data URL) } or null. */
-      const [attachedFile, setAttachedFile] = React.useState(null);
+      /** Local originals and uploaded references stay in this room draft until acceptance. */
+      const [attachmentRows, setAttachmentRows] = React.useState([]);
+      const attachmentDraft = React.useRef(null);
+      const sendAttempt = React.useRef(null);
+      React.useEffect(()=>{
+        const draft=createAttachmentDraft({room:roomId,limits:props.attachmentLimits,onChange:setAttachmentRows});
+        attachmentDraft.current=draft;
+        setAttachmentRows([]);setBusy('');sendAttempt.current=null;
+        const cleanup=()=>draft.dispose();
+        window.addEventListener?.('beforeunload',cleanup);
+        return ()=>{if(attachmentDraft.current===draft)attachmentDraft.current=null;cleanup();window.removeEventListener?.('beforeunload',cleanup);};
+      },[roomId,props.attachmentLimits?.maxFileBytes,props.attachmentLimits?.maxMessageBytes,props.attachmentLimits?.maxAttachments,props.attachmentLimits?.maxTotalBytes]);
       /**
        * This node's public skill catalogue, as the Host reported it.
        * `status` is 'idle' before the first read, then 'ready' or 'unavailable'
@@ -1620,45 +1684,26 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         setSkillMenuOpen(true);
       };
 
-      // ——— file attachment ———
-      const onFilePicked = (event) => {
-        const input = event.target;
-        const file = input.files && input.files[0];
-        if (!file) return;
-        // Rough size cap: the HTTP transport allows 256 KB per envelope, and
-        // base64 encoding adds ~33% overhead, so ~180 KB is a safe upper bound.
-        const MAX_FILE_BYTES = 180 * 1024;
-        if (file.size > MAX_FILE_BYTES) {
-          flash(COPY.fileTooLarge, true);
-          input.value = '';
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          setAttachedFile({
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            data: String(reader.result || ''),
-          });
-          input.value = '';
-        };
-        reader.onerror = () => {
-          flash(`${COPY.error}: ${reader.error?.message ?? 'file read failed'}`, true);
-          input.value = '';
-        };
-        reader.readAsDataURL(file);
+      const intakeFiles = files => {if(busy==='say')return;try{attachmentDraft.current.add(files);}catch(error){flash(errorText(error),true);}};
+      const onFilePicked = event => {intakeFiles(event.target.files||[]);event.target.value='';};
+      const transferFiles = (event, paste=false) => {
+        const transfer=paste?event.clipboardData:event.dataTransfer;
+        const items=Array.from(transfer?.items||[]);
+        if(items.some(i=>i.webkitGetAsEntry?.()?.isDirectory)){event.preventDefault();flash(COPY.attachmentDirectory,true);return;}
+        const files=Array.from(transfer?.files||[]).filter(f=>!paste||f.type.startsWith('image/'));
+        if(files.length){event.preventDefault();intakeFiles(files);}
       };
-      const removeAttachedFile = () => setAttachedFile(null);
 
       const doSay = async () => {
         const readableSkills = draftSkills.map((skill) => `/${skill.name}`)
           .filter((token) => !draft.split(/\s+/u).includes(token));
-        const text = [draft.trim(), ...readableSkills].filter(Boolean).join('\n');
-        if (text === '' && attachedFile === null) {
+        const text = [draft.trim(), ...readableSkills].filter(Boolean).join('\n') || attachmentRows.map(row=>row.file.name).join(', ');
+        if (busy==='say' || !attachmentDraft.current?.ready()) return;
+        if (text === '' && attachmentRows.length === 0) {
           flash(COPY.needMessage, true);
           return;
         }
+        const sendingDraft=attachmentDraft.current;
         setBusy('say');
         try {
           const sayArgs = { room: roomId, sessionId, text };
@@ -1673,8 +1718,12 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
               sourceNodeName,
             }));
           }
-          if (attachedFile !== null) sayArgs.file = attachedFile;
+          if (attachmentRows.length) sayArgs.attachments=attachmentRows.map(row=>row.ref);
+          const fingerprint=JSON.stringify(sayArgs);
+          if(sendAttempt.current?.fingerprint!==fingerprint)sendAttempt.current={fingerprint,messageId:window.crypto.randomUUID()};
+          sayArgs.messageId=sendAttempt.current.messageId;
           const value = await call('roomSay', sayArgs);
+          if(attachmentDraft.current!==sendingDraft)return;
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
           const failed = delivered.filter((row) => row.ok !== true);
           if (failed.length > 0) flash(`${COPY.deliverFailed}: ${failed[0].name ?? ''} ${failed[0].error ?? ''}`, true);
@@ -1682,7 +1731,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           setDraft('');
           setDraftMentions([]);
           setDraftSkills([]);
-          setAttachedFile(null);
+          sendingDraft.clear();
+          sendAttempt.current=null;
           // Quick-task flow: if the user ticked the "as task" box, turn the
           // message into a task right after it was sent. The title is the
           // first line (or first 40 chars), and the assignee is the first
@@ -1724,9 +1774,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           await load();
           props.onChanged?.();
         } catch (error) {
-          flash(`${COPY.error}: ${errorText(error)}`, true);
+          if(attachmentDraft.current===sendingDraft)flash(`${COPY.error}: ${errorText(error)}`, true);
         } finally {
-          setBusy('');
+          if(attachmentDraft.current===sendingDraft)setBusy('');
         }
       };
 
@@ -2171,6 +2221,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 return h(ChatBubble, {
                   key: message.id ?? `${messageStamp(message)}-${senderOf(message)}`,
                   message,
+                  roomId,
                   mine,
                   kind,
                   senderLabel,
@@ -2181,8 +2232,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         ),
 
         h(
-          'div',
-          { className: 'lm-composer' },
+          'fieldset',
+          { disabled:busy==='say',className: 'lm-composer', onDragOver:event=>event.preventDefault(),onDrop:event=>transferFiles(event),onPaste:event=>transferFiles(event,true) },
           h(
             'div',
             { className: 'lm-composerCard' },
@@ -2295,31 +2346,16 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   );
                 }),
               ),
-          attachedFile === null
-            ? null
-            : h(
-                'div',
-                { className: 'lm-composerTools' },
-                h(
-                  'div',
-                  { className: 'lm-fileChip' },
-                  h('span', null, fileIcon(attachedFile.type, attachedFile.name)),
-                  h('span', { className: 'lm-fileChipName', title: attachedFile.name }, attachedFile.name),
-                  h('span', { className: 'lm-fileChipSize' }, formatFileSize(attachedFile.size)),
-                  h(
-                    'button',
-                    {
-                      type: 'button',
-                      className: 'lm-fileChipRemove',
-                      title: COPY.removeFile,
-                      onClick: removeAttachedFile,
-                    },
-                    '×',
-                  ),
-                ),
-              ),
+          h('div',{className:'lm-composerTools'},attachmentRows.map(row=>h('div',{className:'lm-fileChip',key:row.id},
+            row.preview?h('img',{src:row.preview,alt:row.file.name,style:{width:48,height:48,objectFit:'cover'}}):null,
+            h('span',{className:'lm-fileChipName'},row.file.name),
+            h('span',{role:'status'},row.status==='uploading'?COPY.attachmentUploading:row.status==='ready'?COPY.attachmentReady:row.error),
+            row.status==='error'?h('button',{type:'button',disabled:busy==='say',onClick:()=>attachmentDraft.current.retry(row.id)},COPY.attachmentRetry):null,
+            h('button',{type:'button',className:'lm-fileChipRemove',disabled:busy==='say',onClick:()=>attachmentDraft.current.remove(row.id)},'×')
+          ))),
           h('textarea', {
             className: 'lm-composerInput',
+              disabled: busy==='say',
               value: draft,
               placeholder: COPY.sayHint,
               onChange: (event) => {
@@ -2401,6 +2437,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 '📎',
                 h('input', {
                   type: 'file',
+                  multiple: true,
+                  disabled: busy==='say',
                   className: 'lm-fileInput',
                   onChange: onFilePicked,
                 }),
@@ -2442,7 +2480,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 {
                   type: 'button',
                   className: 'lm-sendBtn',
-                  disabled: busy === 'say' || viewer.isMember !== true,
+                  disabled: busy === 'say' || viewer.isMember !== true || attachmentRows.some(row=>row.status!=='ready'),
                   title: busy === 'say' ? COPY.saying : COPY.sayAction,
                   'aria-label': busy === 'say' ? COPY.saying : COPY.sayAction,
                   onClick: doSay,
@@ -3867,6 +3905,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             ? h(RoomPane, {
                 key: selected.id,
                 room: selected,
+                attachmentLimits: state.data?.roomAttachmentLimits,
                 sessionId: HUMAN_SESSION_ID,
                 self,
                 call,

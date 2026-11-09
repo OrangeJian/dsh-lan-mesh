@@ -204,3 +204,9 @@ test('omitted local session is human, never node-wide membership; rejected uploa
  await assert.rejects(a.readRoomAttachment({room:agents.id,blobId:ref.blobId}),/member/);
  await a.close();const fresh=new MeshNode({config:a.config});fresh.started=true;fresh.identity=a.identity;fresh.roomsDoc=a.roomsDoc;await fresh.roomAttachmentHandler();assert.equal(fresh.messages.length,2);await fresh.close();
 });
+test('durable metadata access outlives inbox paging without marking messages read',async t=>{
+ const {nodes:[a,b],room}=await fixture(t);await httpLeader(a,b);const ref=await upload(a,room);await a.sayInRoom({room:room.id,sessionId:'human',attachments:[ref],messageId:'paged'});
+ a.messages=[];
+ assert.deepEqual(await a.describeRoomAttachment({room:room.id,sessionId:'human',blobId:ref.blobId}),ref);
+ await assert.rejects(a.describeRoomAttachment({room:room.id,sessionId:'outsider',blobId:ref.blobId}),/member/);
+});

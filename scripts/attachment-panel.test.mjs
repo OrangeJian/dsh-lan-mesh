@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+import {webcrypto} from 'node:crypto';
+const source=readFileSync(new URL('../client.js',import.meta.url),'utf8');
+function controller(fetch){const a=source.indexOf('    function createAttachmentDraft('),b=source.indexOf('    // Attachment draft end',a);assert.ok(a>=0,'attachment draft controller exists');const revoked=[];const factory=vm.runInNewContext('('+source.slice(a,b).trim()+')',{crypto:webcrypto,URL:{createObjectURL:()=> 'blob:preview',revokeObjectURL:u=>revoked.push(u)},COPY:{fileTooLarge:"Attachment limit exceeded",attachmentLimitsMissing:"Missing limits"},AbortController,URLSearchParams,fetch});return {d:factory({room:'r',limits:{maxFileBytes:8,maxMessageBytes:10,maxAttachments:2},onChange:()=>{}}),revoked};}
+const file=(name='x.png',size=4,type='image/png')=>({name,size,type,arrayBuffer:async()=>new Uint8Array(size).buffer});
+test('multiple intake validates aggregate before uploading; preview/remove cancels and cleans',async()=>{let calls=0;const {d,revoked}=controller(async()=>{calls++;return Response.json({blobId:'a'.repeat(64)});});assert.throws(()=>d.add([file(),file('big',7)]),/limit/i);assert.equal(calls,0);d.add([file(),file('plain',4,'')]);await d.settled();assert.equal(d.rows.length,2);assert.equal(d.rows[1].mediaType,'application/octet-stream');assert.equal(d.ready(),true);d.remove(d.rows[0].id);assert.deepEqual(revoked,['blob:preview']);assert.throws(()=>d.add([file(),file()]),/limit/i);d.dispose();assert.equal(d.rows.length,0);});
+test('failed upload retains original File and retry; disposal ignores stale room results',async()=>{let n=0,resolve;const {d}=controller(async()=>{if(++n===1)throw Error('offline');return new Promise(r=>resolve=r);});const f=file();d.add([f]);assert.equal(d.ready(),false);await d.settled();assert.equal(d.rows[0].status,'error');assert.equal(d.rows[0].file,f);d.retry(d.rows[0].id);await new Promise(r=>setTimeout(r,20));d.dispose();resolve(Response.json({blobId:'b'.repeat(64)}));await d.settled();assert.equal(d.rows.length,0);});

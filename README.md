@@ -206,3 +206,13 @@ node scripts/probe-live.mjs             # 黑盒探测一个正在运行的实�
 - **工具报 `returned invalid output`**：`index.js` 声明的 output schema 与 `lib/` 实际返回的形状不一致。跑 `node scripts/schema-check.mjs` 能直接定位是哪条字段。房间有两套投影不能混用一个 schema：`ROOM_ROW_SCHEMA` 对应 `rooms.mjs` 的 `roomRow`（面向调用者的 role/isMember/isLeader），`ROOM_VIEW_SCHEMA` 对应 `service.mjs` 的 `#roomView`（面向房间本身的 leader/memberCount/createdAt）。
 - **插件工具在宿主里不见了**：工具注册必须走 `ctx.inject(['tools'], scope => scope.tools…)`。`apply` 运行时 `tools` 还没挂上，直接 `ctx.get('tools')` 可能永远拿到 undefined，于是整块注册被静默跳过。
 - **被 dial 的 agent 不做任何事**：先看它的会话日志里有没有 `lan_mesh_*` 工具。没有的话，说明工具没随 preset 挂上去（见上面的「引入／新建出来的 agent」一段）；再确认它的 `cwd` 目录存在，且创建时带上了默认模型，否则 turn 会在启动阶段就报错。
+
+### Room 多附件（M3）
+
+在 Room 输入框用 📎 多选、粘贴图片或拖入文件。默认每文件 **20 MiB**、每条消息 **8 项 / 40 MiB**；本机 Blob 总容量 **200 MiB**。实际限制由 Host 配置并在快照下发。普通文件没有 MIME 也可上传，文件夹不支持。
+
+上传中/失败时发送按钮不可用；失败项点“重试”，移除会取消上传。发送失败保留正文、已上传文件和稳定消息 ID，重试不会重复发表同一附件消息。纯附件发送用文件名作为正文。发送期间冻结编辑；切换房间会取消未完成上传。消息中图片可看原图，其他文件可下载；不可用时可重试。只有当前房间成员能通过已登录面板读取已提交附件。
+
+成功表示发送节点与 Room Leader 已持久保存（两者同机只算一份）；其他成员的离线或旧版本失败会单独提示并后台重试。旧记录中的内联附件仍可读，新附件不会退回 base64 发送。已准备发送的持久副本暂没有手动取消/自动释放机制，容量满会明确失败。
+
+完整规则见 [UI contract](docs/ui-contract.md#m3-附件上传与读取)。真实浏览器与跨设备/模型联合验收由用户完成；自动化 localhost 验证不代表实机验收。

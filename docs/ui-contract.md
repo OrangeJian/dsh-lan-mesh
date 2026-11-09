@@ -40,7 +40,7 @@ role      = 'leader' | 'member'
 | `roomRead` | `{room, sessionId}` | `{flipped}`（**新增**，只翻转真正该看的） |
 | `roomAssign` | `{room, sessionId, assignee, title, detail?}` | `{room, task, delivered}` |
 | `roomStatus` | `{room, sessionId, task, status, note?}` | `{room, task}` |
-| `roomSay` | `{room, sessionId, text, mentions?, skillRefs?, file?}` | `{room, delivered}` |
+| `roomSay` | `{room, text, mentions?, skillRefs?, attachments?, messageId?}` | `{room, delivered, messageId?, durableNodes?}` |
 | `roomSkills` | `{}` | `{status:'ready',skills:[SkillRow]}` 或 `{status:'unavailable',skills:[],reason}`（**新增**，只读本机技能目录） |
 | `send` | `{target, text, topic?}` | 投递结果 |
 | `markRead` | `{}` | inbox |
@@ -253,3 +253,16 @@ activate`）。同理两个 slot 注册都必须走 `ctx.slots.inject(key, () =>
 直接 `register` 会在 owner 声明插槽之前注册，条目静默消失。
 
 `openSession` 只接受**本机** session id；跨节点的 agent 没有本地会话对象。
+
+## M3 附件上传与读取
+
+面板可多选文件、粘贴图片、拖入文件；文件夹会拒绝。每项显示缩略预览（仅 PNG/JPEG/GIF/WebP/AVIF/BMP）、上传中、已上传或错误/重试，可移除取消。上传采用带同源登录态的 Fetch 原始文件流，进度显示不定量“上传中”，不伪造百分比；每个文件在浏览器用 WebCrypto 算 SHA-256，不转 base64。
+
+- 精确 owner 路由：`/api/lan-mesh/attachments`，`requestBody:'streaming'`。POST query：`room, blobId, name, size`；`Content-Type` 为文件 MIME（空 MIME 用 `application/octet-stream`），body 为原始字节。成功直接返回 `{blobId,name,mediaType,size,ownerNodeId}`。
+- GET query：`room, blobId, preview?`。当前本机 `human` 必须属于该 Room，且 durable ledger 中存在该 Room 的 committed 引用；不依赖聊天分页，不标记聊天已读。客户端 name/mediaType/session/node 参数无权覆盖已提交元数据。仅安全 raster 且 `preview=1` 时 inline，其他文件 attachment；响应带 `no-store`、`nosniff` 和禁止脚本的 CSP。
+- 默认 Host 限制：每文件 20 MiB、每消息 8 项/40 MiB、本机 Blob 总容量 200 MiB、孤立 Blob 宽限 24 小时。`snapshot.roomAttachmentLimits` 是实际限制；`roomAttachmentLimits` 可配置上述五项正安全整数，附件数量不得超过结构上限 1024。前端先做数量和总量校验，Host/服务再次验证字节数、hash、Room、引用。孤立宽限不代表 pending pins 自动释放。
+- 上传失败保留原 File 以重试；pending/error 禁止发送。纯附件消息自动用文件名生成正文。失败发送保留草稿和已上传 refs；相同内容重试复用 messageId，成功后清理。发送中冻结编辑，切换 Room/卸载取消上传并释放对象 URL，旧响应不会清除新 Room 草稿。
+- `roomSay` 与模型 `lan_mesh_room_say` 接受 `attachments` 与稳定 `messageId`；面板发送者由 Host 固定为 `human`，模型固定为 `exec.agent.id`（缺失拒绝）。附件发送成功表示 sender 和 Room Leader 已持久化；同一节点兼任时只计一个副本。普通成员离线/不支持附件会明确出现在 `delivered` 失败项，成功持久接受后清稿，后台重试投递；不能把元数据送达称作字节送达。新附件绝不降级内联；历史 `file` 只保留读/显示。
+- 下载/预览不可用时显示错误并可重试。删除草稿仅取消本地上传和释放预览；已有 prepared pins 没有取消/自动回收 API。远端副本依赖 LAN 在线与相同版本能力协商。
+
+自动验证包含 Request/Response 流、真实两节点 HTTP 和 React 行为渲染 harness；harness 不证明浏览器布局。当前批次按用户要求交由用户加载工作区自行做浏览器验收。

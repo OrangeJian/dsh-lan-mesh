@@ -225,6 +225,7 @@ try {
     // re-running it here proves the schema is inside the supported subset rather
     // than silently ignored.
     try {
+      framework.assertSupportedJsonSchema(definition.parameters);
       framework.assertSupportedJsonSchema(definition.output.schema);
       check(`${name} output schema is a supported shape`, true);
     } catch (error) {
@@ -232,6 +233,9 @@ try {
     }
   }
 
+  const attachmentArgs={room:'r',text:'',messageId:'retry-id',attachments:[{blobId:'a'.repeat(64),name:'file.bin',size:3,mediaType:'application/octet-stream',ownerNodeId:'node-a'}]};
+  check('room_say input accepts uploaded refs with stable messageId',framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters,attachmentArgs).length===0);
+  check('room_say input rejects new inline file writer',framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters,{room:'r',text:'',file:{data:'inline'}}).length>0);
   console.log('\nroom tool outputs');
   const created = await run('lan_mesh_room_member', { action: 'create', room: 'Schema Project', topic: 'check' }, 'room_member create');
   const roomId = created?.room?.id ?? '';
@@ -247,6 +251,7 @@ try {
   const referenceArgs = { room: roomId, text: '@Peer /missing-skill hello room', mentions: [mention], skillRefs: [skillRef] };
   check('room_say parameters expose references', framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters, referenceArgs).length === 0, framework.validateJsonSchemaValue(tools.get('lan_mesh_room_say').parameters, referenceArgs).join('; '));
   await run('lan_mesh_room_say', referenceArgs, 'room_say');
+  await panelFetch(new Request('http://mesh.invalid/', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'owner-join',payload:{method:'roomJoin',payload:{room:roomId,sessionId:LEADER}}})}));
   const rpcResponse = await panelFetch(new Request('http://mesh.invalid/', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'ref-rpc',payload:{method:'roomSay',payload:{...referenceArgs,sessionId:LEADER}}})}));
   const rpcBody = await rpcResponse.json();
   check('roomSay RPC accepts structured metadata', rpcBody.result?.ok === true, JSON.stringify(rpcBody).slice(0,300));

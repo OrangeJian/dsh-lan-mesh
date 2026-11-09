@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import {webcrypto} from 'node:crypto';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(here, '..', 'client.js'), 'utf8');
@@ -87,7 +88,7 @@ const window = {
     setItem: (key, value) => store.set(key, value),
     removeItem: (key) => store.delete(key),
   },
-  crypto: { randomUUID: () => 'uuid-1' },
+  crypto: webcrypto,
 };
 const document = {
   documentElement: { lang: 'zh', dataset: {} },
@@ -179,6 +180,7 @@ const strangerRoom = {
 /** What the Host answers for each panel endpoint. */
 const answers = {
   snapshot: {
+    roomAttachmentLimits:{maxFileBytes:20971520,maxTotalBytes:209715200,maxMessageBytes:41943040,maxAttachments:8},
     self: {
       nodeId: 'node-a',
       name: 'Local node',
@@ -399,6 +401,7 @@ const answers = {
           from: { nodeId: 'node-b', name: 'beta-worker', sessionId: 'session-9' },
           to: 'node-a',
           text: 'hello from beta',
+          file:{name:'legacy.txt',type:'text/plain',size:5,data:'data:text/plain;base64,aGVsbG8='},
           receivedAt: '2026-01-01T10:01:00.000Z',
           read: true,
         },
@@ -489,12 +492,22 @@ const answers = {
 const asked = [];
 const requested = [];
 let agentsGate;
+let uploadFailure=false,sendFailure=false,uploadGate;
+const uploaded=[];
 const fetch = async (route, init) => {
+  if(route.startsWith('/api/lan-mesh/attachments?')){
+    if(uploadGate)await uploadGate;
+    if(uploadFailure)throw Error('upload offline');
+    const q=new URL(route,'http://local').searchParams;
+    const ref={blobId:q.get('blobId'),name:q.get('name'),size:Number(q.get('size')),mediaType:init.headers['content-type'],ownerNodeId:'node-a'};
+    uploaded.push(ref);return {ok:true,json:async()=>ref};
+  }
   const body = JSON.parse(init.body);
   const endpoint = body.payload.method;
   const payload = body.payload.payload ?? {};
   asked.push(endpoint);
   requested.push({ endpoint, payload });
+  if(endpoint==='roomSay'&&sendFailure)throw Error('Leader unavailable');
   if (endpoint === 'markRead') {
     for (const message of answers.snapshot.inbox.messages) {
       if (!payload.messageId || payload.messageId === message.id) message.read = true;
@@ -527,6 +540,7 @@ const context = vm.createContext({
   window,
   document,
   crypto: window.crypto,
+  URL, URLSearchParams, AbortController,
   localStorage: window.localStorage,
   require,
   fetch,
@@ -535,7 +549,7 @@ const context = vm.createContext({
   setInterval: (fn, ms) => { const id = ++intervalId; intervals.set(id, { fn, ms }); return id; },
   clearInterval: (id) => intervals.delete(id),
 });
-vm.runInContext(source, context);
+vm.runInContext(source.replace('    function RoomPane(props) {','    window.__roomPane = RoomPane;\n    function RoomPane(props) {').replace('    function AttachmentCard(', '    window.__attachmentCard = AttachmentCard;\n    function AttachmentCard('), context);
 const loaded = window.__loaded;
 
 const opened = [];
@@ -852,6 +866,7 @@ if (!asked.includes('roomDetail')) throw new Error('selecting a room never asked
 checks.push(
   ['selecting a room opens its detail', lastText.includes('ship the panel')],
   ['room pane renders a chat area', count('lm-chat') >= 1],
+  ['historical inline files retain download links',lastNodes.some(n=>n.type==='a'&&n.props.download==='legacy.txt'&&n.props.href==='data:text/plain;base64,aGVsbG8=')],
   ['room pane renders the conversation', lastText.includes('hello from beta')],
   ['room pane leaves task notices out of the chat', !lastText.includes('ASSIGNED Split the panel')],
   // The chat pane is a scroll container the pane scrolls to the bottom on entry
@@ -1359,6 +1374,58 @@ checks.push(
   ['joined project moves out of the joinable list', count('lm-joinBtn') === 0 && count('lm-roomRow') === 3],
   ['successful join opens the mesh panel', document.documentElement.dataset.lanMeshMode === 'lanmesh'],
 );
+
+// Multi-attachment UI behavior through actual React handlers and byte digests.
+await switchTo(RailHost);await clickRail('lm-roomRow');await switchTo(Component);
+await typeInto('lm-composerInput','attachment retry');
+const image=new File([new Uint8Array([0,255,3])],'test.png',{type:'image/png'});
+const ordinary=new File(['doc'],'notes.bin');
+let releaseUpload;uploadGate=new Promise(r=>releaseUpload=r);
+const input=lastNodes.find(n=>hasClass(n,'lm-fileInput'));
+checks.push(['file picker accepts multiple files',input.props.multiple===true]);
+input.props.onChange({target:{files:[image,ordinary],value:'selected'}});await settle();
+checks.push(['pending uploads block send and show previews',lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.disabled===true&&count('lm-fileChip')===2&&lastText.includes('上传中…')]);
+releaseUpload();uploadGate=null;await settle();
+checks.push(['multiple uploads become ready without inline data',uploaded.length===2&&uploaded.every(r=>!r.data)&&lastText.includes('已上传')]);
+sendFailure=true;await click('lm-sendBtn');
+const firstAttempt=requested.filter(r=>r.endpoint==='roomSay').at(-1).payload;
+checks.push(['failed send keeps draft and uploaded references',count('lm-fileChip')===2&&lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='attachment retry']);
+sendFailure=false;await click('lm-sendBtn');const retried=requested.filter(r=>r.endpoint==='roomSay').at(-1).payload;
+checks.push(['send retry retains exact messageId and attachment refs',firstAttempt.messageId===retried.messageId&&retried.attachments.length===2&&JSON.stringify(firstAttempt.attachments)===JSON.stringify(retried.attachments)]);
+checks.push(['accepted send clears attachment draft',count('lm-fileChip')===0]);
+uploadFailure=true;
+lastNodes.find(n=>hasClass(n,'lm-composer')).props.onPaste({clipboardData:{files:[image]},preventDefault(){}});await settle();
+checks.push(['pasted image failure is visible and blocks send',count('lm-fileChip')===1&&lastText.includes('upload offline')&&lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.disabled===true]);
+uploadFailure=false;const retryButton=lastNodes.find(n=>n.type==='button'&&n.children.includes('重试'));retryButton.props.onClick();await settle();
+checks.push(['retry preserves pasted original file',lastText.includes('已上传')]);
+await click('lm-fileChipRemove');
+lastNodes.find(n=>hasClass(n,'lm-composer')).props.onDrop({dataTransfer:{files:[ordinary]},preventDefault(){}});await settle();
+await typeInto('lm-composerInput','');await click('lm-sendBtn');
+checks.push(['dropped attachment-only send uses readable filename',requested.filter(r=>r.endpoint==='roomSay').at(-1).payload.text==='notes.bin']);
+lastNodes.find(n=>hasClass(n,'lm-composer')).props.onDrop({dataTransfer:{items:[{webkitGetAsEntry:()=>({isDirectory:true})}],files:[]},preventDefault(){}});await settle();
+checks.push(['directory drops are rejected',lastText.includes('不支持上传文件夹')]);
+
+let pendingResolve;
+let isolatedRoom='room-1';
+const isolatedCall=async (method,args)=>method==='roomSay'?new Promise(resolve=>{pendingResolve=resolve;}):method==='roomDetail'?answers.roomDetail[args.room]:{status:'ready',skills:[]};
+const Isolated=()=>h(window.__roomPane,{room:{id:isolatedRoom},sessionId:'human',self:answers.snapshot.self,attachmentLimits:answers.snapshot.roomAttachmentLimits,call:isolatedCall});
+await switchTo(Isolated);lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'pending original',selectionStart:16}});await settleIn(Isolated);
+lastNodes.find(n=>hasClass(n,'lm-fileInput')).props.onChange({target:{files:[ordinary],value:''}});await settleIn(Isolated);
+const sending=lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(Isolated);
+checks.push(['pending send freezes text and file intake',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.disabled===true&&lastNodes.find(n=>hasClass(n,'lm-fileInput')).props.disabled===true]);
+isolatedRoom='room-3';await settleIn(Isolated);
+checks.push(['room switch clears attachment chips while send is pending',count('lm-fileChip')===0]);
+lastNodes.find(n=>hasClass(n,'lm-fileInput')).props.onChange({target:{files:[image],value:''}});await settleIn(Isolated);
+pendingResolve({delivered:[],durableNodes:['node-a']});await sending;await settleIn(Isolated);
+checks.push(['old send completion leaves the new room draft intact',count('lm-fileChip')===1]);
+
+const Card=()=>h(window.__attachmentCard,{refData:{blobId:'a'.repeat(64),name:'missing.png',size:3,mediaType:'image/png'},roomId:'room-1'});
+await switchTo(Card);lastNodes.find(n=>n.type==='img').props.onError();await settleIn(Card);
+checks.push(['unavailable attachment preview offers retry',lastText.includes('附件暂不可用')&&lastNodes.some(n=>n.type==='button'&&n.children.includes('重试'))]);
+lastNodes.find(n=>n.type==='button'&&n.children.includes('重试')).props.onClick();await settleIn(Card);
+checks.push(['preview retry restores authorized image URL',lastNodes.some(n=>n.type==='img'&&n.props.src.startsWith('/api/lan-mesh/attachments?room=room-1&blobId='))]);
+await lastNodes.find(n=>n.type==='button'&&n.children.includes('下载')).props.onClick();await settleIn(Card);
+checks.push(['download failure is visible and retryable',lastText.includes('附件暂不可用')&&lastNodes.some(n=>n.type==='button'&&n.children.includes('重试'))]);
 
 // A hostile context proves the entry cannot fail the Web boot: cordis throws on
 // an undeclared service, and the whole app dies when apply() rejects.

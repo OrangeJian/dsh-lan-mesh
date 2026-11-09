@@ -13,6 +13,8 @@
  *
  * @module dsh-lan-mesh
  */
+import { registerAttachmentGateway } from './lib/attachment-gateway.mjs';
+import { ROOM_ATTACHMENT_LIMITS, ROOM_ATTACHMENT_WIRE_LIMITS } from './lib/room-message.mjs';
 import { MeshNode } from './lib/service.mjs';
 import { Notifier } from './lib/notify.mjs';
 import { teamToolDefinitions } from './lib/team-tools.mjs';
@@ -80,7 +82,13 @@ function resolveConfig(raw) {
       : Number(value.discoveryPort);
   const envName = envValue('DSH_LAN_MESH_NAME');
   const envSecret = envValue('DSH_LAN_MESH_SECRET');
+  const roomAttachmentLimits = { ...ROOM_ATTACHMENT_LIMITS, ...value.roomAttachmentLimits };
+  for (const [key, limit] of Object.entries(roomAttachmentLimits)) {
+    if (!(key in ROOM_ATTACHMENT_LIMITS) || !Number.isSafeInteger(limit) || limit < 1) throw new Error('invalid attachment limit '+key);
+  }
+  if (roomAttachmentLimits.maxAttachments > ROOM_ATTACHMENT_WIRE_LIMITS.maxAttachments) throw new Error('attachment count limit exceeds wire bound');
   return {
+    roomAttachmentLimits,
     displayName:
       envName ?? (typeof value.displayName === 'string' ? value.displayName : DEFAULTS.displayName),
     port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : DEFAULTS.port,
@@ -1000,6 +1008,8 @@ export function apply(ctx, rawConfig) {
               text: { type: 'string', description: '要发送的正文，纯文本。' },
               mentions: MENTIONS_SCHEMA,
               skillRefs: SKILL_REFS_SCHEMA,
+              messageId: { type:'string', description:'Stable ID retained for retry.' },
+              attachments: { type:'array', items:{ type:'object', additionalProperties:false, required:['blobId','name','mediaType','size','ownerNodeId'], properties:{blobId:{type:'string'},name:{type:'string'},mediaType:{type:'string'},size:{type:'integer'},ownerNodeId:{type:'string'}} } },
             },
           },
           output: {
@@ -1011,6 +1021,8 @@ export function apply(ctx, rawConfig) {
                 summary: { type: 'string' },
                 room: ROOM_VIEW_SCHEMA,
                 delivered: DELIVERED_SCHEMA,
+                messageId: {type:'string'},
+                durableNodes: {type:'array',items:{type:'string'}},
               },
             },
             render: (_args, value) => text(value.summary),
@@ -1018,6 +1030,7 @@ export function apply(ctx, rawConfig) {
           async execute(args, exec) {
             await node.start();
             const sessionId = callerId(exec);
+            if (!sessionId) throw new Error('Room message requires an executing Agent');
             node.focusAgentId = sessionId;
             const result = await node.sayInRoom({
               room: String(args.room ?? ''),
@@ -1025,6 +1038,8 @@ export function apply(ctx, rawConfig) {
               text: String(args.text ?? ''),
               mentions: args.mentions,
               skillRefs: args.skillRefs,
+              attachments: args.attachments,
+              messageId: args.messageId,
             });
             const remote = Array.isArray(result.delivered) ? result.delivered : [];
             const remoteNote =
@@ -1035,6 +1050,7 @@ export function apply(ctx, rawConfig) {
               summary: `已在房间「${result.room.name}」发言，${result.room.members.length - 1} 位成员会收到。${remoteNote}`,
               room: result.room,
               delivered: remote,
+              ...(result.messageId ? {messageId:result.messageId,durableNodes:result.durableNodes} : {}),
             };
           },
         }),
@@ -1325,7 +1341,8 @@ export function apply(ctx, rawConfig) {
     ctx.inject(['connection'], (scope) => {
       const connection = scope.connection;
       if (connection?.fetch === undefined || typeof connection.fetch.register !== 'function') return;
-      return connection.fetch.register({
+      const disposeAttachments = registerAttachmentGateway(connection, node);
+      const disposePanel = connection.fetch.register({
         path: ROUTE_PATH,
         methods: ['POST'],
         requestBody: 'buffered',
@@ -1345,6 +1362,7 @@ export function apply(ctx, rawConfig) {
           }
         },
       });
+      return () => { disposePanel?.(); disposeAttachments?.(); };
     });
   }
 
@@ -1377,7 +1395,7 @@ export function apply(ctx, rawConfig) {
       ]);
       switch (endpoint) {
         case 'snapshot':
-          return { ok: true, value: node.snapshot({ sessionId: opt('sessionId') }) };
+          return { ok: true, value: node.snapshot({ sessionId: 'human' }) };
         case 'send':
           return {
             ok: true,
@@ -1387,13 +1405,13 @@ export function apply(ctx, rawConfig) {
           await node.markAllRead(opt('messageId'));
           return { ok: true, value: node.humanInbox() };
         case 'roomRead':
-          return { ok: true, value: { flipped: node.markRoomRead(str('room'), opt('sessionId')) } };
+          return { ok: true, value: { flipped: node.markRoomRead(str('room'), 'human') } };
         case 'sessions':
           return { ok: true, value: { sessions: node.sessions() } };
         case 'rooms':
           return {
             ok: true,
-            value: { rooms: node.listRooms({ sessionId: opt('sessionId'), all: request.all === true }) },
+            value: { rooms: node.listRooms({ sessionId: 'human', all: request.all === true }) },
           };
         case 'roomCreate':
           return {
@@ -1401,7 +1419,7 @@ export function apply(ctx, rawConfig) {
             value: await node.createRoom({
               name: str('name'),
               topic: opt('topic'),
-              sessionId: str('sessionId'),
+              sessionId: 'human',
               sessionName: opt('sessionName'),
             }),
           };
@@ -1410,16 +1428,16 @@ export function apply(ctx, rawConfig) {
             ok: true,
             value: await node.joinRoom({
               room: str('room'),
-              sessionId: str('sessionId'),
+              sessionId: 'human',
               sessionName: opt('sessionName'),
             }),
           };
         case 'roomLeave':
-          return { ok: true, value: await node.leaveRoom({ room: str('room'), sessionId: str('sessionId') }) };
+          return { ok: true, value: await node.leaveRoom({ room: str('room'), sessionId: 'human' }) };
         case 'roomKick':
           return {
             ok: true,
-            value: await node.removeMember({ room: str('room'), sessionId: str('sessionId'), member: str('member') }),
+            value: await node.removeMember({ room: str('room'), sessionId: 'human', member: str('member') }),
           };
         case 'roomInvite':
           // The panel route is registered on the owner-only connection channel,
@@ -1441,7 +1459,7 @@ export function apply(ctx, rawConfig) {
             ok: true,
             value: await node.renameRoom({
               room: str('room'),
-              sessionId: str('sessionId'),
+              sessionId: 'human',
               ...(typeof request.name === 'string' ? { name: request.name } : {}),
               ...(typeof request.topic === 'string' ? { topic: request.topic } : {}),
             }),
@@ -1451,7 +1469,7 @@ export function apply(ctx, rawConfig) {
             ok: true,
             value: await node.assignTask({
               room: str('room'),
-              sessionId: str('sessionId'),
+              sessionId: 'human',
               assignee: str('assignee'),
               title: str('title'),
               detail: opt('detail'),
@@ -1462,7 +1480,7 @@ export function apply(ctx, rawConfig) {
             ok: true,
             value: await node.setTaskStatus({
               room: str('room'),
-              sessionId: str('sessionId'),
+              sessionId: 'human',
               task: str('task'),
               status: str('status'),
               note: opt('note'),
@@ -1471,10 +1489,10 @@ export function apply(ctx, rawConfig) {
         case 'roomSay':
           return {
             ok: true,
-            value: await node.sayInRoom({ room: str('room'), sessionId: str('sessionId'), text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, file: request.file }),
+            value: await node.sayInRoom({ room: str('room'), sessionId: 'human', text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, attachments: request.attachments, messageId: request.messageId }),
           };
         case 'roomDetail':
-          return { ok: true, value: await node.roomDetail({ room: str('room'), sessionId: str('sessionId') }) };
+          return { ok: true, value: await node.roomDetail({ room: str('room'), sessionId: 'human' }) };
         case 'agents':
           return { ok: true, value: await node.catalogueAgents({ peers: request.localOnly === true ? false : undefined }) };
         case 'agentImport':
