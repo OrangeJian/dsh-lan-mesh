@@ -18,6 +18,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MeshNode } from '../lib/service.mjs';
+import { Readable } from 'node:stream';
+import { createHash } from 'node:crypto';
 
 const savedHome = process.env.DSH_HOME;
 let failures = 0;
@@ -202,6 +204,16 @@ try {
   const humanSaid = await alpha.sayInRoom({ room: roomId, sessionId: 'human', text: '@beta 请看一下任务' });
   check('the human message is kept locally', chatIn(alpha, roomId).some((item) => item.text === '@beta 请看一下任务'), JSON.stringify(chatIn(alpha, roomId).map((item) => item.text)));
   check('the human message reaches the peer', humanSaid.delivered.some((row) => row.ok === true && row.nodeId === beta.nodeId), JSON.stringify(humanSaid.delivered));
+
+  console.log('\ndurable room attachments');
+  const bytes=Buffer.from('Room attachment smoke');
+  const attachment=await beta.uploadRoomAttachment({room:roomId,sessionId:'sess-beta',readable:Readable.from([bytes]),name:'smoke.txt',mediaType:'text/plain',size:bytes.length,blobId:createHash('sha256').update(bytes).digest('hex')});
+  const attachmentResult=await beta.sayInRoom({room:roomId,sessionId:'sess-beta',text:'Shared attachment',attachments:[attachment],messageId:'smoke-attachment'});
+  check('sender and Room Leader acknowledge durable copies',attachmentResult.durableNodes.length===2 && attachmentResult.durableNodes.includes(alpha.nodeId));
+  let downloaded='';for await(const chunk of await alpha.readRoomAttachment({room:roomId,sessionId:'sess-alpha',blobId:attachment.blobId}))downloaded+=chunk;
+  check('Leader attachment bytes match',downloaded===bytes.toString());
+  await beta.sayInRoom({room:roomId,sessionId:'sess-beta',text:'Shared attachment',attachments:[attachment],messageId:'smoke-attachment'});
+  check('stable attachment retry does not duplicate message',chatIn(alpha,roomId).filter(m=>m.id==='smoke-attachment').length===1);
 
   console.log('\nunread counts follow the badge');
   const unreadBefore = (await beta.snapshot({ sessionId: 'sess-beta' })).rooms.unread[roomId] ?? 0;

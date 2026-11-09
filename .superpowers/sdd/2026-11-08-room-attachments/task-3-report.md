@@ -1,0 +1,49 @@
+# Task 3 report: durable attachment-backed Room messages
+
+Implemented on `codex/room-collaboration`, first implementation commit `62c3d73`. Browser routes, UI, index config resolution and model schemas belong to Task4 by controller ruling.
+
+## Interfaces and storage
+
+- `uploadRoomAttachment({room,readable,name,mediaType,size,blobId,sessionId})` accepts a Node readable/async iterable, requires local Room membership, verifies committed bytes through the Task1 store, and durably records the exact upload reference scoped to Room + session + digest + name + mediaType. Caller ownership is replaced with the local node identity. Upload returns `{blobId,name,mediaType,size,ownerNodeId}` with no inline bytes.
+- `readRoomAttachment({room,blobId,sessionId})` requires local membership and a committed message reference in that exact Room, returning a Node readable. Knowing a digest or possessing a prepared upload does not authorize reads.
+- `sayInRoom({room,sessionId,text,attachments,messageId|idempotencyKey,mentions?,skillRefs?})` accepts exact local uploaded references. Stable IDs are bounded nonempty strings; absent IDs receive UUIDs. Same sender+ID with different immutable content rejects. Success returns `{messageId,room,delivered,durableNodes}`; room uses the normal service projection, and failed ordinary member deliveries remain explicit.
+- `roomAttachmentHandler()` lazily opens and retains the single store/ledger/coordinator and returns the raw peer blob handler. Normal startup awaits this before advertising `roomAttachments:1` and enabling blob transport. Private paths are `meshRootDir(port)/blobs` and `meshRootDir(port)/attachments.json`.
+- `retryRoomAttachmentDeliveries()` retries durable pending sender intents/jobs and returns explicit per-message outcomes. Normal service startup invokes it, and a 10-second timer continues recovery. Shutdown stops that timer and blob requests and drains queued ledger operations.
+- `snapshot().roomAttachmentLimits` exposes the actual initialized limits. Defaults: maxFileBytes 20 MiB, maxTotalBytes 200 MiB, maxAttachments 8, maxMessageBytes 40 MiB, orphanGraceMs 24h. Service reads `config.roomAttachmentLimits`; Task4 must resolve that config object and register model/Host endpoints. Host owner identity must be bound to `human`, model identity to actual exec.agent.id in that layer.
+
+## Wire and authorization
+
+New attachments require negotiated `roomAttachments:1`, `roomBlobs:1` and `/lan-mesh/v1/send-attachments`. `attachmentsVersion:1` and `attachmentPhase:'prepare'|'commit'` are distinct from referencesVersion1. New signing input appends normalized references, normalized attachment metadata (digest/name/type/size/owner), sender session and phase to the existing envelope core. The old referencesVersion1 canonical signing and routing remain unchanged.
+
+Prepare validates current sender session membership and metadata, persists a bounded intent, then permits PUT only for that senderNode+Room+digest. Commit without matching prepare rejects. Incoming references cannot claim another node as owner. Blob GET requires current node membership plus a durable committed reference in that Room. Upload/read boundaries require exact local session membership. Shared-secret and open-cluster identity limitations remain those of Task2; this does not introduce per-node private keys.
+
+Controller approved expiry policy: receiver clock sets a 15-minute persisted expiry. Expired PUT/commit reject. A new fully admitted signed prepare with the identical immutable fingerprint explicitly renews a pending intent for another 15 minutes; different content with the same ID still rejects. Committed entries do not expire or lose pins.
+
+## Publication, recovery, delivery and wake
+
+Sender persists intent and pins local bytes before contacting the Room Leader (`room.leader.nodeId`, independent of Team execution). The initial Leader identity is persisted for stable recovery. Remote Leader receives prepare, verified streamed PUTs, then commit. Commit verifies local bytes/digest/size, persists pins and committed ledger state, then publishes. Only after Leader commit ACK does sender commit/publish its local message. Same-node sender+Leader produces one durable node; no two-device guarantee is claimed. Missing/unsupported Leader throws retryable `LEADER_UNAVAILABLE` and retains local intent/upload/pins.
+
+Ledger state is fsynced to an exclusive temporary file and atomically renamed. One queue serializes service metadata operations. Ledger open rejects malformed maps, records, references, statuses, expiry and jobs instead of enabling access from corrupt state. It is bounded to 32 MiB and 10,000 messages. Exact normalized immutable reference metadata is copied before asynchronous publication.
+
+Commit intent is durable before separate inbox publication. Startup verifies/re-pins committed blobs and reconstructs committed messages without duplicating inbox messages. Pending intents and jobs remain for recovery. Lost Leader commit ACK retries prepare; an already committed prepare response skips re-PUT and repeats idempotent commit. Interrupted local result persistence can rebuild the result from the durable commit. Offline ordinary members have durable pending jobs retried after restart and when they return.
+
+New publication wakes the usual local Room agents using existing exact mention routing, including attachment filenames in the wake text. In-memory publication keys suppress retries even after message paging. Startup reconstruction does not wake agents, preventing duplicate wake on restart. This is at-most-once notification behavior: a crash at the publication/wake boundary can omit a wake; exactly-once external agent execution is not claimed.
+
+## RED/GREEN and checks
+
+1. Added real service/HTTP tests before implementation. Corrected a fixture missing the Room UUID dependency, then observed behavioral RED: **0/3 passed**, missing `uploadRoomAttachment` / `roomAttachmentHandler` and offline upload method.
+2. Implemented focused ledger/coordinator, service and negotiated transport. Restricted loopback failed with fetch EACCES. Normal network escalation reached the real HTTP handler; fixed the test's store manifest filename (`metadata.json`, not `manifest.json`). Initial GREEN **3/3**.
+3. Expanded to **11/11** real filesystem/HTTP tests: upload/reference identity, sender+Leader pins, actual new MeshNode reopen, stable retry conflicts, offline Leader, lost ACK, unauthorized PUT, prepared GET denial, unrelated-Room/outsider GET denial, phase/metadata/owner/session signature tampering, persisted expiry and signed renewal, parseable ledger corruption, count/aggregate limits, crash before result save, ordinary holder outbox restart recovery, agent wake once, unsupported Leader, corrupt content reopen, prepare/pin/commit-write faults followed by recovery. Faults override only the relevant instance method and use real storage/network; no production test hooks.
+4. Final `node --test scripts/room-attachments.test.mjs`: exit 0, **11/11**.
+5. Final `npm test`: exit 0, **156/156**, no skips/cancellations. Output: local uncommitted `task-3-npm-test-final.log`. Earlier full runs each had one unrelated existing Windows EPERM rename failure (inbox rewrite, then Team store); both failure outputs remain in `task-3-npm-test.log` and `task-3-npm-test-retry.log`. No unrelated store code was changed.
+6. `node scripts/schema-check.mjs` with installed official `DSH_TOOLS_MODULE`: **70/70**. Initial default-path lookup failed; actual installation is under `D:/softwareNew/nodejs/node_global/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tools/lib/index.js`.
+7. `node scripts/twin-transport-check.mjs`: exit 0, legacy envelope/state/signature/allowlist checks passed.
+8. Updated and ran `node scripts/rooms-smoke.mjs`: exit 0, including production startup/discovery, streamed upload from non-Leader sender, two durable nodes, Leader read bytes and stable-ID dedup, plus all previous Room behavior.
+
+## Limits and follow-up
+
+- Pending pins/intents are deliberately conservative. They are not automatically unpinned or removed, including after expiry; published pins are never removed. There is no supported manual cancellation/cleanup API yet. Capacity fails explicitly rather than deleting potentially published content.
+- Durability follows Task1 atomic rename/fsync assumptions, without cross-process locking or portable directory fsync/power-loss guarantees. A private directory and one store owner per node remain required.
+- The ledger is the durable source for attachment messages; inbox append failure fails the current call and is recoverable on retry/restart. Startup rebuilds without waking agents again.
+- Legacy inline `file` records still retain the existing reader/projection; new attachments never use inline downgrade. Unsupported peers report failed attachment delivery.
+- Browser upload/download and model/Host identity binding/config/schema registration remain Task4. No browser endpoint was created in Task3.
