@@ -15,6 +15,7 @@
  */
 import { MeshNode } from './lib/service.mjs';
 import { Notifier } from './lib/notify.mjs';
+import { teamToolDefinitions } from './lib/team-tools.mjs';
 
 export const name = 'dsh-lan-mesh';
 /** Every service is optional: a node runs even with no tools, agents or UI. */
@@ -90,6 +91,11 @@ function resolveConfig(raw) {
     clusterSecret:
       envSecret ?? (typeof value.clusterSecret === 'string' ? value.clusterSecret : DEFAULTS.clusterSecret),
     autoWake: value.autoWake === undefined ? DEFAULTS.autoWake : value.autoWake !== false,
+    teamEnabled: value.teamEnabled === true,
+    teamLeaseMs: value.teamLeaseMs ?? 90000,
+    teamHeartbeatMs: value.teamHeartbeatMs ?? 20000,
+    teamRequestWindowMs: value.teamRequestWindowMs ?? 120000,
+    teamAuthorizations: Array.isArray(value.teamAuthorizations) ? value.teamAuthorizations.filter(row => row && typeof row === 'object').map(row => ({ roomId: row.roomId, leaderKey: row.leaderKey, workerSessionId: row.workerSessionId, workspaceRoot: row.workspaceRoot })) : [],
     trustedPeers: Array.isArray(value.trustedPeers)
       ? value.trustedPeers.filter((item) => typeof item === 'string' && item !== '')
       : DEFAULTS.trustedPeers,
@@ -1204,6 +1210,7 @@ export function apply(ctx, rawConfig) {
           },
         }),
       ];
+        if (config.teamEnabled) for (const definition of teamToolDefinitions(node)) disposers.push(registerTool(definition));
         return () => {
           for (const dispose of disposers) dispose?.();
         };

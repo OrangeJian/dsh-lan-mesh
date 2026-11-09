@@ -8,6 +8,9 @@
         clusterSecret: ''
         autoWake: true
         trustedPeers: []
+        # Reliable Team execution is opt-in and requires explicit local grants.
+        teamEnabled: false
+        teamAuthorizations: []
         # Optional extra notification channel. Empty = discover local IM bots
         # (WeChat / Feishu / ...) at send time; one sends automatically, several
         # wait for a human to pick one in the panel.

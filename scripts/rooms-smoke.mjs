@@ -226,7 +226,7 @@ try {
   check('the attention list names the message', loudAttention.some((item) => item.text.includes('@Beta')), JSON.stringify(loudAttention.map((item) => item.text)));
   beta.roomDetail({ room: roomId, sessionId: 'sess-beta' });
 
-  console.log('\nnicknames are local');
+  console.log('\nmember nicknames are local; self identity is shared');
   const nicknamed = await beta.setNickname({ member: 'sess-alpha', name: '小王' });
   check('a nickname is stored', nicknamed.nicknames.members[`${alpha.nodeId}/sess-alpha`] === '小王', JSON.stringify(nicknamed.nicknames));
   const nickRow = roomOf(beta, 'sess-beta', 'shared project')?.members.find((member) => member.sessionId === 'sess-alpha');
@@ -237,8 +237,9 @@ try {
   check('the person can name themselves', selfNamed.nicknames.self === '老板', JSON.stringify(selfNamed.nicknames));
   const selfRow = roomOf(alpha, 'sess-alpha', 'shared project')?.members.find((member) => member.sessionId === 'human');
   check('the human member reads with that name', selfRow?.name === '老板', JSON.stringify(selfRow));
-  const peerView = roomOf(beta, 'sess-beta', 'shared project')?.members.find((member) => member.sessionId === 'human');
-  check('a peer keeps the name the human joined under', peerView?.name === alpha.describe().name, JSON.stringify(peerView));
+  await until(() => roomOf(beta, 'sess-beta', 'shared project')?.members.find((member) => member.sessionId === 'human')?.name === '老板');
+  const renamedPeerView = roomOf(beta, 'sess-beta', 'shared project')?.members.find((member) => member.sessionId === 'human');
+  check('the configured identity reaches a peer', renamedPeerView?.name === '老板', JSON.stringify(renamedPeerView));
   await beta.setNickname({ member: 'sess-alpha', name: '' });
   check('clearing a nickname restores the title', (() => {
     const row = roomOf(beta, 'sess-beta', 'shared project')?.members.find((member) => member.sessionId === 'sess-alpha');

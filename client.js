@@ -1196,7 +1196,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const self = props.self ?? {};
       const selfMember = members.find((member) => member.sessionId === sessionId);
       const selfName = selfMember?.name || self.name || '';
-      const selfLabel = selfMember === undefined ? '' : labelOf(selfMember);
+      const selfLabel = self.selfName || (selfMember === undefined ? '' : labelOf(selfMember));
       // Ownership: a bubble sits right when *this* person wrote it. Room
       // messages carry the sending session since the panel started stamping
       // `from.sessionId`, so the human member's own words come back marked
@@ -2956,7 +2956,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             name: newName.trim(),
             topic: newTopic.trim(),
             sessionId: HUMAN_SESSION_ID,
-            sessionName: HUMAN_SESSION_ID,
+            sessionName: nickname.trim() || self?.selfName || self?.name || '',
           });
           const room = value?.room;
           setNewName('');
@@ -2984,7 +2984,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           const value = await panelCall('roomJoin', {
             room: roomId,
             sessionId: HUMAN_SESSION_ID,
-            sessionName: HUMAN_SESSION_ID,
+            sessionName: nickname.trim() || self?.selfName || self?.name || '',
           });
           const room = value?.room;
           go({
@@ -3025,6 +3025,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         },
         rooms,
         joinable,
+        onJoin: joinRoom,
+        joinBusy: busy,
         agents: railAgentsOf(agents.local, rooms, self?.nodeId ?? ''),
         unreadMap,
         activeId: nav.roomId,
@@ -3265,7 +3267,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           const value = await call('roomJoin', {
             room: roomId,
             sessionId: HUMAN_SESSION_ID,
-            sessionName: HUMAN_SESSION_ID,
+            sessionName: self?.selfName || self?.name || '',
           });
           const room = value?.room;
           patchMeshNav({

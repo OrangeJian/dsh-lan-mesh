@@ -180,6 +180,7 @@ const answers = {
     self: {
       nodeId: 'node-a',
       name: 'Local node',
+      selfName: '建哥',
       port: 45871,
       discoveryPort: 45870,
       peers: 1,
@@ -429,11 +430,19 @@ const answers = {
 };
 
 const asked = [];
+const requested = [];
 const fetch = async (route, init) => {
   const body = JSON.parse(init.body);
   const endpoint = body.payload.method;
   const payload = body.payload.payload ?? {};
   asked.push(endpoint);
+  requested.push({ endpoint, payload });
+  if (endpoint === 'roomJoin') {
+    const joined = { ...strangerRoom, isMember: true, role: 'member' };
+    answers.snapshot.rooms.mine.push(joined);
+    answers.snapshot.rooms.all = answers.snapshot.rooms.all.map(room => room.id === joined.id ? joined : room);
+    return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: { room: joined, added: true } } }) };
+  }
   if (answers[endpoint] === undefined) throw new Error(`unexpected endpoint ${endpoint}`);
   const value = endpoint === 'roomDetail' ? answers.roomDetail[payload.room] : answers[endpoint];
   return {
@@ -670,7 +679,7 @@ const checks = [
   ['never asks the host for its sessions', !asked.includes('sessions')],
   ['the rail renders in the native sidebar', count('lm-rail') === 1],
   ['the rail offers a way back to the conversation', count('lm-conversation') === 1 && lastText.includes('对话')],
-  ['the rail shows this node identity', lastText.includes('Local node') && lastText.includes('node-a')],
+  ['the rail shows the configured identity', lastText.includes('建哥') && lastText.includes('node-a')],
   [
     'the rail shows inbox and the task board',
     lastText.includes('收件箱') && lastText.includes('任务看板') && count('lm-navBtn') >= 3,
@@ -763,6 +772,7 @@ checks.push(
   ['a person speaks in the human tint', count('lm-bubbleHuman') === 1],
   ['a synced agent speaks in the agent tint', count('lm-bubbleAgent') === 1],
   ['own message is the only mine bubble', count('lm-bubbleMine') === 1 && lastText.includes('mine here')],
+  ['own room messages use the configured identity', lastText.includes('建哥')],
 );
 
 // The member row is collapsed by default to keep the room focused on the
@@ -1018,6 +1028,22 @@ checks.push([
   'the rail exit clears the lanmesh chrome marker',
   document.documentElement.dataset.lanMeshMode === undefined,
 ]);
+
+// Joining from the actual native-sidebar host must forward the callback, use
+// the human identity and refresh the joined project list.
+await switchTo(RailHost);
+await clickRail('lm-joinBtn');
+const joinRequest = requested.find(entry => entry.endpoint === 'roomJoin');
+checks.push(
+  [
+    'rail join sends the selected project and configured identity',
+    joinRequest?.payload.room === 'room-2' &&
+      joinRequest?.payload.sessionId === 'human' &&
+      joinRequest?.payload.sessionName === '建哥',
+  ],
+  ['joined project moves out of the joinable list', count('lm-joinBtn') === 0 && count('lm-roomRow') === 3],
+  ['successful join opens the mesh panel', document.documentElement.dataset.lanMeshMode === 'lanmesh'],
+);
 
 // A hostile context proves the entry cannot fail the Web boot: cordis throws on
 // an undeclared service, and the whole app dies when apply() rejects.
