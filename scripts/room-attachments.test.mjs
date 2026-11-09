@@ -166,3 +166,41 @@ test('prepare, pin and sender commit write failures retain retryable intent and 
  await a.close();const fresh=new MeshNode({config:a.config});fresh.started=true;fresh.identity=a.identity;fresh.roomsDoc=a.roomsDoc;fresh.resolvePeers=a.resolvePeers;
  assert.equal((await fresh.sayInRoom(req)).messageId,req.messageId);assert.equal(fresh.messages.length,1);assert.equal(b.messages.length,1);await fresh.close();
 });
+
+test('new inline file input rejects while historical inline records remain readable',async t=>{
+ const {nodes:[a],room}=await fixture(t);const file={name:'old.txt',type:'text/plain',size:1,data:'data:text/plain;base64,eA=='};
+ await assert.rejects(a.sayInRoom({room:room.id,sessionId:'human',text:'inline bypass',file}),/inline|upload|attachment/i);
+ const ref=await upload(a,room);
+ await assert.rejects(a.sayInRoom({room:room.id,sessionId:'human',attachments:[ref],file}),/inline|upload|attachment/i);
+ await a.receive({id:'historical-inline',from:{nodeId:a.nodeId,sessionId:'human'},to:a.nodeId,kind:'room-message',room:room.id,text:'Historical file',sentAt:new Date().toISOString(),file});
+ assert.deepEqual(a.roomDetail({room:room.id}).messages.find(m=>m.id==='historical-inline').file,file);
+});
+
+test('raised count sends over real HTTP and raised file limit survives lowered-policy restart',async t=>{
+ const {nodes:[a,b],room}=await fixture(t);
+ for(const n of [a,b])n.config.roomAttachmentLimits={maxAttachments:9,maxFileBytes:21*1024*1024};
+ await httpLeader(a,b);const refs=[];
+ for(let i=0;i<9;i++)refs.push(await a.uploadRoomAttachment({room:room.id,sessionId:'human',readable:Readable.from(['x']),name:`file-${i}.txt`,mediaType:'text/plain',size:1,blobId:createHash('sha256').update('x').digest('hex')}));
+ const req={room:room.id,sessionId:'human',attachments:refs,messageId:'raised-count'};
+ assert.equal((await a.sayInRoom(req)).messageId,req.messageId);assert.equal(b.messages[0].attachments.length,9);
+ const bytes=Buffer.alloc(20*1024*1024+1,120);
+ const big=await a.uploadRoomAttachment({room:room.id,sessionId:'human',readable:Readable.from([bytes]),name:'large.bin',mediaType:'application/octet-stream',size:bytes.length,blobId:createHash('sha256').update(bytes).digest('hex')});
+ await a.close();
+ const fresh=new MeshNode({config:{...a.config,roomAttachmentLimits:{maxAttachments:1,maxFileBytes:1,maxMessageBytes:1}}});fresh.started=true;fresh.identity=a.identity;fresh.roomsDoc=a.roomsDoc;
+ await fresh.roomAttachmentHandler();assert.equal(await fresh.blobStore.has(big.blobId),true);assert.equal(fresh.messages[0].attachments.length,9);
+ assert.equal((await fresh.sayInRoom(req)).messageId,req.messageId);
+ await assert.rejects(fresh.uploadRoomAttachment({room:room.id,sessionId:'human',readable:Readable.from(['xx']),name:'new.txt',mediaType:'text/plain',size:2,blobId:createHash('sha256').update('xx').digest('hex')}),/size/);
+ await fresh.close();
+});
+
+test('omitted local session is human, never node-wide membership; rejected uploads cannot poison reopen',async t=>{
+ const {nodes:[a],room}=await fixture(t);a.roomsDoc.rooms[room.id].leader={...a.roomsDoc.rooms[room.id].members.find(m=>m.nodeId===a.nodeId)};
+ const request={room:room.id,readable:Readable.from(['hello']),name:'default.txt',mediaType:'text/plain',size:5,blobId:createHash('sha256').update('hello').digest('hex')};
+ const ref=await a.uploadRoomAttachment(request);await a.sayInRoom({room:room.id,sessionId:'human',attachments:[ref],messageId:'human-default'});
+ const stream=await a.readRoomAttachment({room:room.id,blobId:ref.blobId});let text='';for await(const chunk of stream)text+=chunk;assert.equal(text,'hello');
+ const agents=createRoom(a.roomsDoc,{name:'Agent only',leader:{nodeId:a.nodeId,sessionId:'worker',name:'Worker'}},()=> 'cccccccccccc-1111-2222-3333-444444444444');
+ const agentRef=await a.uploadRoomAttachment({...request,room:agents.id,sessionId:'worker',readable:Readable.from(['hello'])});await a.sayInRoom({room:agents.id,sessionId:'worker',attachments:[agentRef],messageId:'agent-only'});
+ await assert.rejects(a.uploadRoomAttachment({...request,room:agents.id,readable:Readable.from(['hello'])}),/member/);
+ await assert.rejects(a.readRoomAttachment({room:agents.id,blobId:ref.blobId}),/member/);
+ await a.close();const fresh=new MeshNode({config:a.config});fresh.started=true;fresh.identity=a.identity;fresh.roomsDoc=a.roomsDoc;await fresh.roomAttachmentHandler();assert.equal(fresh.messages.length,2);await fresh.close();
+});

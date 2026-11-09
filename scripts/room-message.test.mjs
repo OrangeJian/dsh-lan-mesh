@@ -20,6 +20,7 @@ test('normalizer rejects wrong members, malformed values and oversized metadata'
 });
 import { MeshNode } from '../lib/service.mjs';
 import { MeshServer, normalizeEnvelope, signingInput, signEnvelope, verifyEnvelope, deliverToPeer } from '../lib/transport.mjs';
+import { normalizeRoomAttachments, ROOM_ATTACHMENT_WIRE_LIMITS } from '../lib/room-message.mjs';
 import { emptyState, createRoom, joinRoom } from '../lib/rooms.mjs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -28,6 +29,16 @@ import { readInbox } from '../lib/store.mjs';
 
 const refs = { mentions:[{memberKey:'node-b/session-b',label:'Same'}], skillRefs:[{name:'not-installed',sourceNodeId:'node-z',sourceNodeName:'Remote'}] };
 const envelope = () => ({v:2,id:crypto.randomUUID(),from:{nodeId:'node-a',sessionId:'session-a'},to:'node-b',kind:'room-message',room:'room-aaaaaaaaaaaa',text:'@Same /not-installed hello',sentAt:'2026-11-08T00:00:00Z'});
+
+test('attachment wire validation is bounded and independent of deployment defaults',()=>{
+ const ref={blobId:'a'.repeat(64),name:'large.bin',mediaType:'application/octet-stream',size:21*1024*1024,ownerNodeId:'node-a'};
+ const e={...envelope(),attachmentsVersion:1,attachmentPhase:'prepare',attachments:Array(9).fill(ref)};e.sig=signEnvelope(e,'secret');
+ assert.equal(normalizeEnvelope(e).attachments.length,9);assert.equal(verifyEnvelope(normalizeEnvelope(e),'secret'),true);
+ assert.throws(()=>normalizeRoomAttachments(Array(ROOM_ATTACHMENT_WIRE_LIMITS.maxAttachments+1).fill(ref)),/count/);
+ assert.throws(()=>normalizeRoomAttachments([{...ref,size:Number.MAX_SAFE_INTEGER+1}]),/size/);
+ assert.throws(()=>normalizeRoomAttachments([{...ref,size:Number.MAX_SAFE_INTEGER},{...ref,size:1}]),/size/);
+ assert.throws(()=>normalizeRoomAttachments([{...ref,size:-1}]),/size/);
+});
 test('reference signature extension survives normalization and detects routing/source tampering', () => {
   const legacy = envelope();
   assert.equal(signingInput(legacy).split('\n').length,9);
