@@ -724,3 +724,197 @@ test('#9 two attachments with identical bytes but different names get distinct s
   assert.match(keys[0], /\/0$/);
   assert.match(keys[1], /\/1$/);
 });
+
+// -------------------------------------------------- Task 5a (lost ACK) --------
+test('#5a a lost Leader ACK is reconciled read-only: the attested commit is adopted and nothing is re-sent', async t => {
+  const { a, b, room } = await fixture(t);
+  const ref = await upload(a, room);
+  // The Leader commits and then its response is lost on the way back, so the
+  // sender can never learn the outcome from the send call itself.
+  let lost = false;
+  b.server = new MeshServer({
+    describe: () => b.describe(), secret: () => 'secret', trustedPeers: () => [],
+    onMessage: async (e) => {
+      const result = await b.receive(e);
+      if (!lost && e.attachmentPhase === 'commit') { lost = true; throw new Error('lost ACK'); }
+      return result;
+    },
+    onBlob: await b.roomAttachmentHandler(),
+    onSync: await b.roomAttachmentSyncHandler(),
+  });
+  await b.server.listen(0);
+  a.resolvePeers = () => [{ nodeId: b.nodeId, name: 'B', address: '127.0.0.1', httpPort: b.server.port }];
+  await assert.rejects(
+    a.sayInRoom({ room: room.id, sessionId: 'human', text: 'lost', attachments: [ref], messageId: 'lost-ack' }),
+    /lost ACK|Leader|leader/,
+  );
+  assert.equal(lost, true, 'the Leader did answer and commit before the ACK was lost');
+  assert.equal(a.roomDetail({ room: room.id }).messages.length, 0, 'the sender never learned the outcome');
+  assert.equal(b.roomDetail({ room: room.id }).messages.filter(m => m.id === 'lost-ack').length, 1, 'the Leader really committed');
+  const key = JSON.stringify([a.nodeId, 'lost-ack']);
+  assert.equal(a.attachmentService.ledger.data.messages[key].status, 'prepared', 'sender side is still an unresolved intent');
+  // The background sweep deliberately skips uncommitted drafts, so without a
+  // read-only reconciliation this legitimate message would stay stranded forever.
+  const bg = await a.retryRoomAttachmentDeliveries({ background: true });
+  assert.equal(bg.length, 0);
+  assert.equal(a.roomDetail({ room: room.id }).messages.length, 0);
+
+  const summary = await a.reconcileRoomAttachmentDeliveries(room.id);
+  assert.deepEqual(summary.committed, ['lost-ack']);
+  assert.deepEqual(summary.absent, []);
+  assert.deepEqual(summary.unknown, []);
+  assert.equal(a.roomDetail({ room: room.id }).messages.filter(m => m.id === 'lost-ack').length, 1, 'adopted exactly once');
+  assert.equal(a.attachmentService.ledger.data.messages[key].status, 'committed');
+  assert.equal(b.roomDetail({ room: room.id }).messages.filter(m => m.id === 'lost-ack').length, 1,
+    'reconciliation never re-sends: the Leader keeps exactly one copy');
+  // A second reconcile has nothing left to check and publishes nothing new.
+  const again = await a.reconcileRoomAttachmentDeliveries(room.id);
+  assert.equal(again.checked, 0);
+  assert.equal(again.committed.length, 0);
+  assert.equal(a.roomDetail({ room: room.id }).messages.filter(m => m.id === 'lost-ack').length, 1);
+});
+
+test('#5a a draft the Leader never received is recorded as a definite failure and stays retryable', async t => {
+  const { a, b, room } = await fixture(t);
+  const ref = await upload(a, room);
+  // The Leader was unreachable, so nothing was ever transmitted to it.
+  a.resolvePeers = () => [];
+  await assert.rejects(
+    a.sayInRoom({ room: room.id, sessionId: 'human', text: 'never sent', attachments: [ref], messageId: 'never-sent' }),
+    /Leader|leader|unavailable/,
+  );
+  const key = JSON.stringify([a.nodeId, 'never-sent']);
+  assert.equal(a.attachmentService.ledger.data.messages[key].status, 'prepared');
+
+  // The Leader comes up for the first time: it has no such committed message.
+  b.server = new MeshServer({
+    describe: () => b.describe(), secret: () => 'secret', trustedPeers: () => [],
+    onMessage: (e) => b.receive(e), onBlob: await b.roomAttachmentHandler(),
+    onSync: await b.roomAttachmentSyncHandler(),
+  });
+  await b.server.listen(0);
+  a.resolvePeers = () => [{ nodeId: b.nodeId, name: 'B', address: '127.0.0.1', httpPort: b.server.port }];
+
+  const summary = await a.reconcileRoomAttachmentDeliveries(room.id);
+  assert.deepEqual(summary.absent, ['never-sent']);
+  assert.deepEqual(summary.committed, []);
+  assert.equal(a.attachmentService.ledger.data.messages[key].reconcile.decision, 'absent',
+    'the undelivered draft becomes a definite failure instead of an eternal unknown');
+  assert.equal(a.roomDetail({ room: room.id }).messages.length, 0,
+    'reconciliation never publishes a message the Leader does not have');
+
+  // A definite failure is still an operator decision, not a silent resend.
+  const retried = await a.retryRoomAttachmentDeliveries();
+  assert.equal(retried.length, 1);
+  assert.equal(b.roomDetail({ room: room.id }).messages.filter(m => m.id === 'never-sent').length, 1);
+});
+
+test('#5a an unreachable Leader stays unknown and never becomes durable history', async t => {
+  const { a, room } = await fixture(t);
+  const ref = await upload(a, room);
+  a.resolvePeers = () => [];
+  await assert.rejects(
+    a.sayInRoom({ room: room.id, sessionId: 'human', text: 'unknown', attachments: [ref], messageId: 'unknown-state' }),
+    /Leader|leader|unavailable/,
+  );
+  const key = JSON.stringify([a.nodeId, 'unknown-state']);
+
+  // (1) No route to the Leader at all.
+  const noPeer = await a.reconcileRoomAttachmentDeliveries(room.id);
+  assert.deepEqual(noPeer.unknown, ['unknown-state']);
+  assert.equal(a.attachmentService.ledger.data.messages[key].reconcile, undefined);
+
+  // (2) A route exists but the Leader cannot be reached.
+  a.resolvePeers = () => [{ nodeId: 'node-b', name: 'B', address: '127.0.0.1', httpPort: 1 }];
+  const unreachable = await a.reconcileRoomAttachmentDeliveries(room.id);
+  assert.deepEqual(unreachable.unknown, ['unknown-state']);
+  assert.equal(a.attachmentService.ledger.data.messages[key].reconcile, undefined,
+    'an undetermined outcome is never recorded as a decision');
+  assert.equal(a.attachmentService.ledger.data.messages[key].status, 'prepared');
+  assert.equal(a.roomDetail({ room: room.id }).messages.length, 0);
+});
+
+// -------------------------------------- Task 5b (renewal + GC safety) --------
+test('#5b renewing a stale prepare only re-arms a fresh PUT; a captured prepare replay still cannot commit', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'm3-renew-'));
+  const ledger = await RoomAttachmentLedger.open(dir);
+  const store = await RoomBlobStore.open({ dir: join(dir, 'blobs') });
+  const bytes = Buffer.from('expired prepare bytes');
+  const ref = refOf(bytes, 'renew.txt');
+  const e = envelope({ id: 'renew-1', text: 'renew', attachments: [ref] });
+
+  // An intent that was legitimately received once, then expired.
+  await ledger.prepare(e);
+  await ledger.run(() => ledger.recordReceived({ roomId: ROOM_ID, senderNodeId: 'node-a', ref }));
+  assert.deepEqual(ledger.data.messages[ledger.key(e)].receivedRefs, [receiptRefKey(ref)]);
+  await ledger.run(() => ledger.save(d => { d.messages[ledger.key(e)].expiresAt = 1; }));
+  await store.put(Readable.from([bytes]), { ...ref, ownerNodeId: 'node-a' });
+
+  // The sender replays the CAPTURED prepare envelope. Renewal re-arms the intent
+  // but wipes the old receipts, so the previously-captured bytes are not proof.
+  const renewed = await ledger.prepare(e);
+  assert.equal(renewed.status, 'prepared');
+  assert.ok(renewed.expiresAt > Date.now(), 'renewal extends the deadline');
+  assert.deepEqual(renewed.receivedRefs, [], 'renewal clears receipts: a replay cannot revive authorization');
+  assert.equal(await ledger.authorize({ operation: 'put', roomId: ROOM_ID, senderNodeId: 'node-a', blobId: ref.blobId }), true,
+    'a fresh authorized PUT is allowed again, and only that PUT can mint a new receipt');
+  await assert.rejects(ledger.commit(e, store), /bytes were not received for this intent/,
+    'clearing receipts is not the same as making a replay safe: commit stays illegal');
+
+  // A genuinely fresh PUT (new nonce, inside the window) restores legality.
+  const handler = createBlobHandler({
+    store, nodeId: () => 'node-b', secret: () => 'secret', trustedPeers: () => ['node-a'],
+    authorize: (...args) => ledger.authorize({ ...args[0], operation: 'put' }),
+    onReceived: r => ledger.run(() => ledger.recordReceived({ roomId: r.roomId, senderNodeId: r.senderNodeId, ref: r.ref })),
+  });
+  const server = new MeshServer({ describe: () => ({ nodeId: 'node-b' }), secret: () => 'secret', trustedPeers: () => [], onMessage: async () => ({}), onBlob: handler });
+  await server.listen(0);
+  t.after(() => server.close());
+  const peer = { address: '127.0.0.1', port: server.port, nodeId: 'node-b', roomBlobs: 1 };
+  await sendBlob({ peer, nodeId: 'node-a', secret: 'secret', roomId: ROOM_ID, attachment: ref, readable: Readable.from([bytes]) });
+  assert.deepEqual(ledger.data.messages[ledger.key(e)].receivedRefs, [receiptRefKey(ref)]);
+  assert.equal((await ledger.commit(e, store)).status, 'committed');
+  // Committed history survives reopen.
+  const reopened = await RoomAttachmentLedger.open(dir);
+  assert.equal(reopened.data.messages[ledger.key(e)].status, 'committed');
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('#5b orphan GC never reclaims verified committed bytes and never races the ledger queue', async t => {
+  const { a, b, room } = await fixture(t);
+  const ref = await upload(a, room, 'gc guarded bytes');
+  b.server = new MeshServer({
+    describe: () => b.describe(), secret: () => 'secret', trustedPeers: () => [],
+    onMessage: (e) => b.receive(e), onBlob: await b.roomAttachmentHandler(),
+  });
+  await b.server.listen(0);
+  a.resolvePeers = () => [{ nodeId: b.nodeId, name: 'B', address: '127.0.0.1', httpPort: b.server.port }];
+  await a.sayInRoom({ room: room.id, sessionId: 'human', text: 'gc', attachments: [ref], messageId: 'gc-guard' });
+
+  // A far-future sweep (well past the orphan grace) must not touch committed pins.
+  const collected = await a.collectRoomAttachmentGarbage(Date.now() + 86400000 * 30);
+  assert.ok(!collected.includes(ref.blobId), 'committed content is pinned, so GC skips it');
+  assert.equal(await a.attachmentService.store.has(ref.blobId), true);
+
+  // Deleting the upload record must not orphan a still-committed message either:
+  // the uploads entry is removed only for blobs GC actually collected.
+  const uploadKey = JSON.stringify([room.id, 'human', ref.blobId, ref.name, ref.mediaType]);
+  assert.notEqual(a.attachmentService.ledger.data.uploads[uploadKey], undefined,
+    'committed upload records are retained while the bytes are pinned');
+
+  // GC runs concurrently with an in-flight send: the queue stays consistent and
+  // the message that was sent during the sweep is still committed exactly once.
+  const ref2 = await upload(a, room, 'concurrent gc bytes', 'gc2.txt');
+  const [sent] = await Promise.all([
+    a.sayInRoom({ room: room.id, sessionId: 'human', text: 'during gc', attachments: [ref2], messageId: 'gc-concurrent' }),
+    a.collectRoomAttachmentGarbage(Date.now() + 1000),
+    a.collectRoomAttachmentGarbage(Date.now() + 2000),
+  ]);
+  assert.equal(sent.messageId, 'gc-concurrent');
+  assert.equal(a.roomDetail({ room: room.id }).messages.filter(m => m.id === 'gc-concurrent').length, 1);
+  assert.equal(b.roomDetail({ room: room.id }).messages.filter(m => m.id === 'gc-concurrent').length, 1);
+  assert.equal(await a.attachmentService.store.has(ref2.blobId), true, 'an in-flight/completed send is not collected');
+  // The ledger is still readable and valid after the interleaving.
+  const reopened = await RoomAttachmentLedger.open(meshRootDir(a.config.port));
+  assert.equal(reopened.data.messages[JSON.stringify([a.nodeId, 'gc-concurrent'])].status, 'committed');
+});
