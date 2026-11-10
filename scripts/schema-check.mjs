@@ -217,7 +217,7 @@ try {
   apply(stub, { port: 45907, discoveryPort: 45937, displayName: 'schema-check', autoWake: false });
 
   console.log('registration');
-  for (const name of ['lan_mesh_rooms', 'lan_mesh_room_member', 'lan_mesh_room_task', 'lan_mesh_room_say']) {
+  for (const name of ['lan_mesh_rooms', 'lan_mesh_room_member', 'lan_mesh_room_task', 'lan_mesh_room_say','lan_mesh_document_list','lan_mesh_document_read','lan_mesh_document_propose','lan_mesh_document_history','lan_mesh_room_context']) {
     const definition = tools.get(name);
     check(`${name} is registered`, definition !== undefined);
     if (definition === undefined) continue;

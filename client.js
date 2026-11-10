@@ -227,6 +227,64 @@ window.__ModuleLoader__.load({
           emptyBoard: '还没有任务。进入房间后 leader 可以拆任务派给成员。',
           boardAcross: '跨房间任务汇总',
           boardNoRooms: '还没有加入任何房间，没有可汇总的任务。',
+          // shared documents (M4)
+          chatTab: '对话',
+          docsTab: '文档',
+          docList: '共享文档',
+          docEmpty: '这个房间还没有共享文档。',
+          docLoading: '正在读取文档…',
+          docUnavailable: '文档暂时读不到',
+          docNew: '新建文档',
+          docNewTitle: '文档标题',
+          docNewTitleHint: '比如 接口说明',
+          docNewContent: '初始正文',
+          docNewMessage: '提交说明',
+          docNewCreate: '创建',
+          docCreating: '创建中…',
+          docCreated: '已创建',
+          docNeedTitle: '请填写文档标题',
+          docHead: '版本',
+          docAuthor: '作者',
+          docUpdated: '更新于',
+          docConflicts: '待解决冲突',
+          docTask: '任务',
+          docReadTab: '阅读',
+          docEditTab: '编辑',
+          docDiffTab: '差异',
+          docHistoryTab: '历史',
+          docSave: '提交修改',
+          docSaving: '提交中…',
+          docSaved: '已提交',
+          docConflictFound: '这次修改与最新版本冲突，请先解决',
+          docPending: '提案已记录，等待确认',
+          docDiffEmpty: '与当前版本没有差异',
+          docDiffTitle: '与当前版本的差异',
+          docBaseline: '基线第',
+          docBaselineUnit: '行起',
+          docLineUnit: '行',
+          docCurrent: '最新版本',
+          docProposed: '我的提案',
+          docHunk: '冲突块',
+          docResolution: '解决后的正文',
+          docResolve: '提交解决方案',
+          docResolving: '提交中…',
+          docResolved: '解决方案已提交',
+          docConfirm: '确认到最新版本',
+          docConfirming: '确认中…',
+          docConfirmed: '已确认',
+          docConfirmStale: '服务端已不允许确认，已刷新为最新版本',
+          docHistoryEmpty: '还没有历史记录。',
+          docHistoryMore: '加载更多',
+          docRevision: '修订',
+          docEvent: '事件',
+          docReadOnly: '历史是只读的，旧版本不会被改写',
+          docCopy: '复制为新提案',
+          docCopied: '已复制到编辑器',
+          docRenamed: '标题已更新',
+          docRenameDoc: '改标题',
+          docArchived: '已归档',
+          docArchive: '归档',
+          docSource: '来源',
     };
 
     const COPY_EN = {
@@ -403,6 +461,64 @@ window.__ModuleLoader__.load({
           emptyBoard: 'No tasks yet. The leader of a room can split the work into tasks for members.',
           boardAcross: 'Tasks across all rooms',
           boardNoRooms: 'Not in any room yet, so there are no tasks to summarise.',
+          // shared documents (M4)
+          chatTab: 'Chat',
+          docsTab: 'Docs',
+          docList: 'Shared documents',
+          docEmpty: 'This room has no shared documents yet.',
+          docLoading: 'Loading documents…',
+          docUnavailable: 'Documents are unavailable right now',
+          docNew: 'New document',
+          docNewTitle: 'Document title',
+          docNewTitleHint: 'e.g. interface notes',
+          docNewContent: 'Initial body',
+          docNewMessage: 'Commit message',
+          docNewCreate: 'Create',
+          docCreating: 'Creating…',
+          docCreated: 'Created',
+          docNeedTitle: 'Enter a document title',
+          docHead: 'Head',
+          docAuthor: 'Author',
+          docUpdated: 'Updated',
+          docConflicts: 'Open conflicts',
+          docTask: 'Task',
+          docReadTab: 'Read',
+          docEditTab: 'Edit',
+          docDiffTab: 'Diff',
+          docHistoryTab: 'History',
+          docSave: 'Submit change',
+          docSaving: 'Submitting…',
+          docSaved: 'Submitted',
+          docConflictFound: 'This change conflicts with the head revision; resolve it first',
+          docPending: 'Proposal recorded, waiting for confirmation',
+          docDiffEmpty: 'No difference from the head revision',
+          docDiffTitle: 'Diff against the head revision',
+          docBaseline: 'Base from line',
+          docBaselineUnit: '',
+          docLineUnit: 'lines',
+          docCurrent: 'Head revision',
+          docProposed: 'My proposal',
+          docHunk: 'Conflict hunk',
+          docResolution: 'Resolved body',
+          docResolve: 'Submit resolution',
+          docResolving: 'Submitting…',
+          docResolved: 'Resolution submitted',
+          docConfirm: 'Confirm onto head',
+          docConfirming: 'Confirming…',
+          docConfirmed: 'Confirmed',
+          docConfirmStale: 'The server no longer allows confirmation; refreshed to the latest revision',
+          docHistoryEmpty: 'No history yet.',
+          docHistoryMore: 'Load more',
+          docRevision: 'Revision',
+          docEvent: 'Event',
+          docReadOnly: 'History is read-only; old revisions are never rewritten',
+          docCopy: 'Copy into a new proposal',
+          docCopied: 'Copied into the editor',
+          docRenamed: 'Title updated',
+          docRenameDoc: 'Rename',
+          docArchived: 'Archived',
+          docArchive: 'Archive',
+          docSource: 'Source',
     };
 
     /**
@@ -685,6 +801,56 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-attachDl{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);cursor:pointer;flex:0 0 auto}
 .lm-attachDl:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}
 .lm-composerTools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 8px 0}
+/* shared documents (M4) */
+.lm-chatView{display:flex;flex-direction:column;flex:1;min-height:0}
+.lm-roomTabs{display:flex;gap:4px;padding:8px 16px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.lm-roomTab{font:inherit;font-size:12px;padding:5px 12px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;background:none;color:var(--dsw-alias-label-secondary);cursor:pointer}
+.lm-roomTab:hover{color:var(--dsw-alias-label-primary)}
+.lm-roomTabActive{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l1);font-weight:600}
+.lm-docsPane{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;padding:12px 16px;overflow:auto}
+.lm-docListHead{display:flex;align-items:center;gap:8px}
+.lm-docListTitle{flex:1 1 auto}
+.lm-docList{display:flex;flex-direction:column;gap:6px}
+.lm-docRow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;padding:8px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);cursor:pointer}
+.lm-docRow:hover{border-color:var(--dsw-alias-brand-primary)}
+.lm-docRowActive{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
+.lm-docRowTitle{font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm-docRowHead{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.lm-docRowAuthor{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.lm-docConflicts{font-size:11px;border-radius:999px;padding:1px 8px;white-space:nowrap;background:var(--dsw-alias-state-warn-primary);color:var(--dsw-alias-label-primary-foreground)}
+.lm-docRowTask{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.lm-docDetail{display:flex;flex-direction:column;gap:10px;min-height:0;padding-top:4px}
+.lm-docHead{display:flex;flex-direction:column;gap:2px}
+.lm-docTitle{font-size:14px;font-weight:600}
+.lm-docMeta{font-size:11px;color:var(--dsw-alias-label-secondary)}
+.lm-docTabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.lm-docTab{font:inherit;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);cursor:pointer}
+.lm-docTabActive{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary);font-weight:600}
+.lm-docBody{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:12px 14px;max-height:44vh;overflow:auto}
+.lm-docEditor{min-height:160px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.lm-docMessage{margin-top:6px}
+.lm-docDiffWrap{display:flex;flex-direction:column;gap:6px}
+.lm-docDiff{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap}
+.lm-docDiffRow{display:flex;gap:8px;border-radius:4px;padding:0 4px}
+.lm-docDiffAdd{background:rgba(40,170,90,.14)}
+.lm-docDiffDel{background:rgba(200,60,60,.14)}
+.lm-docDiffSign{flex:0 0 auto;width:10px;color:var(--dsw-alias-label-secondary)}
+.lm-docDiffText{flex:1 1 auto;min-width:0;word-break:break-word}
+.lm-docColumns{display:flex;gap:8px;align-items:flex-start}
+.lm-docColumn{flex:1 1 0;min-width:0;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-base);padding:8px 10px;max-height:30vh;overflow:auto}
+.lm-docColumnTitle{font-size:11px;font-weight:600;color:var(--dsw-alias-label-secondary);margin-bottom:6px}
+.lm-docColumnBody{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word}
+.lm-docHunk{margin-bottom:10px}
+.lm-docHunkRange{font-size:11px;color:var(--dsw-alias-label-secondary);margin-bottom:4px}
+.lm-docHistory{display:flex;flex-direction:column;gap:2px}
+.lm-docHistoryRow{display:flex;flex-direction:column;gap:2px;padding:6px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.lm-docVersionRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lm-docVersionId{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+.lm-docVersionMessage{font-size:12px}
+.lm-docEventRow{font-size:11px;color:var(--dsw-alias-label-secondary)}
+.lm-docCreate{display:flex;flex-direction:column;gap:2px}
+.lm-docConfirm{align-items:center;gap:8px;margin-top:4px}
+.lm-docRenameRow{margin-top:2px}
 `;
 
     /**
@@ -1400,12 +1566,1006 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
     }
     // Attachment draft end
 
+    /**
+     * Line-level diff without a dependency: the common prefix and suffix are
+     * context, whatever sits between them is the change. Markdown bodies are
+     * small enough that an O(n) trim beats carrying a diff engine.
+     * @param {string} baseText - the text the reader is comparing from.
+     * @param {string} nextText - the text to compare against.
+     * @returns {Array<{ sign: string, text: string }>} rows in reading order.
+     */
+    function docLineDiff(baseText, nextText) {
+      const base = String(baseText ?? '').split('\n');
+      const next = String(nextText ?? '').split('\n');
+      let head = 0;
+      while (head < base.length && head < next.length && base[head] === next[head]) head += 1;
+      let tail = 0;
+      while (
+        tail < base.length - head &&
+        tail < next.length - head &&
+        base[base.length - 1 - tail] === next[next.length - 1 - tail]
+      ) {
+        tail += 1;
+      }
+      const rows = [];
+      for (let i = 0; i < head; i += 1) rows.push({ sign: ' ', text: base[i] });
+      for (let i = head; i < base.length - tail; i += 1) rows.push({ sign: '-', text: base[i] });
+      for (let i = head; i < next.length - tail; i += 1) rows.push({ sign: '+', text: next[i] });
+      for (let i = base.length - tail; i < base.length; i += 1) rows.push({ sign: ' ', text: base[i] });
+      return rows;
+    }
+
+    /**
+     * A document history row's timestamp. `HistoryRow` names it `createdAt`,
+     * while a room message names it `at`, so the two stamps stay separate.
+     * @param {object} row - document revision or event row.
+     * @returns {string} the stamp, or '' when the server sent none.
+     */
+    function docStamp(row) {
+      const value = row?.createdAt ?? row?.at ?? '';
+      return String(value).replace('T', ' ').slice(0, 19);
+    }
+
+    /**
+     * Panel statuses that mean "the server said no". Anything else is a
+     * success: the document endpoints differ in their success word
+     * (`clean`, `pending`, `confirmed`, …), and this panel must not guess.
+     * @param {object} value - the endpoint value.
+     * @returns {boolean} true when the call may be treated as accepted.
+     */
+    function docAccepted(value) {
+      const status = value?.status;
+      if (typeof status !== 'string') return false;
+      return ['unavailable', 'error', 'not-found', 'rejected', 'stale'].includes(status) !== true;
+    }
+
+    /**
+     * The shared documents of one room: the list, and the four read/edit/diff/
+     * history areas plus the three-way conflict area for the open document.
+     *
+     * Everything rendered here comes from the server; the only permission
+     * inputs are `DocumentView.canConfirm` and `DocumentView.isMaintainer`,
+     * both read from the response and never inferred from a local role.
+     * Author names, titles and commit messages are untrusted text and are only
+     * ever rendered as children so the renderer escapes them.
+     *
+     * @param {{ roomId: string, call: Function, isMember: boolean, onChanged?: Function }} props
+     * @returns {object} pane element.
+     */
+    function DocumentsPane(props) {
+      const roomId = String(props.roomId ?? '');
+      const call = props.call;
+      const canCreate = props.isMember === true;
+
+      const [list, setList] = React.useState({ status: 'loading', documents: [], reason: '' });
+      const [selectedId, setSelectedId] = React.useState('');
+      const [view, setView] = React.useState({ status: 'idle', document: null, revision: null, reason: '' });
+      const [mode, setMode] = React.useState('read');
+      /** The edit draft survives a rejected save; only an accepted one clears it. */
+      const [editText, setEditText] = React.useState('');
+      const [editBase, setEditBase] = React.useState('');
+      const [baseContent, setBaseContent] = React.useState('');
+      const [editMessage, setEditMessage] = React.useState('');
+      const [busy, setBusy] = React.useState('');
+      const [notice, setNotice] = React.useState('');
+      const [noticeBad, setNoticeBad] = React.useState(false);
+      const [history, setHistory] = React.useState({ status: 'idle', revisions: [], events: [], cursor: '', reason: '' });
+      const [conflict, setConflict] = React.useState(null);
+      const [resolveText, setResolveText] = React.useState('');
+      const [pending, setPending] = React.useState(null);
+      const [createOpen, setCreateOpen] = React.useState(false);
+      const [newTitle, setNewTitle] = React.useState('');
+      const [newContent, setNewContent] = React.useState('');
+      const [newMessage, setNewMessage] = React.useState('');
+      const [renaming, setRenaming] = React.useState(false);
+      const [titleDraft, setTitleDraft] = React.useState('');
+      const readSequence = React.useRef(0);
+      const documentLifetime = React.useRef({live:true});
+      const proposalRetry = React.useRef(null);
+      const creationRetry = React.useRef(null);
+      const [deliveriesOpen, setDeliveriesOpen] = React.useState(false);
+      const [deliveries, setDeliveries] = React.useState({status:'idle', rows:[], reason:''});
+      const deliverySequence = React.useRef(0);
+      React.useEffect(() => () => { deliverySequence.current += 1; }, [roomId]);
+      const loadDeliveries = async () => {
+        const sequence = ++deliverySequence.current;
+        setDeliveriesOpen(true);setDeliveries({status:'loading',rows:[],reason:''});
+        try {const value=await call('contextDeliveries',{roomId,limit:20});
+          if(sequence!==deliverySequence.current)return;
+          setDeliveries({status:value?.status==='ready'?'ready':'error',rows:Array.isArray(value?.deliveries)?value.deliveries:[],reason:String(value?.reason??'')});
+        }catch(error){if(sequence===deliverySequence.current)setDeliveries({status:'error',rows:[],reason:errorText(error)});}
+      };
+      const importRetry = React.useRef(null);
+      React.useEffect(() => () => { readSequence.current += 1; documentLifetime.current.live=false; }, [roomId]);
+
+      const flash = React.useCallback((text, bad) => {
+        setNotice(text);
+        setNoticeBad(bad === true);
+      }, []);
+
+      const loadList = React.useCallback(async () => {
+        try {
+          const value = await call('documents', { roomId });
+          setList({
+            status: value?.status === 'ready' ? 'ready' : 'unavailable',
+            documents: Array.isArray(value?.documents) ? value.documents : [],
+            reason: String(value?.reason ?? ''),
+            offline:value?.offline===true,
+          });
+        } catch (error) {
+          setList({ status: 'error', documents: [], reason: errorText(error) });
+        }
+      }, [call, roomId]);
+
+      React.useEffect(() => {
+        loadList();
+      }, [loadList]);
+
+      /**
+       * Read one document (optionally one of its revisions).
+       * `keepDraft` is how a conflict refresh leaves the user's draft alone.
+       */
+      const readDocument = React.useCallback(
+        async (documentId, revisionId, keepDraft) => {
+          const sequence = ++readSequence.current;
+          const payload = { documentId };
+          if (typeof revisionId === 'string' && revisionId !== '') payload.revisionId = revisionId;
+          const value = await call('documentRead', payload);
+          if (sequence !== readSequence.current) return null;
+          const document = value?.document ?? null;
+          setView({
+            status: value?.status === 'ready' ? 'ready' : 'unavailable',
+            document,
+            revision: value?.revision ?? null,
+            offline:value?.offline===true,
+            reason: String(value?.reason ?? ''),
+          });
+          if (document !== null && keepDraft !== true) {
+            const content = String(document.content ?? '');
+            setEditText(content);
+            setBaseContent(content);
+            setEditBase(String(value?.revision?.revisionId ?? document.headRevisionId ?? ''));
+          }
+          return value;
+        },
+        [call],
+      );
+
+      const openDocument = React.useCallback(
+        async (documentId) => {
+          setBusy('read');
+          try {
+            const read = await readDocument(documentId, '', false);
+            if (!read) return;
+            setMode('read');
+            const proposal = read.proposal ?? read.document?.proposal ?? null;
+            if (proposal?.status === 'conflicted' || (proposal && typeof proposal.baseContent === 'string' && proposal.status !== 'pending')) {
+              setConflict({documentId, proposal, base:String(proposal.baseContent ?? ''), current:String(proposal.currentContent ?? read.document?.content ?? ''), proposed:String(proposal.proposedContent ?? '')});
+              setResolveText(String(proposal.resolutionContent ?? proposal.proposedContent ?? ''));
+              setPending(null);
+            } else {
+              setConflict(null);
+              setPending(proposal?.status === 'pending' ? {documentId,proposal,headRevisionId:String(read.document?.headRevisionId ?? '')} : null);
+            }
+            setHistory({ status: 'idle', revisions: [], events: [], cursor: '', reason: '' });
+          } catch (error) {
+            setView({ status: 'error', document: null, revision: null, reason: errorText(error) });
+          } finally {
+            setBusy('');
+          }
+        },
+        [readDocument],
+      );
+
+      const loadHistory = React.useCallback(
+        async (cursor) => {
+          const document = view.document;
+          if (document === null || document === undefined) return;
+          setBusy('history');
+          try {
+            const payload = { documentId: String(document.documentId ?? '') };
+            if (typeof cursor === 'string' && cursor !== '') payload.cursor = cursor;
+            const value = await call('documentHistory', payload);
+            const revisions = Array.isArray(value?.revisions) ? value.revisions : [];
+            const events = Array.isArray(value?.events) ? value.events : [];
+            const firstPage = typeof cursor !== 'string' || cursor === '';
+            setHistory((current) => ({
+              status: value?.status === 'ready' ? 'ready' : 'unavailable',
+              revisions: firstPage ? revisions : current.revisions.concat(revisions),
+              events: firstPage ? events : current.events.concat(events),
+              cursor: String(value?.nextCursor ?? ''),
+              reason: String(value?.reason ?? ''),
+            }));
+          } catch (error) {
+            setHistory({ status: 'error', revisions: [], events: [], cursor: '', reason: errorText(error) });
+          } finally {
+            setBusy('');
+          }
+        },
+        [call, view.document],
+      );
+
+      const saveEdit = async () => {
+        const document = view.document;
+        if (document === null || document === undefined) return;
+        const documentId = String(document.documentId ?? '');
+        const baseRevisionId = editBase !== '' ? editBase : String(document.headRevisionId ?? '');
+        setBusy('save');
+        try {
+          const signature = JSON.stringify([documentId, baseRevisionId, editText, editMessage]);
+          if (proposalRetry.current?.signature !== signature) proposalRetry.current = {signature, proposalId: 'prop-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12)};
+          const value = await call('documentPropose', {
+            proposalId: proposalRetry.current.proposalId,
+            documentId,
+            baseRevisionId,
+            content: editText,
+            message: editMessage,
+          });
+          if (!documentLifetime.current.live) return;
+          const status = String(value?.status ?? '');
+          if (docAccepted(value)) proposalRetry.current = null;
+          if (status === 'conflict') {
+            // The draft stays exactly as typed: the user is about to resolve it.
+            const fresh = await readDocument(documentId, '', true);
+            const current = String(fresh?.document?.content ?? document.content ?? '');
+            setConflict({
+              documentId,
+              proposal: value?.proposal ?? null,
+              base: baseContent !== '' ? baseContent : String(document.content ?? ''),
+              current,
+              proposed: editText,
+            });
+            setResolveText(editText);
+            flash(COPY.docConflictFound, true);
+          } else if (status === 'pending') {
+            setPending({
+              documentId,
+              proposal: value?.proposal ?? null,
+              headRevisionId: baseRevisionId,
+            });
+            flash(COPY.docPending, false);
+            await readDocument(documentId, '', true);
+          } else if (docAccepted(value) !== true) {
+            flash(`${COPY.error}: ${String(value?.reason ?? '')}`, true);
+          } else {
+            setConflict(null);
+            setPending(null);
+            setEditMessage('');
+            flash(COPY.docSaved, false);
+            await openDocument(documentId);
+            await loadList();
+          }
+          props.onChanged?.();
+        } catch (error) {
+          if (!documentLifetime.current.live) return;
+          // A transport failure is not a reason to throw the draft away either.
+          flash(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setBusy('');
+        }
+      };
+
+      const submitResolution = async () => {
+        if (conflict === null) return;
+        const documentId = String(conflict.documentId ?? '');
+        setBusy('resolve');
+        try {
+          const value = await call('documentResolve', {
+            documentId,
+            proposalId: String(conflict.proposal?.proposalId ?? ''),
+            content: resolveText,
+            message: editMessage,
+          });
+          if (docAccepted(value) !== true) {
+            flash(`${COPY.error}: ${String(value?.reason ?? '')}`, true);
+            return;
+          }
+          const proposal = value?.proposal ?? conflict.proposal ?? null;
+          const head = String(view.document?.headRevisionId ?? '');
+          setConflict(null);
+          flash(COPY.docResolved, false);
+          // Re-read so `canConfirm` is the server's fresh answer, not the one
+          // from before the resolution.
+          await openDocument(documentId);
+          setPending({ documentId, proposal, headRevisionId: editBase !== '' ? editBase : head });
+          await loadList();
+          props.onChanged?.();
+        } catch (error) {
+          flash(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setBusy('');
+        }
+      };
+
+      const confirmPending = async () => {
+        if (pending === null) return;
+        const documentId = String(pending.documentId ?? '');
+        setBusy('confirm');
+        try {
+          // Never confirm against a stale head: read first, decide after.
+          const fresh = await call('documentRead', { documentId });
+          const freshDocument = fresh?.document ?? null;
+          const freshHead = String(freshDocument?.headRevisionId ?? '');
+          if (freshDocument === null || freshDocument?.canConfirm !== true) {
+            setPending(null);
+            flash(COPY.docConfirmStale, true);
+            await openDocument(documentId);
+          } else if (freshHead !== String(pending.headRevisionId ?? '')) {
+            setPending(null);
+            flash(COPY.docConfirmStale, true);
+            await openDocument(documentId);
+          } else {
+            const value = await call('documentConfirm', {
+              documentId,
+              proposalId: String(pending.proposal?.proposalId ?? ''),
+            });
+            if (docAccepted(value) !== true) {
+              flash(`${COPY.error}: ${String(value?.reason ?? '')}`, true);
+            } else {
+              setPending(null);
+              flash(COPY.docConfirmed, false);
+            }
+            await openDocument(documentId);
+            await loadList();
+          }
+          props.onChanged?.();
+        } catch (error) {
+          flash(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setBusy('');
+        }
+      };
+
+      const copyRevision = async (revisionId) => {
+        const document = view.document;
+        if (document === null || document === undefined) return;
+        setBusy('copy');
+        try {
+          const value = await call('documentRead', {
+            documentId: String(document.documentId ?? ''),
+            revisionId: String(revisionId ?? ''),
+          });
+          if (value?.status !== 'ready' || !value.document) throw new Error(value?.reason || '历史版本不可用');
+          const content = String(value.document.content ?? value?.revision?.content ?? '');
+          setEditText(content);
+          // Copying an old revision into the editor does not move the base:
+          // the next proposal is still built on the current head.
+          setEditBase(String(document.headRevisionId ?? ''));
+          setBaseContent(String(document.content ?? ''));
+          setMode('edit');
+          flash(COPY.docCopied, false);
+        } catch (error) {
+          flash(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setBusy('');
+        }
+      };
+
+      const doCreate = async () => {
+        const title = newTitle.trim();
+        if (title === '') {
+          flash(COPY.docNeedTitle, true);
+          return;
+        }
+        setBusy('create');
+        try {
+          const fingerprint = JSON.stringify([roomId, title, newContent]);
+          if (creationRetry.current?.fingerprint !== fingerprint) creationRetry.current = {fingerprint, requestId: crypto.randomUUID()};
+          const value = await call('documentCreate', {
+            requestId: creationRetry.current.requestId,
+            roomId,
+            title,
+            content: newContent,
+            message: newMessage,
+          });
+          if (docAccepted(value) !== true) {
+            flash(`${COPY.error}: ${String(value?.reason ?? '')}`, true);
+            return;
+          }
+          creationRetry.current = null;
+          const created = value?.document ?? null;
+          setCreateOpen(false);
+          setNewTitle('');
+          setNewContent('');
+          setNewMessage('');
+          flash(COPY.docCreated, false);
+          await loadList();
+          if (created?.documentId !== undefined) {
+            setSelectedId(String(created.documentId));
+            await openDocument(String(created.documentId));
+          }
+          props.onChanged?.();
+        } catch (error) {
+          flash(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setBusy('');
+        }
+      };
+
+      const doRename = async () => {
+        const document = view.document;
+        if (document === null || document === undefined) return;
+        const title = titleDraft.trim();
+        if (title === '') {
+          flash(COPY.docNeedTitle, true);
+          return;
+        }
+        setBusy('rename');
+        try {
+          const value = await call('documentRename', { documentId: String(document.documentId ?? ''), title });
+          if (docAccepted(value) !== true) {
+            flash(`${COPY.error}: ${String(value?.reason ?? '')}`, true);
+            return;
+          }
+          setRenaming(false);
+          flash(COPY.docRenamed, false);
+          await openDocument(String(document.documentId ?? ''));
+          await loadList();
+          props.onChanged?.();
+        } catch (error) {
+          flash(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setBusy('');
+        }
+      };
+
+      const doArchive = async () => {
+        const document = view.document;
+        if (document === null || document === undefined) return;
+        setBusy('archive');
+        try {
+          const value = await call('documentArchive', { documentId: String(document.documentId ?? '') });
+          if (docAccepted(value) !== true) {
+            flash(`${COPY.error}: ${String(value?.reason ?? '')}`, true);
+            return;
+          }
+          setSelectedId('');
+          setView({ status: 'idle', document: null, revision: null, reason: '' });
+          flash(COPY.docArchived, false);
+          await loadList();
+          props.onChanged?.();
+        } catch (error) {
+          flash(`${COPY.error}: ${errorText(error)}`, true);
+        } finally {
+          setBusy('');
+        }
+      };
+
+      const stateLine =
+        list.status === 'loading'
+          ? h('div', { className: 'lm-muted lm-docListState' }, COPY.docLoading)
+          : list.status === 'unavailable' || list.status === 'error'
+            ? h(
+                'div',
+                { className: 'lm-error lm-note lm-docListState' },
+                `${COPY.docUnavailable}${list.reason === '' ? '' : `: ${list.reason}`}`,
+              )
+            : null;
+
+      const listBlock =
+        stateLine !== null
+          ? stateLine
+          : list.documents.length === 0
+            ? h('div', { className: 'lm-muted lm-docListState' }, COPY.docEmpty)
+            : h(
+                'div',
+                { className: 'lm-docList' },
+                ...list.documents.map((row) =>
+                  h(
+                    'button',
+                    {
+                      key: row.documentId ?? labelOf(row),
+                      type: 'button',
+                      className:
+                        String(row.documentId ?? '') === selectedId ? 'lm-docRow lm-docRowActive' : 'lm-docRow',
+                      onClick: () => {
+                        setSelectedId(String(row.documentId ?? ''));
+                        openDocument(String(row.documentId ?? ''));
+                      },
+                    },
+                    h('span', { className: 'lm-docRowTitle' }, String(row.title ?? '')),
+                    h('span', { className: 'lm-docRowHead' }, shortId(row.headRevisionId)),
+                    h('span', { className: 'lm-docRowAuthor' }, String(row.authorName ?? '')),
+                    row.relatedTaskId === undefined || row.relatedTaskId === ''
+                      ? null
+                      : h('span', { className: 'lm-docRowTask' }, `${COPY.docTask} ${shortId(row.relatedTaskId)}`),
+                    typeof row.conflictCount === 'number' && row.conflictCount > 0
+                      ? h('span', { className: 'lm-docConflicts' }, `${COPY.docConflicts} ${row.conflictCount}`)
+                      : null,
+                  ),
+                ),
+              );
+
+      const createForm = h(
+        'div',
+        { className: 'lm-docCreate lm-card' },
+        h('div', { className: 'lm-label' }, COPY.docNew),
+        h('input', {
+          className: 'lm-input lm-docTitleInput',
+          value: newTitle,
+          placeholder: COPY.docNewTitleHint,
+          'aria-label': COPY.docNewTitle,
+          onChange: (event) => setNewTitle(event.target.value),
+        }),
+        h('textarea', {
+          className: 'lm-textarea lm-textareaShort lm-docContentInput',
+          value: newContent,
+          placeholder: COPY.docNewContent,
+          'aria-label': COPY.docNewContent,
+          onChange: (event) => setNewContent(event.target.value),
+        }),
+        h('input', {
+          className: 'lm-input lm-docMessageInput',
+          value: newMessage,
+          placeholder: COPY.docNewMessage,
+          'aria-label': COPY.docNewMessage,
+          onChange: (event) => setNewMessage(event.target.value),
+        }),
+        h(
+          'div',
+          { className: 'lm-row' },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'lm-btn lm-btnPrimary lm-btnSmall lm-docCreateBtn',
+              disabled: busy === 'create',
+              onClick: doCreate,
+            },
+            busy === 'create' ? COPY.docCreating : COPY.docNewCreate,
+          ),
+          h('button', { type: 'button', className: 'lm-btn lm-btnSmall', onClick: () => setCreateOpen(false) }, COPY.collapse),
+        ),
+      );
+
+      const document = view.document;
+      let detailBlock = null;
+
+      if (document !== null && document !== undefined) {
+        const documentId = String(document.documentId ?? '');
+        const body = String(document.content ?? '');
+        const tabs = ['read', 'edit', 'diff', 'history'];
+        const tabLabels = {
+          read: COPY.docReadTab,
+          edit: COPY.docEditTab,
+          diff: COPY.docDiffTab,
+          history: COPY.docHistoryTab,
+        };
+        const diffRows = docLineDiff(body, editText);
+        const changed = diffRows.some((row) => row.sign !== ' ');
+
+        const editorBlock = h(
+          'div',
+          { className: 'lm-docEditorWrap' },
+          h('textarea', {
+            className: 'lm-textarea lm-docEditor',
+            value: editText,
+            disabled: busy === 'save',
+            'aria-label': COPY.docEditTab,
+            onChange: (event) => setEditText(event.target.value),
+          }),
+          h('input', {
+            className: 'lm-input lm-docMessageInput',
+            value: editMessage,
+            placeholder: COPY.docNewMessage,
+            'aria-label': COPY.docNewMessage,
+            disabled: busy === 'save',
+            onChange: (event) => setEditMessage(event.target.value),
+          }),
+          h(
+            'div',
+            { className: 'lm-row' },
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'lm-btn lm-btnPrimary lm-btnSmall lm-docSaveBtn',
+                disabled: busy === 'save',
+                onClick: saveEdit,
+              },
+              busy === 'save' ? COPY.docSaving : COPY.docSave,
+            ),
+            h('span', { className: 'lm-muted lm-note' }, `${COPY.docBaseline} ${shortId(editBase)}`),
+          ),
+        );
+
+        const diffBlock = h(
+          'div',
+          { className: 'lm-docDiffWrap' },
+          h('div', { className: 'lm-muted lm-note' }, COPY.docDiffTitle),
+          changed === true
+            ? h(
+                'div',
+                { className: 'lm-docDiff' },
+                ...diffRows.map((row, index) =>
+                  h(
+                    'div',
+                    {
+                      key: `${index}-${row.sign}`,
+                      className:
+                        row.sign === '+'
+                          ? 'lm-docDiffRow lm-docDiffAdd'
+                          : row.sign === '-'
+                            ? 'lm-docDiffRow lm-docDiffDel'
+                            : 'lm-docDiffRow',
+                    },
+                    h('span', { className: 'lm-docDiffSign' }, row.sign),
+                    h('span', { className: 'lm-docDiffText' }, row.text),
+                  ),
+                ),
+              )
+            : h('div', { className: 'lm-muted lm-docDiffEmpty' }, COPY.docDiffEmpty),
+        );
+
+        const historyBlock = h(
+          'div',
+          { className: 'lm-docHistoryWrap' },
+          h('div', { className: 'lm-muted lm-note' }, COPY.docReadOnly),
+          history.status === 'idle' || history.status === 'loading'
+            ? h('div', { className: 'lm-muted' }, COPY.docLoading)
+            : null,
+          history.status === 'unavailable' || history.status === 'error'
+            ? h(
+                'div',
+                { className: 'lm-error lm-note' },
+                `${COPY.docUnavailable}${history.reason === '' ? '' : `: ${history.reason}`}`,
+              )
+            : null,
+          history.status === 'ready' && history.revisions.length === 0
+            ? h('div', { className: 'lm-muted lm-docHistoryEmpty' }, COPY.docHistoryEmpty)
+            : null,
+          h(
+            'div',
+            { className: 'lm-docHistory' },
+            ...history.revisions.map((revision) =>
+              h(
+                'div',
+                { key: revision.revisionId ?? messageStamp(revision), className: 'lm-docHistoryRow' },
+                h(
+                  'div',
+                  { className: 'lm-docVersionRow' },
+                  h('span', { className: 'lm-docVersionId lm-docRevisionId' }, shortId(revision.revisionId)),
+                  h('span', { className: 'lm-docVersionMessage' }, String(revision.message ?? '')),
+                  h('span', { className: 'lm-muted' }, String(revision.authorName ?? '')),
+                  h('span', { className: 'lm-muted' }, messageStamp(revision)),
+                  h('span', { className: 'lm-badge' }, `${COPY.docSource} ${String(revision.source ?? '')}`),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'lm-btn lm-btnSmall lm-docCopyBtn',
+                      disabled: busy === 'copy',
+                      onClick: () => copyRevision(revision.revisionId),
+                    },
+                    COPY.docCopy,
+                  ),
+                ),
+                Array.isArray(revision.eventTypes) && revision.eventTypes.length > 0
+                  ? h(
+                      'div',
+                      { className: 'lm-docEventRow' },
+                      `${COPY.docEvent} ${revision.eventTypes.map((type) => String(type)).join(', ')}`,
+                    )
+                  : null,
+              ),
+            ),
+          ),
+          history.events.length > 0
+            ? h(
+                'div',
+                { className: 'lm-docEvents' },
+                ...history.events.map((event, index) =>
+                  h(
+                    'div',
+                    { key: `${index}`, className: 'lm-docEventRow' },
+                    `${COPY.docEvent} ${String(event?.summary ?? event?.type ?? '')}`,
+                  ),
+                ),
+              )
+            : null,
+          history.cursor === ''
+            ? null
+            : h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'lm-btn lm-btnSmall lm-docHistoryMore',
+                  disabled: busy === 'history',
+                  onClick: () => loadHistory(history.cursor),
+                },
+                COPY.docHistoryMore,
+              ),
+        );
+
+        const conflictBlock =
+          conflict === null
+            ? null
+            : h(
+                'div',
+                { className: 'lm-docConflict' },
+                h('div', { className: 'lm-error lm-note' }, COPY.docConflictFound),
+                Array.isArray(conflict.proposal?.conflict?.hunks) && conflict.proposal.conflict.hunks.length > 0
+                  ? h(
+                      'div',
+                      { className: 'lm-docHunks' },
+                      ...conflict.proposal.conflict.hunks.map((hunk, index) =>
+                        h(
+                          'div',
+                          { key: `${index}`, className: 'lm-docHunk' },
+                          h(
+                            'div',
+                            { className: 'lm-docHunkRange' },
+                            `${COPY.docHunk} ${index + 1} · ${COPY.docBaseline} ${String(hunk.baseStart)} ${COPY.docBaselineUnit} ${String(hunk.baseCount)} ${COPY.docLineUnit}`,
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+                h(
+                  'div',
+                  { className: 'lm-docColumns' },
+                  h(
+                    'div',
+                    { className: 'lm-docColumn lm-docColumnBase' },
+                    h('div', { className: 'lm-docColumnTitle' }, COPY.docBaseline),
+                    h('div', { className: 'lm-docColumnBody' }, String(conflict.base ?? '')),
+                  ),
+                  h(
+                    'div',
+                    { className: 'lm-docColumn lm-docColumnCurrent' },
+                    h('div', { className: 'lm-docColumnTitle' }, COPY.docCurrent),
+                    h('div', { className: 'lm-docColumnBody' }, String(conflict.current ?? '')),
+                  ),
+                  h(
+                    'div',
+                    { className: 'lm-docColumn lm-docColumnProposed' },
+                    h('div', { className: 'lm-docColumnTitle' }, COPY.docProposed),
+                    h('div', { className: 'lm-docColumnBody' }, String(conflict.proposed ?? '')),
+                  ),
+                ),
+                h(
+                  'div',
+                  { className: 'lm-field' },
+                  h('span', { className: 'lm-label' }, COPY.docResolution),
+                  h('textarea', {
+                    className: 'lm-textarea lm-docResolutionInput',
+                    value: resolveText,
+                    disabled: busy === 'resolve',
+                    'aria-label': COPY.docResolution,
+                    onChange: (event) => setResolveText(event.target.value),
+                  }),
+                ),
+                h(
+                  'div',
+                  { className: 'lm-row' },
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'lm-btn lm-btnPrimary lm-btnSmall lm-docResolveBtn',
+                      disabled: busy === 'resolve',
+                      onClick: submitResolution,
+                    },
+                    busy === 'resolve' ? COPY.docResolving : COPY.docResolve,
+                  ),
+                ),
+              );
+
+        const pendingBlock =
+          pending === null
+            ? null
+            : h(
+                'div',
+                { className: 'lm-docPending' },
+                h('div', { className: 'lm-note' }, COPY.docPending),
+                h(
+                  'div',
+                  { className: 'lm-row lm-docConfirm' },
+                  // The server decides who may confirm; this panel only mirrors
+                  // `canConfirm` and never derives the capability itself.
+                  document.canConfirm === true
+                    ? h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'lm-btn lm-btnPrimary lm-btnSmall lm-docConfirmBtn',
+                          disabled: busy === 'confirm',
+                          onClick: confirmPending,
+                        },
+                        busy === 'confirm' ? COPY.docConfirming : COPY.docConfirm,
+                      )
+                    : null,
+                ),
+              );
+
+        detailBlock = h(
+          'div',
+          { className: 'lm-docDetail' },
+          h(
+            'div',
+            { className: 'lm-docHead' },
+            h('span', { className: 'lm-docTitle' }, String(document.title ?? '')),
+            h(
+              'span',
+              { className: 'lm-docMeta' },
+              `${COPY.docHead} ${shortId(document.headRevisionId)} · ${String(document.contentHash ?? '').slice(0, 8)}`,
+            ),
+            view.revision === null
+              ? null
+              : h(
+                  'span',
+                  { className: 'lm-docMeta' },
+                  `${COPY.docAuthor} ${String(view.revision.authorName ?? '')} · ${COPY.docUpdated} ${messageStamp(view.revision)}`,
+                ),
+          ),
+          h(
+            'div',
+            { className: 'lm-docTabs', role: 'tablist' },
+            ...tabs.map((tab) =>
+              h(
+                'button',
+                {
+                  key: tab,
+                  type: 'button',
+                  className: mode === tab ? 'lm-docTab lm-docTabActive' : 'lm-docTab',
+                  role: 'tab',
+                  'aria-selected': mode === tab,
+                  onClick: () => {
+                    if (tab === 'edit' && editBase === '') {
+                      // Editing always starts from the head this document was
+                      // read at, so the base revision cannot drift silently.
+                      setEditBase(String(document.headRevisionId ?? ''));
+                      setBaseContent(body);
+                    }
+                    setMode(tab);
+                    if (tab === 'history' && history.status === 'idle') loadHistory('');
+                  },
+                },
+                tabLabels[tab],
+              ),
+            ),
+          ),
+          mode === 'read'
+            ? h(
+                'div',
+                { className: 'lm-docBody lm-docRead' },
+                MarkdownText === undefined
+                  ? h('div', { className: 'lm-bubblePlain' }, body)
+                  : h(MarkdownText, { text: body, labels: markdownLabels() }),
+              )
+            : null,
+          mode === 'edit' ? editorBlock : null,
+          mode === 'diff' ? diffBlock : null,
+          mode === 'history' ? historyBlock : null,
+          conflictBlock,
+          pendingBlock,
+          document.isMaintainer === true
+            ? h(
+                'div',
+                { className: 'lm-docAdmin' },
+                h(
+                  'div',
+                  { className: 'lm-row' },
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'lm-btn lm-btnSmall lm-docRenameBtn',
+                      onClick: () => {
+                        setTitleDraft(String(document.title ?? ''));
+                        setRenaming((open) => open !== true);
+                      },
+                    },
+                    COPY.docRenameDoc,
+                  ),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'lm-btn lm-btnSmall lm-docArchiveBtn',
+                      disabled: busy === 'archive',
+                      onClick: doArchive,
+                    },
+                    COPY.docArchive,
+                  ),
+                ),
+                renaming === true
+                  ? h(
+                      'div',
+                      { className: 'lm-row lm-docRenameRow' },
+                      h('input', {
+                        className: 'lm-input lm-docTitleInput',
+                        value: titleDraft,
+                        'aria-label': COPY.docNewTitle,
+                        onChange: (event) => setTitleDraft(event.target.value),
+                      }),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'lm-btn lm-btnPrimary lm-btnSmall lm-docTitleSave',
+                          disabled: busy === 'rename',
+                          onClick: doRename,
+                        },
+                        COPY.save,
+                      ),
+                    )
+                  : null,
+              )
+            : null,
+          h(
+            'div',
+            { className: 'lm-row lm-docActions' },
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'lm-btn lm-btnSmall lm-docRefreshBtn',
+                disabled: busy === 'read',
+                onClick: () => {
+                  openDocument(documentId);
+                  loadList();
+                },
+              },
+              COPY.refresh,
+            ),
+          ),
+        );
+      }
+
+      return h(
+        'div',
+        { className: 'lm-docsPane' },
+        h(
+          'div',
+          { className: 'lm-docListHead' },
+          h('span', { className: 'lm-docListTitle lm-sectionHead' }, COPY.docList),
+          h('button',{type:'button',className:'lm-contextDeliveriesToggle','aria-expanded':deliveriesOpen,onClick:()=>deliveriesOpen?setDeliveriesOpen(false):loadDeliveries()},'上下文投递记录'),
+
+          canCreate ? h('input',{type:'file',accept:'.md,.markdown,text/plain,text/markdown','aria-label':'导入 Markdown',disabled:!!busy,onChange:async(event)=>{
+            const file=event.target.files?.[0];if(!file)return;event.target.value='';setBusy('import');
+            try{if(file.size>256*1024)throw new Error('文档超过 256 KiB');const content=await file.text();const fingerprint=JSON.stringify([roomId,file.name,content]);if(importRetry.current?.fingerprint!==fingerprint)importRetry.current={fingerprint,requestId:crypto.randomUUID()};const value=await call('documentImport',{roomId,content,name:file.name,title:file.name,requestId:importRetry.current.requestId});if(!docAccepted(value))throw new Error(value?.reason||'导入不可用');importRetry.current=null;await loadList();}catch(error){flash(errorText(error),true);}finally{setBusy('');}
+          }}) : null,
+          view.offline?h('div',{className:'lm-muted lm-note'},'当前显示本机缓存，恢复连接后同步。'):null,
+          view.status==='ready' ? h('button',{type:'button',onClick:async()=>{try{const value=await call('documentExport',{documentId:view.document.documentId,revisionId:view.revision?.revisionId});if(!docAccepted(value)||typeof value.content!=='string')throw new Error(value?.reason||'导出不可用');const url=URL.createObjectURL(new Blob([value.content],{type:'text/markdown;charset=utf-8'}));const link=globalThis.document.createElement('a');link.href=url;link.download=value.name||'document.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){flash(errorText(error),true);}}},'下载 Markdown') : null,
+          view.status==='ready' ? h('button',{type:'button',disabled:!view.document.contentHash,onClick:()=>props.onContextSelect?.({documentId:view.document.documentId,revisionId:view.revision?.revisionId??view.document.headRevisionId,contentHash:view.document.contentHash})},(props.contextDocuments??[]).some(r=>r.documentId===view.document.documentId)?'取消上下文文档':'选择此版本为上下文') : null,
+
+          canCreate === true
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'lm-btn lm-btnSmall lm-docNewBtn',
+                  'aria-pressed': createOpen === true,
+                  onClick: () => setCreateOpen((open) => open !== true),
+                },
+                createOpen === true ? COPY.collapse : COPY.docNew,
+              )
+            : null,
+        ),
+        notice === '' ? null : h('div', { className: noticeBad ? 'lm-error lm-note' : 'lm-ok lm-note' }, notice),
+        deliveriesOpen ? h('section',{className:'lm-contextDeliveries','aria-label':'上下文投递记录'},
+          deliveries.status==='loading'?h('div',{role:'status'},'正在加载投递记录…'):null,
+          deliveries.status==='error'?h('div',{role:'alert'},deliveries.reason||'投递记录不可用'):null,
+          h('button',{type:'button',className:'lm-contextDeliveriesRetry',disabled:deliveries.status==='loading',onClick:loadDeliveries},'刷新 / 重试'),
+          deliveries.status==='ready'&&deliveries.rows.length===0?h('div',{},'暂无投递记录'):null,
+          ...deliveries.rows.map(row=>h('article',{key:row.deliveryId},
+            h('div',{},'Agent: '+String(row.recipient??'')+' · '+String(row.status??'')),
+            ...(row.packet?.selectedDocumentVersions??[]).map((ref,index)=>h('div',{key:String(ref.documentId??index)},String(ref.title??ref.documentId??'')+' · '+String(ref.revisionId??'')+' · '+String(ref.contentHash??'')))
+          ))) : null,
+        createOpen === true ? createForm : null,
+        listBlock,
+        detailBlock,
+      );
+    }
+
     function RoomPane(props) {
       const roomId = String(props.room?.id ?? '');
       const sessionId = props.sessionId;
       const call = props.call;
       const localAgents = Array.isArray(props.localAgents) ? props.localAgents : [];
 
+      const [contextDocuments, setContextDocuments] = React.useState([]);
       const [detail, setDetail] = React.useState({ status: 'loading', room: null, messages: [], viewer: null, error: '' });
       const [tasksOpen, setTasksOpen] = React.useState(false);
       const [draft, setDraft] = React.useState('');
@@ -1461,6 +2621,12 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [skillQuery, setSkillQuery] = React.useState('');
       const [skillPick, setSkillPick] = React.useState(0);
       const chatRef = React.useRef(null);
+      /**
+       * Which content view the room shows. Chat is the default and the state is
+       * deliberately per-mount: docs/ui-contract.md keeps it out of
+       * localStorage so two rooms never share a remembered tab.
+       */
+      const [panelTab, setPanelTab] = React.useState('chat');
 
       const flash = React.useCallback((text, bad) => {
         setNotice(text);
@@ -1710,7 +2876,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         const sendingDraft=attachmentDraft.current;
         setBusy('say');
         try {
-          const sayArgs = { room: roomId, sessionId, text };
+          const sayArgs = { room: roomId, sessionId, text, ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments}}:{}) };
           if (draftMentions.length > 0 && !/@all(?:\s|$)/i.test(text)) sayArgs.mentions = draftMentions.map(({ memberKey, label }) => ({ memberKey, label }));
           // Only confirmed picks become references. `skillRefs` is metadata for
           // the reader, never an instruction to this node: nothing is loaded,
@@ -1845,6 +3011,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             assignee: assigneeValue,
             title: taskTitle.trim(),
             detail: taskDetail,
+            ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments}}:{}),
           });
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
           const failed = delivered.filter((row) => row.ok !== true);
@@ -2119,6 +3286,52 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           notice === '' ? null : h('div', { className: noticeBad ? 'lm-error lm-note' : 'lm-ok lm-note' }, notice),
         ),
 
+        // Chat is the default view; documents are one switch away and never
+        // replace the conversation without the user asking.
+        h(
+          'div',
+          { className: 'lm-roomTabs', role: 'tablist' },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: panelTab === 'chat' ? 'lm-roomTab lm-roomTabActive' : 'lm-roomTab',
+              role: 'tab',
+              'aria-selected': panelTab === 'chat',
+              onClick: () => setPanelTab('chat'),
+            },
+            COPY.chatTab,
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: panelTab === 'docs' ? 'lm-roomTab lm-roomTabActive' : 'lm-roomTab',
+              role: 'tab',
+              'aria-selected': panelTab === 'docs',
+              onClick: () => setPanelTab('docs'),
+            },
+            COPY.docsTab,
+          ),
+        ),
+
+        panelTab === 'docs'
+          ? h(DocumentsPane, {
+              key: `docs-${roomId}`,
+              contextDocuments,
+              onContextSelect: (ref) => setContextDocuments(rows => rows.some(r => r.documentId === ref.documentId) ? rows.filter(r => r.documentId !== ref.documentId) : rows.length < 8 ? rows.concat(ref) : rows),
+              roomId,
+              call,
+              isMember: viewer.isMember === true,
+              onChanged: props.onChanged,
+            })
+          : null,
+
+        panelTab === 'chat'
+          ? h(
+          'div',
+          { className: 'lm-chatView' },
+
         h(
           'div',
           { className: 'lm-tasksWrap' },
@@ -2238,6 +3451,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         h(
           'fieldset',
           { disabled:busy==='say',className: 'lm-composer', onDragOver:event=>event.preventDefault(),onDrop:event=>transferFiles(event),onPaste:event=>transferFiles(event,true) },
+          contextDocuments.length?h('div',{className:'lm-referenceRail'},h('span',{className:'lm-muted'},`已选 ${contextDocuments.length} 份文档作为上下文`),h('button',{type:'button',onClick:()=>setContextDocuments([])},'移除文档上下文')):null,
           h(
             'div',
             { className: 'lm-composerCard' },
@@ -2498,6 +3712,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             ),
           ),
         ),
+          )
+          : null,
       );
     }
 

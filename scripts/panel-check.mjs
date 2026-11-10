@@ -549,7 +549,7 @@ const context = vm.createContext({
   setInterval: (fn, ms) => { const id = ++intervalId; intervals.set(id, { fn, ms }); return id; },
   clearInterval: (id) => intervals.delete(id),
 });
-vm.runInContext(source.replace('    function RoomPane(props) {','    window.__roomPane = RoomPane;\n    function RoomPane(props) {').replace('    function AttachmentCard(', '    window.__attachmentCard = AttachmentCard;\n    function AttachmentCard('), context);
+vm.runInContext(source.replace('    function DocumentsPane(props) {','    window.__documentsPane = DocumentsPane;\n    function DocumentsPane(props) {').replace('    function RoomPane(props) {','    window.__roomPane = RoomPane;\n    function RoomPane(props) {').replace('    function AttachmentCard(', '    window.__attachmentCard = AttachmentCard;\n    function AttachmentCard('), context);
 const loaded = window.__loaded;
 
 const opened = [];
@@ -997,6 +997,7 @@ checks.push(
 
 await click('lm-sendBtn');
 const exactRequest = requested.filter(row => row.endpoint === 'roomSay').at(-1);
+checks.push(['ordinary messages do not silently opt into context delivery',exactRequest.payload.contextSelection===undefined]);
 checks.push(['composer serializes only exact selected identity and label', exactRequest?.payload.mentions?.[0]?.memberKey === 'node-c/session-7' && !('start' in exactRequest.payload.mentions[0])]);
 await typeInto('lm-composerInput', '@bet');
 await press('lm-composerInput', 'Enter');
@@ -1476,6 +1477,101 @@ checks.push([
     injectedSlots.includes('sidebar.panellist') &&
     injectedSlots.includes('sidebar.workspaces'),
 ]);
+
+
+// Exercise the actual documents component with endpoint DTOs, rather than source checks.
+let docConflict=false, docFailure=false, docCalls=[], contextPicked=null;
+const docView={documentId:'doc-aaaaaaaaaaaa',roomId:'room-test',title:'Test',headRevisionId:'rev-aaaaaaaaaaaa',contentHash:'a'.repeat(64),content:'original',canConfirm:true,isMaintainer:true};
+const docCall=async(method,payload)=>{docCalls.push({method,payload});if(method==='documents')return {status:'ready',documents:[docView]};if(method==='documentRead')return {status:'ready',document:docView,revision:{revisionId:docView.headRevisionId}};if(method==='documentPropose'){if(docFailure)throw Error('offline');return docConflict ? {status:'conflict',proposal:{proposalId:'prop-aaaaaaaaaaaa'}} : {status:'clean'};}if(method==='documentResolve')return {status:'pending',proposal:{proposalId:'prop-aaaaaaaaaaaa'}};if(method==='documentCreate'||method==='documentImport')return {status:'ready',document:docView};if(method==='documentHistory')return {status:'ready',revisions:[{revisionId:'rev-old',message:'old'}],events:[]};return {status:'ready'};};
+const DocComponent=()=>window.__documentsPane({roomId:'room-test',call:docCall,isMember:true,contextDocuments:[],onContextSelect:ref=>contextPicked=ref});
+const docClick=async(token)=>{const n=lastNodes.find(n=>hasClass(n,token));if(!n)throw Error('missing document control '+token);await n.props.onClick();await settleIn(DocComponent);};
+await switchTo(DocComponent);
+await docClick('lm-docNewBtn');
+for(const [token,value] of [['lm-docTitleInput','New'],['lm-docContentInput','body']]){lastNodes.find(n=>hasClass(n,token)).props.onChange({target:{value}});await settleIn(DocComponent);}
+await docClick('lm-docCreateBtn');
+checks.push(['documents create passes explicit content',docCalls.some(c=>c.method==='documentCreate'&&c.payload.content==='body')]);
+checks.push(['documents read renders server content',lastText.includes('original')]);
+const selectContext=lastNodes.find(n=>n.type==='button'&&n.children.includes('选择此版本为上下文'));selectContext.props.onClick();
+checks.push(['context pins revision and hash',contextPicked?.revisionId===docView.headRevisionId&&contextPicked?.contentHash===docView.contentHash]);
+const editTab=lastNodes.filter(n=>hasClass(n,'lm-docTab'))[1];editTab.props.onClick();await settleIn(DocComponent);
+const editor=lastNodes.find(n=>n.type==='textarea'&&n.props.value==='original');editor.props.onChange({target:{value:'changed'}});await settleIn(DocComponent);
+docFailure=true;await docClick('lm-docSaveBtn');
+checks.push(['document failed save retains draft',lastNodes.some(n=>n.type==='textarea'&&n.props.value==='changed')]);
+await docClick('lm-docSaveBtn');const attempts=docCalls.filter(c=>c.method==='documentPropose');
+checks.push(['document retries reuse proposal id',attempts.length===2&&attempts[0].payload.proposalId===attempts[1].payload.proposalId]);
+docFailure=false;await docClick('lm-docSaveBtn');
+checks.push(['document accepted save refreshes head',lastText.includes('original')]);
+
+
+lastNodes.filter(n=>hasClass(n,'lm-docTab'))[3].props.onClick();await settleIn(DocComponent);
+await docClick('lm-docCopyBtn');
+checks.push(['history restoration opens proposal editor without changing head',lastNodes.some(n=>hasClass(n,'lm-docSaveBtn'))&&docCalls.filter(c=>c.method==='documentPropose').length===3]);
+docConflict=true;await docClick('lm-docSaveBtn');
+checks.push(['conflicted proposal opens manual resolution',lastNodes.some(n=>hasClass(n,'lm-docResolutionInput'))]);
+await docClick('lm-docResolveBtn');
+checks.push(['human resolution requires separate confirmation',docCalls.some(c=>c.method==='documentResolve')&&!docCalls.some(c=>c.method==='documentConfirm')]);
+await docClick('lm-docConfirmBtn');
+checks.push(['role-authorized confirmation calls endpoint',docCalls.some(c=>c.method==='documentConfirm')]);
+const importInput=lastNodes.find(n=>n.props['aria-label']==='导入 Markdown');
+await importInput.props.onChange({target:{files:[new File(['imported'],'safe.md')],value:'safe.md'}});await settleIn(DocComponent);
+checks.push(['import sends selected file text without host path',docCalls.some(c=>c.method==='documentImport'&&c.payload.content==='imported'&&c.payload.name==='safe.md'&&!('path' in c.payload))]);
+
+
+const exportButton=lastNodes.find(n=>n.type==='button'&&n.children.includes('下载 Markdown'));await exportButton.props.onClick();await settleIn(DocComponent);
+checks.push(['export requests content without host destination path',docCalls.some(c=>c.method==='documentExport'&&!('path' in c.payload))]);
+// Two deferred reads resolve in reverse order; only the latest selection wins.
+
+let releaseFirst;
+const rowA={...docView,documentId:'doc-aaaaaaaaaaaa',title:'A'};const rowB={...docView,documentId:'doc-bbbbbbbbbbbb',title:'B'};
+const racingCall=async(method,payload)=>method==='documents'?{status:'ready',documents:[rowA,rowB]} : (payload.documentId===rowA.documentId ? await new Promise(resolve=>releaseFirst=resolve) : {status:'ready',document:{...rowB,content:'latest B'}});
+const RaceComponent=()=>window.__documentsPane({roomId:'room-race',call:racingCall,isMember:true});
+await switchTo(RaceComponent);
+const raceRows=lastNodes.filter(n=>hasClass(n,'lm-docRow'));const firstRead=raceRows[0].props.onClick();await settleIn(RaceComponent);await raceRows[1].props.onClick();await settleIn(RaceComponent);
+releaseFirst({status:'ready',document:{...rowA,content:'stale A'}});await firstRead;await settleIn(RaceComponent);
+checks.push(['deferred A read cannot overwrite later B selection',lastText.includes('latest B')&&!lastText.includes('stale A')]);
+
+let releaseSave;
+const saveCall=async(method,payload)=>method==='documentPropose'?await new Promise(resolve=>releaseSave=resolve):docCall(method,payload);
+const SaveComponent=()=>window.__documentsPane({roomId:'room-old',call:saveCall,isMember:true});
+await switchTo(SaveComponent);lastNodes.find(n=>hasClass(n,'lm-docRow')).props.onClick();await settleIn(SaveComponent);lastNodes.filter(n=>hasClass(n,'lm-docTab'))[1].props.onClick();await settleIn(SaveComponent);
+const oldSave=lastNodes.find(n=>hasClass(n,'lm-docSaveBtn')).props.onClick();await settleIn(SaveComponent);
+await switchTo(DocComponent);await docClick('lm-docNewBtn');lastNodes.find(n=>hasClass(n,'lm-docContentInput')).props.onChange({target:{value:'new room draft'}});await settleIn(DocComponent);
+releaseSave({status:'clean'});await oldSave;await settleIn(DocComponent);
+checks.push(['old room save receipt preserves new room draft',lastNodes.some(n=>hasClass(n,'lm-docContentInput')&&n.props.value==='new room draft')]);
+
+
+let creationFailures=2;const creationAttempts=[];
+const retryCreate=async(method,payload)=>{if(method==='documentCreate'||method==='documentImport'){creationAttempts.push({method,payload});if(creationFailures-->0)throw Error('retry me');}return docCall(method,payload);};
+const RetryComponent=()=>window.__documentsPane({roomId:'room-retry',call:retryCreate,isMember:true});await switchTo(RetryComponent);
+lastNodes.find(n=>hasClass(n,'lm-docNewBtn')).props.onClick();await settleIn(RetryComponent);lastNodes.find(n=>hasClass(n,'lm-docTitleInput')).props.onChange({target:{value:'same'}});await settleIn(RetryComponent);
+for(let i=0;i<3;i++){await lastNodes.find(n=>hasClass(n,'lm-docCreateBtn')).props.onClick();await settleIn(RetryComponent);}
+checks.push(['create retry reuses stable request id',creationAttempts.length===3&&creationAttempts.every(c=>c.payload.requestId===creationAttempts[0].payload.requestId)&&!!creationAttempts[0].payload.requestId]);
+creationFailures=1;for(let i=0;i<2;i++){await lastNodes.find(n=>n.props['aria-label']==='导入 Markdown').props.onChange({target:{files:[new File(['same'],'same.md')],value:'same'}});await settleIn(RetryComponent);}
+const importAttempts=creationAttempts.filter(c=>c.method==='documentImport');checks.push(['import retry reuses stable request id',importAttempts.length===2&&!!importAttempts[0].payload.requestId&&importAttempts[0].payload.requestId===importAttempts[1].payload.requestId]);
+
+
+const persistedProposal={proposalId:'prop-persistedaaa',status:'conflicted',baseContent:'persisted base',currentContent:'persisted head',proposedContent:'original remote proposal',resolutionContent:'saved human resolution'};
+const persistedCall=async(method,payload)=>method==='documentRead'?{status:'ready',document:docView,proposal:persistedProposal}:docCall(method,payload);
+const PersistedComponent=()=>window.__documentsPane({roomId:'room-persisted',call:persistedCall,isMember:true});await switchTo(PersistedComponent);lastNodes.find(n=>hasClass(n,'lm-docRow')).props.onClick();await settleIn(PersistedComponent);
+checks.push(['remote persisted conflict renders all three original versions',lastText.includes('persisted base')&&lastText.includes('persisted head')&&lastText.includes('original remote proposal')]);
+checks.push(['persisted resolution takes precedence in editor',lastNodes.some(n=>hasClass(n,'lm-docResolutionInput')&&n.props.value==='saved human resolution')]);
+lastNodes.find(n=>hasClass(n,'lm-docResolutionInput')).props.onChange({target:{value:'new local resolution'}});await settleIn(PersistedComponent);
+checks.push(['editing resolution preserves remote original proposal',lastText.includes('original remote proposal')&&persistedProposal.proposedContent==='original remote proposal']);
+persistedProposal.resolutionContent=null;await switchTo(PersistedComponent);lastNodes.find(n=>hasClass(n,'lm-docRow')).props.onClick();await settleIn(PersistedComponent);
+checks.push(['remote proposal initializes missing resolution',lastNodes.some(n=>hasClass(n,'lm-docResolutionInput')&&n.props.value==='original remote proposal')]);
+
+
+let deliveryFail=true,releaseDelivery;
+const deliveryCall=async(method,payload)=>method==='contextDeliveries'?(deliveryFail?{status:'error',reason:'audit offline'}:{status:'ready',deliveries:[{deliveryId:'delivery-test',recipient:'Agent Remote',status:'delivered',packet:{selectedDocumentVersions:[{documentId:docView.documentId,title:'Pinned document',revisionId:'rev-pinned',contentHash:'hash-pinned',content:'PRIVATE FULL CONTENT'}]}}]}):docCall(method,payload);
+const DeliveryComponent=()=>window.__documentsPane({roomId:'room-delivery',call:deliveryCall,isMember:true});await switchTo(DeliveryComponent);
+await lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesToggle')).props.onClick();await settleIn(DeliveryComponent);
+checks.push(['context delivery errors are visible with retry',lastText.includes('audit offline')&&lastNodes.some(n=>hasClass(n,'lm-contextDeliveriesRetry'))]);
+deliveryFail=false;await lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesRetry')).props.onClick();await settleIn(DeliveryComponent);
+checks.push(['delivery audit renders recipient and pinned version only',lastText.includes('Agent Remote')&&lastText.includes('delivered')&&lastText.includes('Pinned document')&&lastText.includes('rev-pinned')&&lastText.includes('hash-pinned')&&!lastText.includes('PRIVATE FULL CONTENT')]);
+lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesToggle')).props.onClick();await settleIn(DeliveryComponent);checks.push(['delivery audit can collapse',!lastText.includes('Agent Remote')]);
+const DeferredDelivery=()=>window.__documentsPane({roomId:'room-old-audit',call:async(method,payload)=>method==='contextDeliveries'?await new Promise(resolve=>releaseDelivery=resolve):docCall(method,payload),isMember:true});
+await switchTo(DeferredDelivery);const loadingDelivery=lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesToggle')).props.onClick();await settleIn(DeferredDelivery);checks.push(['delivery audit displays loading state',lastText.includes('正在加载投递记录')]);
+await switchTo(DeliveryComponent);releaseDelivery({status:'ready',deliveries:[{deliveryId:'stale',recipient:'STALE AGENT',status:'delivered'}]});await loadingDelivery;await settleIn(DeliveryComponent);checks.push(['old room delivery response cannot leak into new room',!lastText.includes('STALE AGENT')]);
 
 let failed = 0;
 for (const [label, ok] of checks) {

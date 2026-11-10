@@ -14,6 +14,8 @@
  * @module dsh-lan-mesh
  */
 import { registerAttachmentGateway } from './lib/attachment-gateway.mjs';
+import { sharedDocumentTools } from './lib/shared-doc-tools.mjs';
+import { CONTEXT_SELECTION_SCHEMA } from './lib/room-context-protocol.mjs';
 import { ROOM_ATTACHMENT_LIMITS, ROOM_ATTACHMENT_WIRE_LIMITS } from './lib/room-message.mjs';
 import { MeshNode } from './lib/service.mjs';
 import { Notifier } from './lib/notify.mjs';
@@ -939,6 +941,7 @@ export function apply(ctx, rawConfig) {
               assignee: { type: 'string', description: 'assign 时必填：成员名、会话 id 或节点名。' },
               title: { type: 'string', description: 'assign 时必填：一句话任务标题。' },
               detail: { type: 'string', description: 'assign 时可选：任务详情、验收标准或上下文。' },
+              contextSelection: CONTEXT_SELECTION_SCHEMA,
               task: { type: 'string', description: 'status 时必填：任务 id 或任务标题。' },
               status: {
                 type: 'string',
@@ -973,6 +976,7 @@ export function apply(ctx, rawConfig) {
                 assignee: String(args.assignee ?? ''),
                 title: String(args.title ?? ''),
                 detail: typeof args.detail === 'string' ? args.detail : '',
+                contextSelection:args.contextSelection,
               });
               return {
                 summary: renderTask({ room: result.room, task: result.task, delivered: result.delivered }),
@@ -1007,6 +1011,7 @@ export function apply(ctx, rawConfig) {
               room: { type: 'string', description: '房间名或房间 id。' },
               text: { type: 'string', description: '要发送的正文，纯文本。' },
               mentions: MENTIONS_SCHEMA,
+              contextSelection: CONTEXT_SELECTION_SCHEMA,
               skillRefs: SKILL_REFS_SCHEMA,
               messageId: { type:'string', description:'Stable ID retained for retry.' },
               attachments: { type:'array', items:{ type:'object', additionalProperties:false, required:['blobId','name','mediaType','size','ownerNodeId'], properties:{blobId:{type:'string'},name:{type:'string'},mediaType:{type:'string'},size:{type:'integer'},ownerNodeId:{type:'string'}} } },
@@ -1037,6 +1042,7 @@ export function apply(ctx, rawConfig) {
               sessionId,
               text: String(args.text ?? ''),
               mentions: args.mentions,
+              contextSelection:args.contextSelection,
               skillRefs: args.skillRefs,
               attachments: args.attachments,
               messageId: args.messageId,
@@ -1324,6 +1330,7 @@ export function apply(ctx, rawConfig) {
           },
         }),
       ];
+        for (const definition of sharedDocumentTools(node, callerId)) disposers.push(registerTool(definition));
         if (config.teamEnabled) for (const definition of teamToolDefinitions(node)) disposers.push(registerTool(definition));
         return () => {
           for (const dispose of disposers) dispose?.();
@@ -1394,6 +1401,34 @@ export function apply(ctx, rawConfig) {
         }),
       ]);
       switch (endpoint) {
+        case 'contextDeliveries':
+          return {ok:true,value:await node.contextDeliveryHistory({roomId:str('roomId'),sessionId:'human',limit:request.limit})};
+        case 'documents':
+          return {ok:true,value:await node.documentOperation('listDocuments',{roomId:str('roomId'),via:'panel'})};
+        case 'documentRead':
+        case 'documentCreate':
+        case 'documentPropose':
+        case 'documentResolve':
+        case 'documentConfirm':
+        case 'documentHistory':
+        case 'documentRename':
+        case 'documentArchive':
+        case 'documentMaintainer': {
+          const methods={documentRead:'getDocument',documentCreate:'createDocument',documentPropose:'submitDocumentProposal',documentResolve:'resolveDocumentConflict',documentConfirm:'confirmDocumentResolution',documentHistory:'listDocumentHistory',documentRename:'renameDocument',documentArchive:'archiveDocument',documentMaintainer:'grantDocumentMaintainer'};
+          const args={};
+          for(const key of ['roomId','documentId','revisionId','baseRevisionId','proposalId','title','content','message','cursor','limit','holderKey','requestId'])if(request[key]!==undefined)args[key]=request[key];
+          return {ok:true,value:await node.documentOperation(methods[endpoint],{...args,via:'panel'})};
+        }
+        case 'documentImport': {
+          if(typeof request.content!=='string')throw Error('Select a UTF-8 Markdown file to import');
+          const result=await node.documentOperation('createDocument',{roomId:str('roomId'),title:opt('title')||opt('name')||'Imported Markdown',content:request.content,message:'Import Markdown',source:'import',requestId:opt('requestId')||undefined,via:'panel'});
+          return {ok:true,value:{...result,audit:{type:'document-imported'}}};
+        }
+        case 'documentExport': {
+          const value=await node.documentOperation('getDocument',{documentId:str('documentId'),revisionId:opt('revisionId'),via:'panel'});
+          const name=String(value.document.title??'document').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')+'.md';
+          return {ok:true,value:{status:'ready',content:value.document.content,name}};
+        }
         case 'snapshot':
           return { ok: true, value: node.snapshot({ sessionId: 'human' }) };
         case 'send':
@@ -1473,6 +1508,7 @@ export function apply(ctx, rawConfig) {
               assignee: str('assignee'),
               title: str('title'),
               detail: opt('detail'),
+              contextSelection: request.contextSelection,
             }),
           };
         case 'roomStatus':
@@ -1489,7 +1525,7 @@ export function apply(ctx, rawConfig) {
         case 'roomSay':
           return {
             ok: true,
-            value: await node.sayInRoom({ room: str('room'), sessionId: 'human', text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, attachments: request.attachments, messageId: request.messageId }),
+            value: await node.sayInRoom({ room: str('room'), sessionId: 'human', text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, attachments: request.attachments, messageId: request.messageId,contextSelection:request.contextSelection }),
           };
         case 'roomDetail':
           return { ok: true, value: await node.roomDetail({ room: str('room'), sessionId: 'human' }) };
