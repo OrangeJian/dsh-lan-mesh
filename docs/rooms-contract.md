@@ -136,6 +136,40 @@ export async function pushStateToPeer({address, port, payload, secret, timeoutMs
 
 **签名输入的规范化（重要，早先的契约文本这里是错的）**：不能对原始 `payload.state` 直接 `JSON.stringify`。验签发生在 `normalizeStatePayload()` 之后，而 `normalizeState()` 会重排 key、丢弃未知字段、约束 `left` 墓碑等；对原始 json 签名会让**诚实对端互相 401**。正确做法是先 normalize、再按 `Object.keys(rooms).sort()` 排序后序列化（`canonicalStateJson`）。于是字段顺序与多余字段都不影响验签，而改动房间名或任何被 normalize 保留的字段仍然破签。第三方实现必须按这条规则对齐。
 
+### 4.4 房间附件通道（M3，2026-11-10/11）
+
+附件字节与附件历史都不进 `rooms.json`。两条独立通道，各自显式协商能力：
+
+```js
+new MeshServer({describe, secret, trustedPeers, onError, onMessage, onState, onBlob, onSync})
+// onBlob(request, response)  → /lan-mesh/v1/room-blobs/*（原始流，PUT/GET）
+// onSync(request, response)  → /lan-mesh/v1/room-attachment-sync（JSON，POST）
+```
+
+能力广告（`GET /lan-mesh/v1/info` 的 `node`）：`roomAttachments:1`（有附件服务）、`roomBlobs:1`（注册了 `onBlob`）、`roomReferences:1`（精确 mentions/skillRefs）、`roomAttachmentSync:1`（注册了 `onSync`）。四个都必须 `delete` 后按实际 handler 重新设置，不能凭传入的 describe 对象自称。
+
+**字节通道** `/lan-mesh/v1/room-blobs/<64 hex>`：请求头 `x-room-blob-{room,sender,target,time,nonce,digest,size,metadata}` 全部参与 HMAC；`target` 必须等于接收节点自身 nodeId，否则 `WRONG_TARGET` 403；时间窗默认 120 s，nonce 在窗口内去重（`REPLAY` 409）；`authorize({operation,roomId,senderNodeId,blobId})` 必须返回 `true` 才允许 PUT/GET。PUT 落盘校验长度与 SHA-256 后必须先持久化 per-intent 收据再返回 201，收据失败返回 `RECEIPT_UNAVAILABLE` 503。
+
+**历史通道** `POST /lan-mesh/v1/room-attachment-sync`（M3 Task 4）：
+
+```jsonc
+// 请求（≤16 KiB）
+{ "v":2, "syncVersion":1, "id":"<uuid>", "from":{"nodeId":"node-c"}, "to":"node-b",
+  "room":"room-xxx", "cursor":"", "limit":50, "sentAt":"<iso>", "nonce":"<uuid>", "sig":"<hex>" }
+// 响应（≤1 MiB；超限 SYNC_PAGE_TOO_LARGE 413）
+{ "ok":true, "syncVersion":1, "room":"room-xxx", "leader":"node-b",
+  "entries":[{"id","room","from","kind","text","sentAt","attachments":[...],
+              "mentions"?,"skillRefs"?,"receivedAt","fingerprint"}],
+  "nextCursor":"", "hash":"<sha256>", "requestNonce":"<uuid>", "sig":"<hex>" }
+```
+
+- 签名输入各自规范化：请求 `roomAttachmentSync:1` + `request` + `v` + `id` + `from.nodeId` + `to` + `room` + `cursor` + `limit` + `sentAt` + `nonce`；响应 `roomAttachmentSync:1` + `response` + `room` + `nextCursor` + `hash` + `leader` + `requestNonce`。**两端都签名**，客户端不能只验请求方向。
+- `hash` 覆盖 `room + nextCursor + 每条 [id, from.nodeId, from.sessionId, fingerprint, receivedAt]`，逐条再校验 `fingerprint` 与规范化内容一致（`BAD_ENTRY`）。
+- 服务端必须重新判定：本节点是该房间**当前** Leader（`NOT_LEADER`）、请求节点是**当前**成员（`FORBIDDEN`）、房间存在（`UNKNOWN_ROOM`）；只输出 `committed` 条目，绝不输出 prepared、其他房间或本机路径。
+- 分页默认 50、上限 100；`nextCursor` 为空表示结束；**不允许截断条目当作合法清单**。
+- 导入侧（`ledger.importManifest`）是独立事务：同 ID 同 fingerprint 幂等跳过，同 ID 不同 fingerprint 报冲突且**不覆盖**本地历史，保存 `relayNodeId` 表示中继来源；导入不要求本地有字节、不自动唤醒；`pin` 只对本地确有字节的引用重建。
+- 订阅/同步由客户端发起（`joinRoom` 后有界回填 + 显式重试），Leader 不主动推送。
+
 ## 5. `lib/service.mjs`（负责人：#2 service）
 
 `MeshNode` 新增（**内部形状保持不变**，`constructor({config,agents,log})` 不变）：

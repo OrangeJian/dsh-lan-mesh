@@ -272,9 +272,12 @@ activate`）。同理两个 slot 注册都必须走 `ctx.slots.inject(key, () =>
 - **接收侧授权**：远端 commit 必须具备本节点为该 prepared 意图记录的 per-intent 收据（发送者、房间、blobId、名称、MIME、大小、owner 全部精确匹配）。PUT 成功前若收据无法持久化，返回 503，不返回 201。物理去重与「本节点有同摘要文件」都不构成授权。历史 prepared 意图无收据时 commit 失败，需要重新走合法 prepare + 上传；已提交历史不受影响。
 - **入站校验**：`to` 不是本节点（`WRONG_TARGET`）、房间未知或不是 `room-message`（`BAD_ATTACHMENTS`）、发送者已不在房间或本节点已退出，都在写盘前拒绝。
 - **续期**：只有内容一致的新签名 prepare 能续期，续期同时清空收据；旧的 PUT/commit 不能自行续期，捕获的旧请求重放不能复活授权。
-- **读取回退**：本节点无本地字节但该房间有 committed 引用时，会尝试从当前房间成员按需拉取，校验长度/MIME/SHA-256 通过后才声明为 holder。没有任何可达 holder 时返回明确不可用错误（`attachment is temporarily unavailable; no reachable holder`），界面显示为重试而非「未找到」。跨房间仍拒绝。
-- **旧普通成员**：对方明确不具备附件能力时，仍收到一条可读纯文本（正文 + 文件名 + 「不支持附件预览」提示），保持精确签名 `to`，不含 attachments/mentions，不扩成广播，也不会把此事报告为字节已送达。旧 Leader 路径不降级：失败并保留草稿。
+- **读取回退**：本节点无本地字节但该房间有 committed 引用时，会尝试从当前房间成员按需拉取，校验长度/MIME/SHA-256 通过后才声明为 holder 并 pin。没有任何可达 holder 时返回明确不可用错误（`attachment is temporarily unavailable; no reachable holder`），界面显示为重试而非「未找到」。跨房间仍拒绝。
+- **旧普通成员**：对方支持精确引用但无附件能力时，仍收到一条可读纯文本（正文 + 文件名 + 「不支持附件预览」提示），`mentions` 始终存在（精确引用或空数组），不含 attachments，不扩成广播，也不把此事报告为字节已送达。对方连精确引用都不支持时 **fail closed**：该投递项返回 `ok:false, incompatible:true`，一条也不发，界面必须显示「对方版本不兼容，未自动投递」而不是「已送达」。旧 Leader 路径不降级：失败并保留草稿。
+- **元数据与字节分开**：`delivered` 的每一项现在明确区分 `metadataDelivered` 与 `blobDelivered`。普通 `ok:true` 不再隐含字节已送达（旧节点降级时 `blobDelivered:false`）。这两个字段只出现在 Host 返回值里，面板只用它们决定提示文案，不新增 RPC 字段。
 - **后台重试**：定时扫描只对账已提交消息；未提交的本地 prepared 是用户可编辑草稿，后台不会代为发布，只有显式操作员重试才会发送。已提交消息不提供撤回。
+- **丢 ACK 对账**：新增只读对账入口（Host 方法，不经面板 RPC、不新增端点）：向当前 Leader 拉取已提交清单，未出现→记为明确失败（`absent`，仍可显式重试），出现且内容一致→采纳为已提交并发布（不唤醒），内容不一致→`unknown` 不采纳，Leader 不可达→什么都不写。对账永不重发。
+- **迟到成员回填**：新成员加入房间后，后台有界地向当前 Leader 同步该房间已提交的附件消息元数据（`roomAttachmentSync:1` 能力，独立通道，不进 `rooms.json`），只导入不可变引用，不唤醒 Agent，不要求本地已有字节；首次读取时再按需下载校验。
 - **垃圾回收**：生产生命周期每小时（并每次启动）执行一次延迟清理，释放超过孤立宽限期且无 pin、无在途读写的 Blob，并删除与之对应的失效上传记录；已提交引用与在途读写不受影响。
 
 
