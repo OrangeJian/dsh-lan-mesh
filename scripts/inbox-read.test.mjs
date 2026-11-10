@@ -56,8 +56,8 @@ test('single ordinary room message and all-read flags survive close and restart'
   await node.receive(message('ordinary-room', 'remote-node', 'human', { kind: 'room-message', room: roomId }));
   await node.receive(message('private', 'remote-node', 'agent-one', { file: { name: 'note.txt', size: 1, type: 'text/plain', data: 'data:text/plain;base64,eA==' } }));
   node.roomDetail({ room: roomId, sessionId: 'human' });
-  assert.equal(node.humanInbox().unread, 2, 'display polling alone cannot clear ordinary messages');
-  assert.equal(await node.markAllRead('ordinary-room'), 1);
+  assert.equal(node.humanInbox().unread, 1, 'viewing the room clears ordinary replies but not private messages');
+  assert.equal(await node.markAllRead('ordinary-room'), 0);
   assert.deepEqual(node.humanInbox().messages.map(item => item.id), ['private']);
   assert.equal((await readInbox({ port: 0 })).find(item => item.envelope.id === 'ordinary-room').read, true);
   await node.close();
@@ -69,6 +69,23 @@ test('single ordinary room message and all-read flags survive close and restart'
   assert.equal(node.humanInbox().unread, 0);
   assert.equal(node.snapshot().self.unread, 0);
   assert.equal(node.inbox().messages.find(item => item.id === 'private').file.name, 'note.txt');
+});
+
+test('open human room acknowledges new agent replies without clearing other rooms or private mail', async t => {
+  const { open } = await fixture(t);
+  const node = await open();
+  const first = await node.createRoom({ name: 'Visible', sessionId: 'human' });
+  const other = await node.createRoom({ name: 'Other', sessionId: 'human' });
+  await node.receive(message('other-reply', 'remote', 'agent', { kind: 'room-message', room: other.room.id }));
+  await node.receive(message('private-reply', 'remote', 'agent'));
+  for (const id of ['reply-one', 'reply-two']) {
+    await node.receive(message(id, 'remote', 'agent', { kind: 'room-message', room: first.room.id }));
+    node.roomDetail({ room: first.room.id, sessionId: 'human' });
+    assert.deepEqual(node.humanInbox().messages.map(m => m.id), ['other-reply', 'private-reply']);
+  }
+  await node.close();
+  const fresh = await open();
+  assert.deepEqual(fresh.humanInbox().messages.map(m => m.id), ['other-reply', 'private-reply']);
 });
 
 test('concurrent delivery and repeated read rewrites retain all records and durable flags', async t => {
