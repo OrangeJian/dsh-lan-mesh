@@ -31,4 +31,18 @@ try{
  await until(()=>leader.roomDetail({room:room.id}).messages.some(m=>m.id===offline.messageId));assert.equal((await sender.sayInRoom(offline)).messageId,offline.messageId);assert.equal(leader.roomDetail({room:room.id}).messages.filter(m=>m.id===offline.messageId).length,1);
  const read=await route(leader).fetch(new Request('http://owner/api/lan-mesh/attachments?'+query));assert.deepEqual(Buffer.from(await read.arrayBuffer()),bytes);
  console.log('PASS actual offline Leader restart + recovery, retained bytes, stable retry, received download');
+ // A member that joins only after the original sender is gone must obtain the
+ // authorized reference from the Leader through the signed manifest channel
+ // (never by hand-injecting a ledger) and then download verified bytes.
+ await sender.close();
+ const late=await make('attachment-late',47983);await until(()=>late.peers().length>0);
+ await late.syncRooms();await until(()=>late.listRooms({all:true}).some(r=>r.id===room.id));
+ await late.joinRoom({room:room.id,sessionId:'human'});
+ await until(()=>late.roomDetail({room:room.id}).messages.some(m=>m.id===request.messageId));
+ const chunks=[];for await(const chunk of await late.readRoomAttachment({room:room.id,sessionId:'human',blobId}))chunks.push(Buffer.from(chunk));
+ assert.deepEqual(Buffer.concat(chunks),bytes);
+ const lateMeta=JSON.parse(await readFile(join(meshRootDir(late.config.port),'blobs','metadata.json'),'utf8'));
+ assert.ok(lateMeta.blobs[blobId].pins.length,'fetched committed bytes stay pinned against orphan GC');
+ const lateRead=await route(late).fetch(new Request('http://owner/api/lan-mesh/attachments?'+query));assert.deepEqual(Buffer.from(await lateRead.arrayBuffer()),bytes);
+ console.log('PASS late member synced authorized history from the Leader after the sender left, verified and pinned the bytes');
 }finally{for(const node of open)await node.close();if(prior===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=prior;await rm(home,{recursive:true,force:true});}
