@@ -300,3 +300,14 @@ RPC 端点（走 `ctx.inject(['connection'], scope => scope.connection.fetch.reg
 4. `node scripts/rooms-smoke.mjs` 输出 `rooms interop ok`。
 5. 装回 profile：`plugin_manager set_plugin {target:'include:dsh-lan-mesh', enabled:false}` 再 `true`，
    返回 `application: applied`，且 host `Tool.listTools` 能看到全部 7 个工具。
+# M4/M5 接续运行协议（2026-11-11）
+
+`sharedDocs:1` 在服务真实初始化后声明，`POST /lan-mesh/v1/shared-doc` 使用现有 Mesh v2 签名扩展；op 为 submit/sync，完整 payload `{method,request,actorKind}` 被摘要签名。Host owner 固定 human，工具固定实际 session；接收端再检查目标、时间、成员、当前 Leader。方法只能来自明确 allowlist。room 级 list/create 使用保留 documentId `doc-000000000000`，不生成该 ID 的文档。
+
+响应为 `{ok:true,result:{body,sig}}`：body 包含 requestId、to/from、roomId、value 及 snapshot 描述，HMAC 覆盖完整 body。副本由 Leader 提供，原作者不改为 Leader。snapshot 分为每片16,000字符，描述包含 id/hash/parts/first；后续 `__snapshot` 操作再次检查当前成员及 Leader，完成全包 hash、审计链/历史重建校验后才原子导入。缓存120秒、房间快照32 MiB、单RPC响应2 MiB；过期/超限明确失败，不裁剪历史。
+
+`__refresh` 只接收当前 Leader 的副本通知。写事务中已原子创建 event outbox；后台在事务外投递和取分片，当前目标节点全部确认后才标 sent，重启继续。较旧快照不覆盖新 head/元数据；同检查点不同 hash 或改写旧历史持久阻止相关房间写入并报 CONFLICTING_CHECKPOINT。
+
+已接收的写请求 nonce（envelope.id）在时间窗内持久保留；重启后原封重放不再执行。结果未知时须查状态或用稳定 requestId/proposalId 发起新请求，不能猜测成功。首次认可的 Leader key 持久绑定，改变权威需人工核对，不自动接管。
+
+`roomContextVersion:1` 为独立能力。room-message/room-task 的可选 contextPacket 完整进入 `roomContext:1` 签名后缀，旧消息无该字段时原签名不变。发送前协商能力，旧节点拒绝；接收验证房间、版本、大小及成员。Agent prompt 与投递审计使用同一固定快照，不把上下文 JSON 改写进房间正文。

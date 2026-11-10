@@ -345,3 +345,15 @@ activate`）。同理两个 slot 注册都必须走 `ctx.slots.inject(key, () =>
 导出遇到目标已存在时必须报错（`DOC_EXPORT_TARGET_EXISTS`），**绝不静默覆盖**；
 需要覆盖只能由用户先自行删除目标文件。两边都**不**自动与磁盘或 Git 双向同步——
 文档只存在 Room 里，导入导出是一次性动作。
+# M4/M5 接续实现补充（2026-11-11）
+
+后续新增契约以本节和 `docs/shared-doc-interfaces.md` 为准，旧批次中 path 导入/导出由本节替代：
+
+- `documentImport {roomId,content,name?,title?,requestId?}`：owner 显式上传选择的 UTF-8 文本，真实 document-imported 审计；不接受任意 Host 路径。
+- `documentExport {documentId,revisionId?}`：返回 `{status,content,name}`，浏览器下载当前阅读修订。
+- `documentCreate` 支持稳定 `requestId`；`documentPropose` 保持稳定 `proposalId`。同 ID 不同内容拒绝。
+- `documentRead.proposal` 增加 `baseContent/currentContent/proposedContent/resolutionContent`。历史修订读取的 hash 与正文一致，选择上下文/导出使用 `revision.revisionId`，不能用当前 head ID 配旧正文。
+- `roomSay` / `roomAssign` 可传 `contextSelection {selectedDocumentVersions:[{documentId,revisionId,contentHash}]}`；未选择时 UI 不发送该字段。Agent/Team 还可明确选择 documentIds、messageIds、attachmentIds、skillNames，由 Host 按房间授权解析。
+- `contextDeliveries {roomId,limit?}`：owner human 成员读取本节点最近投递记录，limit 最大20。返回精简 packet 版本/hash，不返回正文；服务层 Agent 调用只可读取自己收到的记录。
+- Agent 工具新增 `lan_mesh_document_list/read/propose/history`、`lan_mesh_room_context`。实际执行身份来自 exec.agent.id；无人工确认工具。
+- DocsPane 的创建/保存/读取、错误/重试、切房间失效、冲突、导入/导出、版本选择与投递记录均有组件行为测试；这些不替代真实浏览器验收。
