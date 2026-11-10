@@ -363,3 +363,37 @@ node scripts/shared-docs-smoke.mjs                     # Leader
 ```
 
 报告必须给**实际退出码**和首次失败记录，不得用源码字符串断言凑数字。
+## 13. 实施裁定（A 提出 9 条疑点后由 Leader 固化）
+
+状态层实现时提出的边界问题，逐条裁定如下。**后续所有模块都按本节理解契约**；
+实现与本节不符即为缺陷，需要改代码而不是改文档。
+
+1. **提交说明超限**用 `DOC_LIMIT_REACHED`（§7 没有单独的消息类错误码，不再新增）。
+2. **`document/create` 的 `event.type` 由调用方选择**：人类新建传 `proposal-accepted`，
+   Markdown 导入传 `document-imported`。状态层不强制，也不替调用方改写。
+3. **`revision/append` 的 `command.document` 必须是完整的 document 视图**，且
+   `headRevisionId === revision.revisionId`、`contentHash === revision.resultHash`、
+   `(generation, seq)` 与 revision 一致；`roomId`/`createdBy`/`createdAt` 不可变。
+   协调器必须按此构造命令，不要只传增量字段。
+4. **`conflictCount` 由状态层重算**（统计该文档 `status === 'conflicted'` 的提案数），
+   并覆盖调用方声明的值。任何地方读到的 `conflictCount` 都可信。
+5. **归档后**：改标题、追加修订、提交新提案 → `DOC_NOT_FOUND`；`event/append`、
+   `maintainer/grant`、以及**已存 revision 的重放**仍然允许。理由：丢掉这些事件会让
+   对端的审计链缺项，而审计链完整性优先于"归档即封闭"。
+6. **畸形 `documentId`** → `DOC_NOT_FOUND`（不是 `DOC_COMMAND_INVALID`）：
+   这个 id 永远不可能命名文档。
+7. **`MAX_DOCUMENTS_PER_ROOM` 计入 tombstone**：已归档文档仍占额度。
+8. **事件 hash** = `sha256(canonicalJson(事件除 hash 外的全部字段，含 prevHash))`，
+   首事件 `prevHash = ''`；同 `eventId` 不同内容 → `CONFLICTING_CHECKPOINT`。
+9. **`MAX_PROPOSALS_PER_DOC` 按未决提案数计**（`pending` + `conflicted`）；
+   已达上限时新提案抛 `DOC_LIMIT_REACHED`，已存在提案的幂等重试不受限。
+## 14. 合并层实施裁定（B 提出三条疑问后由 Leader 固化）
+
+1. **`applyPatch` 只做结构校验，不做体积检查**。体积检查留在 `diffLines` /
+   `patchFromContent`（超 `MAX_DOC_PATCH_BYTES` 抛 `DOC_PATCH_TOO_LARGE`）。
+   理由：若 `applyPatch` 也查体积，大正文 clean merge 返回的 hunks 无法 re-apply，
+   等于把「能重建」这个不变量拆掉。
+2. **clean 结果的 `hunks` 口径是「base → 结果」**，即 `applyPatch(base, hunks) === content`。
+   协调器写 `revision.patch` 时直接用这份 hunks；它可 JSON 往返。
+3. **两侧做了完全相同的编辑判 clean，结果只出现一次**。§5 的冲突条件是「两侧都改且
+   结果不同」；结果相同时没有歧义可解，判冲突只会让两人修同一个错别字也要人工确认。
