@@ -55,3 +55,52 @@
 创建 `docs/handoffs/dsh-m4-m5-development-report.md`：base/head、每个阶段的代码/界面/测试对应、协议与迁移说明、失败记录、实际验证、未实现项及剩余限制。给出明确复核命令，区分已实现自动化通过、待用户实机、设计未实现和外部阻塞。
 
 M4/M5 完成后停止，交 Codex 独立复核；不要自动开始生命周期或 M6。不要用“运行很久”或测试数量代替完成条件。
+
+## 团队并行执行方案（负责人追加授权）
+
+请开启开发团队加速，不要把所有任务仍交给一个 Agent 顺序执行。建议 1 名 Leader/集成者 + 3 名实施者；有更多席位也不必全部占满。下面的并行关系优先于旧计划中逐任务串行的执行建议，但不改变业务、权限和验收约束。
+
+### 起步：Leader 先冻结最小接口
+
+Leader 核对现状后，先用一份短接口契约固定 ID/状态/actor、proposal/revision/audit 形状、错误码、大小限额、store 事务入口、Coordinator 方法及 panel DTO。落到受版本管理的 `docs/shared-doc-interfaces.md`。各实施者确认接口后立刻开工，不必等完整业务实现。
+
+接口冻结不要求把所有实现预写出来。重要变更由 Leader 裁定并更新契约，通知受影响成员；不能让各人独立发明不兼容字段。给每人一份短任务说明：目标、依赖、独占文件、接口版本、测试、交付条件；不复制整段聊天历史。
+
+### 波次 A：三条真正独立的基础工作并行
+
+| 成员 | 工作 | 独占文件 | 可并行原因 |
+|---|---|---|---|
+| A 状态模型 | core Task1：实体、纯状态转换、权限/幂等/审计字段验证 | `lib/shared-doc-state.mjs`、`scripts/shared-doc-state.test.mjs` | 不依赖磁盘、网络、UI |
+| B 合并算法 | core Task2：行级 diff3、patch、冲突与确定性 | `lib/shared-doc-merge.mjs`、`scripts/shared-doc-merge.test.mjs` | 只依赖冻结的字符串输入输出，不等待状态实现 |
+| C 文档界面 | ui-context Task1–3：列表、编辑/diff/历史、冲突提案/确认界面 | 建议独立 `client/shared-documents.js` 或符合现有加载方式的专用模块及独立 UI 测试 | 消费冻结的 DTO/RPC adapter；用测试 fixture 开发，不等待服务上线 |
+
+Leader 同时负责 package.json/锁文件中的 diff 依赖、官方公开组件可用性、最小加载接线和真实验收脚本框架。若现有浏览器加载方式不能直接拆模块，先确定一个可用的模块接线方式；不要让 C 单方面引入运行时无法加载的模块。不要为了并行大规模重构整个 client.js。
+
+### 波次 B：按接口就绪解锁，不等整波结束
+
+- A 的状态接口稳定后，A 继续 core Task3 原子 store/重建与故障测试。
+- 协议 DTO 和状态校验器就绪、B 的合并模块交付后，B 负责 core Task4 独立签名协议及协议测试。协议模块通过回调依赖 coordinator，可先用受控服务实现验证；最终必须接真实 store/coordinator 验收。
+- C 继续完整界面与状态/权限/草稿测试；待接口可用逐步换真实 adapter，不把 fixture 当最终交付。
+- Leader 在状态/store/merge API 可用后负责 core Task5 coordinator，以及 core Task6 中 Host 身份、service/index/transport 的统一接线。协议与 store 的后续独立测试仍可并行。
+
+### 波次 C：M4 集成与 M5 纯上下文并行
+
+- M4 文档版本读取 API 稳定后，释放出来的实施者可先做 `lib/room-context.mjs` 和独立测试：版本/hash 固定、显式决策、限额、截断、引用及投递记录形状。不改 service/Team 共享文件，不宣称 M5 已接通。
+- 另一名实施者做 Markdown 导入导出的独立校验/转换模块及测试；Host 路径授权与端点由 Leader 集成，UI 接入口由 C 处理。
+- C 完成 M4 的真实 adapter 接入与界面回归。Leader 合入 M4、跑真实多节点 shared-doc smoke 后，再把纯 Context Pack 接入 mentions/任务/Team 投递和持久审计。
+- 如有空闲席位，可做只读需求/权限/恢复审查，不得再组织第二套重复实现或反复跑完整套件。
+
+### 文件所有权与合入规则
+
+- `lib/service.mjs`、`index.js`、`lib/transport.mjs`、`lib/team-coordinator.mjs`、package.json/锁文件、ROADMAP、正式回执只由 Leader 改；实施者提交接口调用需求/补丁建议。`client.js` 的具体所有权由 Leader 与 C 开始前约定，任一时刻只能一人写。
+- 测试也按文件独占，避免多人同时修改 panel-check/schema-check。独立测试各自运行；统一 harness 接线由 Leader 在合入点完成。
+- 优先每人独立 worktree/分支，Leader 顺序合入；若 DSH 团队共用工作区，则严格按文件分工，Git stage/commit/push 只由 Leader 执行，禁止成员各自 `git add .` 混入别人的半成品。
+- 合入必须包含实现、有效回归、实际测试结果及限制；仅有 mock/UI fixture 不算端到端完成。模块相关测试由实施者跑，Leader 在接口/阶段合入点运行完整套件，不让每个成员重复全量验证。
+- 共享集成测试使用各自临时目录和独立端口；需要同一组固定端口或同一真实 Host 的测试串行运行，避免残留进程与端口占用造成假失败。
+- 独立模块准备好就交付，不等其他成员；失败修复交原负责人，Leader 持续推进不受影响的分支。禁止嵌套无限开团队；成员不自行再派团队。
+
+### 不能并行跳过的门槛
+
+状态/协议契约未定，不能各自编写权威规则；store 事务语义未稳，不能宣称 coordinator 持久化可靠；权限/版本未接真实服务，不能验收 UI；M4 修订历史不可读，不能验收 M5 的版本固定投递；有共享文件或真实测试环境冲突时必须串行。
+
+最终回执增加团队分工、接口版本、各模块提交及合入点，说明哪些工作并行、哪些因依赖串行。目标是缩短等待和重复劳动，不以 Agent 数量或运行时长作为成果。
