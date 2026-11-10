@@ -147,13 +147,24 @@ export function applyDocumentCommand(state, command)
 | `document/rename` | `documentId, title, event` | 改标题（不动 head） |
 | `document/archive` | `documentId, at, event` | 写 `deletedAt`，不物理删除 |
 | `revision/append` | `revision, document, event` | 追加修订并推进 head |
-| `proposal/put` | `proposal` | 建或更新提案（同 `proposalId` 只能同内容重试） |
+| `proposal/put` | `proposal` | 建提案，或把冲突提案改成人工解决的正文（见下） |
 | `proposal/status` | `proposalId, status, resolvedBy?, resolvedAt?, event` | 改提案状态 |
 | `event/append` | `documentId, event` | 只追加审计事件 |
 | `maintainer/grant` | `documentId, holder, event` | 授予文档维护权 |
 
-同 `proposalId` 出现**不同内容**（`resultHash` 或 `baseRevisionId` 不同）必须拒绝：
-`DOC_PROPOSAL_ID_REUSED`。
+同 `proposalId` 出现**不同内容**必须拒绝：`DOC_PROPOSAL_ID_REUSED`。
+唯一例外是**解决冲突**：一个 `proposalId` 回答的是「这个 base 该变成什么文本」，
+人工解决就是同一问题换一个答案，所以允许原地改写。
+
+允许改写的条件（`isResolutionRefinement`）：
+
+- `proposalId`、`documentId`、`baseRevisionId`、`authorKey`、`createdAt` 五项**字节相同**
+  —— 改任何一项都等于换了一个问题，仍报 `DOC_PROPOSAL_ID_REUSED`；
+- 已存状态与新状态**都**是 `conflicted` —— `accepted`/`auto-merged` 是已了结的变更，
+  再改就是重写历史。
+
+满足时允许更新 `patch`/`resultHash`/`message`/`resolvedBy`/`resolvedAt`。
+`documentId` 换成一个不存在的文档时更早失败，报 `DOC_NOT_FOUND`。
 
 ## 4. 排序权威
 
@@ -278,7 +289,7 @@ confirmDocumentResolution({ documentId, proposalId, via, actorKey })
 ```js
 listDocuments({ roomId })
 createDocument({...})                  // 见 §8
-getDocument({ documentId, revisionId })        // → { document, revision, content }
+getDocument({ documentId, revisionId })        // → { document, revision, content, proposal }
 submitDocumentProposal({...})
 resolveDocumentConflict({...})
 confirmDocumentResolution({...})
@@ -290,6 +301,9 @@ importDocument({ roomId, path, title, via, actorKey })
 exportDocument({ documentId, path, via, actorKey })
 buildRoomContextPacket({ roomId, taskId, messageId, documentIds }, limits)
 ```
+
+`cursor` 是**正序偏移量**（不是 opaque 令牌），`limit` 上限 `MAX_HISTORY_PAGE`。
+`nextCursor === ''` 表示没有下一页；非空时把它原样回传即得下一页。
 
 ## 10. 面板端点（Leader 在 `index.js` 加；C 按这些名字调 `call()`）
 

@@ -689,6 +689,71 @@ test('proposal/put refuses a reused proposal id with different content', () => {
   });
 });
 
+test('a resolution may re-answer a conflicted proposal under the same id', () => {
+  // Resolving a conflict rewrites the answer to one question, so the id stays.
+  // Everything that identifies the question must stay identical; only the text,
+  // its patch/hash, the message and the resolver may move.
+  const state = stateWithDocument();
+  const proposal = { ...proposalRecord(state.documents[documentIdFor(1)]), status: 'conflicted' };
+  const once = applyDocumentCommand(state, { type: 'proposal/put', proposal });
+  const answered = {
+    ...proposal,
+    resultHash: HASH_A,
+    patch: [{ baseStart: 0, baseCount: 1, lines: ['resolved'] }],
+    message: 'merged by hand',
+    resolvedBy: 'node-aaa/human',
+    resolvedAt: '2026-10-30T00:00:00.000Z',
+  };
+  const twice = applyDocumentCommand(once, { type: 'proposal/put', proposal: answered });
+  assert.equal(twice.proposals[proposal.proposalId].resultHash, HASH_A);
+  assert.equal(twice.proposals[proposal.proposalId].message, 'merged by hand');
+  assert.equal(twice.proposals[proposal.proposalId].status, 'conflicted');
+  assert.notEqual(twice, once);
+});
+
+test('a resolution may not change what the proposal is about', () => {
+  // The refinement path is narrow on purpose: moving the author, the base or the
+  // document would make the id stand for a different question, which is exactly
+  // what the reuse guard exists to stop.
+  const state = stateWithDocument();
+  const proposal = { ...proposalRecord(state.documents[documentIdFor(1)]), status: 'conflicted' };
+  const once = applyDocumentCommand(state, { type: 'proposal/put', proposal });
+  const answer = { resultHash: HASH_A, message: 'merged by hand' };
+
+  assert.throws(
+    () => applyDocumentCommand(once, { type: 'proposal/put', proposal: { ...proposal, ...answer, authorKey: 'node-bbb/human' } }),
+    (error) => {
+      assert.equal(error.code, 'DOC_PROPOSAL_ID_REUSED');
+      return true;
+    },
+    'moving the author must not be treated as a resolution',
+  );
+
+  // A different document is refused even earlier: the document must exist before
+  // the id can be looked up in it.
+  assert.throws(
+    () => applyDocumentCommand(once, { type: 'proposal/put', proposal: { ...proposal, ...answer, documentId: documentIdFor(2) } }),
+    (error) => {
+      assert.equal(error.code, 'DOC_NOT_FOUND');
+      return true;
+    },
+    'moving the document must not be treated as a resolution',
+  );
+
+  // Re-answering a proposal that is already settled is history rewriting, not a
+  // resolution: only a conflicted proposal can still be answered.
+  const settled = { ...proposal, status: 'accepted' };
+  const accepted = applyDocumentCommand(state, { type: 'proposal/put', proposal: settled });
+  assert.throws(
+    () => applyDocumentCommand(accepted, { type: 'proposal/put', proposal: { ...settled, ...answer } }),
+    (error) => {
+      assert.equal(error.code, 'DOC_PROPOSAL_ID_REUSED');
+      return true;
+    },
+    'a settled proposal may not be re-answered',
+  );
+});
+
 test('proposal/put refuses a base revision outside the history', () => {
   const state = stateWithDocument();
   const proposal = proposalRecord(state.documents[documentIdFor(1)], { baseRevisionId: revisionIdFor(999) });
