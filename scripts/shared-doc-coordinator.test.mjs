@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { TransportError } from '../lib/transport.mjs';
-import { SharedDocStore } from '../lib/shared-doc-store.mjs';
+import { SharedDocStore, validateSharedDocReplica } from '../lib/shared-doc-store.mjs';
 import {
   SharedDocCoordinator,
   VIA_PANEL,
@@ -302,7 +302,7 @@ test('a real conflict parks a proposal and leaves the head exactly where it was'
     assert.notEqual(after.document.headRevisionId, before.document.headRevisionId);
 
     // The conflict is visible on the row, and the three texts are readable.
-    const listed = coordinator.listDocuments({ roomId: ROOM });
+    const listed = coordinator.listDocuments({ roomId: ROOM, via: VIA_PANEL });
     const row = listed.documents.find((entry) => entry.documentId === documentId);
     assert.equal(row.conflictCount, 1);
     assert.equal(after.proposal.conflicted, true);
@@ -391,7 +391,7 @@ test('a resolution only becomes the head once a maintainer confirms it', async (
 
     // Any member may write the resolution — the resolver need not be the author.
     const resolved = await coordinator.resolveDocumentConflict({
-      documentId, proposalId, content: 'a\nBOTH\nc\n', message: 'merged by hand', via: VIA_TOOL,
+      documentId, proposalId, content: 'a\nBOTH\nc\n', message: 'merged by hand', via: VIA_PANEL,
       sessionId: 'session-agent',
     });
     assert.equal(resolved.status, 'pending');
@@ -419,7 +419,7 @@ test('a resolution only becomes the head once a maintainer confirms it', async (
   });
 });
 
-test('an agent may resolve but never confirm', async () => {
+test('an agent may neither resolve nor confirm', async () => {
   await withCoordinator(async ({ coordinator }) => {
     const documentId = await createDoc(coordinator, 'a\nb\nc\n');
     const base = coordinator.getDocument({ documentId, via: VIA_PANEL }).revision.revisionId;
@@ -429,10 +429,10 @@ test('an agent may resolve but never confirm', async () => {
     const conflicted = await coordinator.submitDocumentProposal({
       documentId, baseRevisionId: base, content: 'a\nTWO\nc\n', message: 'theirs', via: VIA_PANEL,
     });
-    await coordinator.resolveDocumentConflict({
+    assert.equal((await settle(coordinator.resolveDocumentConflict({
       documentId, proposalId: conflicted.proposal.proposalId, content: 'a\nBOTH\nc\n',
       message: 'agent resolution', via: VIA_TOOL, sessionId: 'session-agent',
-    });
+    }))).code, 'AGENT_CANNOT_CONFIRM');
     const error = await settle(coordinator.confirmDocumentResolution({
       documentId, proposalId: conflicted.proposal.proposalId, via: VIA_TOOL, sessionId: 'session-agent',
     }));
@@ -462,7 +462,7 @@ test('a human who is neither Leader nor maintainer cannot confirm', async () => 
     assert.equal(error.code, 'NOT_DOCUMENT_MAINTAINER');
   }, {
     roomInfo: (roomId) => (roomId === ROOM
-      ? { id: ROOM, leaderKey: PEER_HUMAN, memberKeys: new Set([SELF_HUMAN, PEER_HUMAN, AGENT]) }
+      ? { id: ROOM, leaderKey: AGENT, memberKeys: new Set([SELF_HUMAN, PEER_HUMAN, AGENT]) }
       : undefined),
   });
 });
@@ -594,7 +594,7 @@ test('history pages by cursor and never repeats or skips a revision', async () =
     const pages = [];
     let cursor = '';
     for (let guard = 0; guard < 10; guard += 1) {
-      const page = coordinator.listDocumentHistory({ documentId, cursor, limit: 2 });
+      const page = coordinator.listDocumentHistory({ documentId, via: VIA_PANEL, cursor, limit: 2 });
       pages.push(page);
       assert.ok(page.revisions.length <= 2);
       cursor = page.nextCursor;
@@ -612,7 +612,7 @@ test('listDocuments hides archived documents but keeps them readable by id', asy
     const documentId = await createDoc(coordinator);
     const archived = await coordinator.archiveDocument({ documentId, via: VIA_PANEL });
     assert.equal(archived.document.archived, true);
-    assert.deepEqual(coordinator.listDocuments({ roomId: ROOM }).documents, []);
+    assert.deepEqual(coordinator.listDocuments({ roomId: ROOM, via: VIA_PANEL }).documents, []);
     // A tombstone, not a delete: the history is still there.
     const view = coordinator.getDocument({ documentId, via: VIA_PANEL });
     assert.equal(view.document.title, 'Notes');
@@ -632,7 +632,7 @@ test('renaming records an audit event without minting a revision', async () => {
     assert.equal(renamed.document.title, 'Renamed');
     const after = coordinator.getDocument({ documentId, via: VIA_PANEL });
     assert.equal(after.document.headRevisionId, before.document.headRevisionId);
-    const types = coordinator.listDocumentHistory({ documentId }).events.map((event) => event.type);
+    const types = coordinator.listDocumentHistory({ documentId, via: VIA_PANEL }).events.map((event) => event.type);
     assert.ok(types.includes('document-renamed'));
     assert.equal(store.verifyAudit(documentId).ok, true);
   });
@@ -704,4 +704,124 @@ test('a document survives a store restart with the same head and text', async ()
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('trusted relay retains remote identity and read membership', async () => {
+  await withCoordinator(async ({ coordinator, store }) => {
+    const relay = coordinator.forTrustedActor({ nodeId: 'node-bbb', sessionId: 'human', isHuman: true });
+    const created = await relay.createDocument({ roomId: ROOM, title: 'remote', content: 'body', via: VIA_TOOL });
+    const id = created.document.documentId;
+    assert.equal(store.state().documents[id].createdBy, PEER_HUMAN);
+    assert.equal(relay.listDocuments({ roomId: ROOM }).documents.length, 1);
+    assert.equal(relay.listDocumentHistory({ documentId: id }).revisions.length, 1);
+    assert.ok(Object.keys(store.state().outbox).length > 0);
+    const stranger = coordinator.forTrustedActor({ nodeId: 'stranger', sessionId: 'human', isHuman: true });
+    assert.equal(catchSync(() => stranger.listDocuments({ roomId: ROOM })).code, 'NOT_ROOM_MEMBER');
+  });
+});
+
+test('tool cannot pass a remote or human actor key as session', () => {
+  for (const sessionId of ['node-bbb/human', 'node-bbb/agent', 'human']) {
+    assert.equal(catchSync(() => resolveActor({ via: VIA_TOOL, nodeId: 'node-aaa', sessionId })).code, 'DOC_COMMAND_INVALID');
+  }
+});
+
+test('outbox and proposal fingerprints survive reopening', async () => {
+  await withCoordinator(async ({ coordinator, store, dir }) => {
+    const id = await createDoc(coordinator, 'a\nb\nc');
+    const base = store.state().documents[id].headRevisionId;
+    await coordinator.submitDocumentProposal({ documentId: id, baseRevisionId: base, content: 'A\nb\nc', via: VIA_PANEL });
+    const request = { documentId: id, proposalId: 'prop-123456abcdef', baseRevisionId: base, content: 'a\nb\nC', via: VIA_PANEL };
+    await coordinator.submitDocumentProposal(request);
+    assert.equal((await coordinator.submitDocumentProposal(request)).status, 'clean');
+    const reopened = await SharedDocStore.open(dir);
+    try {
+      assert.deepEqual(reopened.state().idempotency, store.state().idempotency);
+      assert.deepEqual(reopened.state().outbox, store.state().outbox);
+      for (const revision of Object.values(reopened.state().revisions)) reopened.documentAt(id, revision.revisionId);
+    } finally { await reopened.close(); }
+  });
+});
+
+test('concurrent proposals cannot overwrite a committed head', async () => {
+  await withCoordinator(async ({ coordinator, store }) => {
+    const id = await createDoc(coordinator, 'base');
+    const base = store.state().documents[id].headRevisionId;
+    const request = { documentId: id, proposalId: 'prop-abcdef123456', baseRevisionId: base, content: 'new', via: VIA_PANEL };
+    const results = await Promise.allSettled([coordinator.submitDocumentProposal(request), coordinator.submitDocumentProposal(request)]);
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(results.find(result => result.status === 'rejected').reason.code, 'DOC_CONFLICT_PENDING');
+    assert.equal((await coordinator.submitDocumentProposal(request)).status, 'clean');
+    assert.equal(Object.keys(store.state().revisions).length, 2);
+  });
+});
+
+test('create requestId commits one document concurrently and survives reopening', async () => {
+  await withCoordinator(async ({ coordinator, store, dir }) => {
+    const request = { roomId: ROOM, title: 'import', content: 'original', message: 'receipt', source: 'import', requestId: 'create-retry-1', via: VIA_PANEL };
+    const [first, second] = await Promise.all([coordinator.createDocument(request), coordinator.createDocument(request)]);
+    assert.equal(first.document.documentId, second.document.documentId);
+    assert.equal(Object.keys(store.state().documents).length, 1);
+    assert.equal(Object.values(store.state().events).flat()[0].type, 'document-imported');
+    for (const changed of [{ content: 'different' }, { title: 'different' }, { message: 'different' }, { source: 'human' }]) {
+      assert.equal((await settle(coordinator.createDocument({ ...request, ...changed }))).code, 'DOC_COMMAND_INVALID');
+    }
+    const reopened = await SharedDocStore.open(dir);
+    try {
+      const retry = new SharedDocCoordinator({ store: reopened, nodeId: 'node-aaa', roomInfo: () => ({ id: ROOM, leaderKey: LEADER, memberKeys: new Set([SELF_HUMAN, PEER_HUMAN]) }) });
+      assert.equal((await retry.createDocument(request)).document.documentId, first.document.documentId);
+      const remote = retry.forTrustedActor({ nodeId: 'node-bbb', sessionId: 'human', isHuman: true });
+      assert.equal((await settle(remote.createDocument(request))).code, 'DOC_COMMAND_INVALID');
+      assert.equal(Object.keys(reopened.state().documents).length, 1);
+    } finally { await reopened.close(); }
+  });
+});
+
+test('pure replica validation rejects damaged history, heads and audit', async () => {
+  await withCoordinator(async ({ coordinator, store }) => {
+    const id = await createDoc(coordinator, 'original');
+    const base = store.state().documents[id].headRevisionId;
+    await coordinator.submitDocumentProposal({ documentId: id, baseRevisionId: base, content: 'next', via: VIA_PANEL });
+    const valid = store.state();
+    assert.equal(validateSharedDocReplica(valid), true);
+    for (const corrupt of [
+      state => { state.revisions[base].resultHash = '0'.repeat(64); },
+      state => { delete state.revisions[base]; },
+      state => { state.events[id][0].detail = { tampered: true }; },
+      state => { state.documents[id].contentHash = '0'.repeat(64); },
+    ]) {
+      const damaged = structuredClone(valid);
+      corrupt(damaged);
+      assert.equal(catchSync(() => validateSharedDocReplica(damaged)).code, 'DOC_STORE_CORRUPT');
+    }
+    assert.deepEqual(store.state(), valid);
+  });
+});
+
+test('conflict originals and versioned resolutions survive restart and reject moved heads', async () => {
+  await withCoordinator(async ({ coordinator, store, dir }) => {
+    const documentId = await createDoc(coordinator, 'a\nb\nc');
+    const baseRevisionId = store.state().documents[documentId].headRevisionId;
+    await coordinator.submitDocumentProposal({ documentId, baseRevisionId, content: 'a\nONE\nc', via: VIA_PANEL });
+    const conflict = await coordinator.submitDocumentProposal({ documentId, baseRevisionId, content: 'a\nTWO\nc', via: VIA_PANEL });
+    const proposalId = conflict.proposal.proposalId;
+    const remote = coordinator.forTrustedActor({ nodeId: 'node-bbb', sessionId: 'human', isHuman: true });
+    assert.equal(remote.getDocument({ documentId }).proposal.proposedContent, 'a\nTWO\nc');
+    await remote.resolveDocumentConflict({ documentId, proposalId, content: 'a\nBOTH\nc' });
+    const reopened = await SharedDocStore.open(dir);
+    try {
+      const reader = new SharedDocCoordinator({ store: reopened, nodeId: 'node-aaa', roomInfo: () => ({ id: ROOM, leaderKey: LEADER, memberKeys: new Set([SELF_HUMAN, PEER_HUMAN]) }) }).forTrustedActor({ nodeId: 'node-bbb', sessionId: 'human', isHuman: true });
+      const view = reader.getDocument({ documentId }).proposal;
+      assert.equal(view.proposedContent, 'a\nTWO\nc');
+      assert.equal(view.resolutionContent, 'a\nBOTH\nc');
+    } finally { await reopened.close(); }
+    const head = store.state().documents[documentId].headRevisionId;
+    await coordinator.submitDocumentProposal({ documentId, baseRevisionId: head, content: 'a\nONE\nNEW', via: VIA_PANEL });
+    assert.equal((await settle(coordinator.confirmDocumentResolution({ documentId, proposalId, via: VIA_PANEL }))).code, 'DOC_CONFLICT_PENDING');
+    await remote.resolveDocumentConflict({ documentId, proposalId, content: 'a\nBOTH\nNEW' });
+    assert.equal(store.state().idempotency[proposalId].resolutions.length, 2);
+    assert.equal(store.state().idempotency[proposalId].content, 'a\nTWO\nc');
+    await coordinator.confirmDocumentResolution({ documentId, proposalId, content: 'payload must not override resolution', via: VIA_PANEL });
+    assert.equal(remote.getDocument({ documentId }).document.content, 'a\nBOTH\nNEW');
+  });
 });

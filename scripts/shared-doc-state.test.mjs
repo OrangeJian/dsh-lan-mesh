@@ -299,7 +299,7 @@ test('the module keeps the frozen limits and enums of §2 and §3', () => {
 
 test('an empty state has the six maps the contract names', () => {
   const state = emptyDocumentState();
-  assert.deepEqual(Object.keys(state).sort(), ['documents', 'events', 'maintainers', 'proposals', 'revisions', 'version']);
+  assert.deepEqual(Object.keys(state).sort(), ['documents', 'events', 'idempotency', 'maintainers', 'outbox', 'proposals', 'revisions', 'version']);
   assert.equal(state.version, DOC_STATE_VERSION);
   for (const key of ['documents', 'revisions', 'proposals', 'events', 'maintainers']) {
     assert.deepEqual(state[key], {});
