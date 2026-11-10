@@ -268,6 +268,30 @@ RPC 端点（走 `ctx.inject(['connection'], scope => scope.connection.fetch.reg
 与 `lib/store.mjs` 房间落盘往返。`scripts/rooms-smoke.mjs`：两节点（独立 DSH_HOME）建房→加入→派任务→
 房间消息→状态收敛。
 
+### 4.5 共享文档通道（M4，2026-11-11）
+
+共享文档**不走** `rooms.json`。它是一条与房间附件并列的独立通道，同样显式协商能力：
+
+- 能力广告：`GET /lan-mesh/v1/info` 的 `node.sharedDocs: 1`。
+- 信封字段 `sharedDocsVersion: 1` 参与签名（与 `referencesVersion: 1`、
+  `attachmentsVersion: 1` 同一套 `signingInput()` 扩展规则，互不替代）。
+- 对端未广告 `sharedDocs: 1` → `DOC_PEER_UNSUPPORTED`，**该文档的精确投递失败**，
+  不降级广播、不假装成功。
+- 消息体上限 `MAX_BODY_BYTES`；超限 `DOC_BODY_TOO_LARGE`。
+- 详细形状（`submit` / `status` / `sync` 三个 op、`generation+seq+hash` 检查点、
+  重复 `eventId` 幂等、gap 必须等补发、同 `generation+seq` 不同 hash 必须
+  `CONFLICTING_CHECKPOINT` 暂停）见 `docs/shared-doc-interfaces.md` §6。
+- 实现落在 `lib/shared-doc-protocol.mjs`；`lib/transport.mjs` 的接线由 Lead 改。
+
+**排序权威**：文档 head 与审计顺序只认 Leader 的 `(generation, seq)`，**不看墙钟**。
+多个节点各自认为自己是 Leader 时，冲突检查点必须停下报错，不允许"取最新"。
+
+### 4.6 文档审计的不可改写性
+
+`events[documentId]` 只追加。任何"删除文档"都是新的 tombstone（`document/archive`
+写 `deletedAt`），不物理抹除旧 revision、旧事件。用于重建任意 revision 的快照与
+修订对象在保留期内不得回收——hash 不能代替可恢复的 patch。
+
 ## 9. 验证门槛（谁都不能跳过）
 
 1. `node --check` 每个改过的文件。

@@ -57,6 +57,17 @@ role      = 'leader' | 'member'
 | `notifySend` | `{channel, text}` | 投递结果（单渠道自动发时用） |
 | `notifyConfirm` | `{id, channel}` | `{status, summary, ok?}`（按人选定的渠道发出挂起通知） |
 | `notifyDismiss` | `{id}` | `{ok}`（忽略挂起通知） |
+| `documents` | `{roomId}` | `{status, reason?, documents: DocumentRow[]}`（M4，**新增**） |
+| `documentRead` | `{documentId, revisionId?}` | `{status, reason?, document: DocumentView, revision: HistoryRow}` |
+| `documentCreate` | `{roomId, title, content, message}` | `{status, reason?, document: DocumentRow}` |
+| `documentPropose` | `{documentId, baseRevisionId, content, message, proposalId?}` | `{status:'clean'\|'conflict'\|'pending', reason?, revision?, proposal?}` |
+| `documentResolve` | `{documentId, proposalId, content, message}` | `{status, reason?, proposal: ProposalRow}` |
+| `documentConfirm` | `{documentId, proposalId}` | `{status, reason?, document: DocumentRow, revision: HistoryRow}` |
+| `documentHistory` | `{documentId, cursor?, limit?}` | `{status, reason?, revisions: HistoryRow[], events: object[], nextCursor}` |
+| `documentRename` | `{documentId, title}` | `{status, reason?, document: DocumentRow}` |
+| `documentArchive` | `{documentId}` | `{status, reason?, document: DocumentRow}` |
+| `documentImport` | `{roomId, path, title}` | `{status, reason?, document: DocumentRow, audit}` |
+| `documentExport` | `{documentId, path}` | `{status, reason?, path, bytes}` |
 
 `snapshot.notify` 是 `{pending:[{id, message, createdAt, channels:[{id,label}]}]}`。多渠道通知不会自动发，左栏「待确认通知」渲染它，点渠道按钮调 `notifyConfirm`、点忽略调 `notifyDismiss`；单渠道时 Host 直接发，不留 pending。
 
@@ -283,3 +294,54 @@ activate`）。同理两个 slot 注册都必须走 `ctx.slots.inject(key, () =>
 
 
 自动验证包含 Request/Response 流、真实两节点 HTTP 和 React 行为渲染 harness；harness 不证明浏览器布局。当前批次按用户要求交由用户加载工作区自行做浏览器验收。
+
+## M4 共享文档界面
+
+契约全文（状态模型、排序权威、合并规则、错误码、权限派生）见 `docs/shared-doc-interfaces.md`；
+本节只记录面板侧的形状与交互。端点见 §2 的 `documents`…`documentExport` 一组。
+
+### 权限
+
+文档端点都是**面板入口**：服务端强制 `via: 'panel'`，actor 是 `nodeId/human`。
+客户端**不要**发 `sessionId` 或任何身份字段——发了也会被忽略。
+
+- 任何人类成员可以创建文档、提交提案、提交冲突解决方案。
+- 只有 Leader 或该文档的维护者可以**确认**冲突解决方案；这个能力由服务端在
+  `DocumentView.canConfirm` 里告知，**前端只读这个布尔值**，不自己推算角色。
+- Agent 通过工具可以提案，但**不能确认**；界面上不出现能让 Agent 确认的路径。
+- 作者名、标题、提交说明都是不可信文本：只做 default 转义渲染，不参与任何判断。
+
+### 视图结构
+
+房间内容区增加「聊天 / 文档」切换，默认聊天，切换状态只存组件内（不进 localStorage）。
+
+文档列表每行：标题、head revision 短 id、最近作者、未解决冲突数（>0 时用警示色徽标）、
+关联任务链接。空列表 / 加载中 / 出错三种状态各有明确文案，不要用空列表冒充「没有文档」。
+
+文档详情四区：
+
+1. **阅读**：`MarkdownText` 渲染当前 head 正文；顶部显示 `headRevisionId` 短 id 与 `contentHash` 前 8 位。
+2. **编辑**：textarea + 提交说明输入 + 保存按钮。保存时**必须**发送当前 `baseRevisionId`。
+   保存失败**保留草稿**（不清空 textarea），错误就地显示，可再次保存。
+3. **diff**：以 `+` / `-` 前缀的等宽文本渲染行级差异，不引入新依赖。
+4. **历史**：revision 列表（作者、时间、提交说明、source）+ 事件列表，按 `nextCursor` 分页。
+   历史**只读**：旧 revision 不能编辑，只能「复制为新提案」——点了以后把该版本正文填进编辑区，
+   `baseRevisionId` 仍是当前 head，保存后成为一条新提案，旧记录不动。
+
+### 冲突
+
+`documentPropose` 返回 `status: 'conflict'` 时进入冲突区，并排显示 base / current / proposed
+三段内容（各自可滚动）。人类成员可以编辑一段最终正文并提交 `documentResolve`；
+提交后提案状态变 `resolved`，等待确认。
+
+确认按钮**只在 `canConfirm === true` 时渲染**，并且点击时**先重新拉一次 `documentRead`**
+拿到最新 head 再调 `documentConfirm`——否则确认的可能是已被别人推进的旧冲突。重读发现 head
+已变化时不确认，提示用户重新走一遍解决流程。
+
+### 导入导出
+
+导入必须由用户显式选择路径或文件，成功后显示一条审计记录（谁、什么时候、从哪条路径导入）。
+
+导出遇到目标已存在时必须报错（`DOC_EXPORT_TARGET_EXISTS`），**绝不静默覆盖**；
+需要覆盖只能由用户先自行删除目标文件。两边都**不**自动与磁盘或 Git 双向同步——
+文档只存在 Room 里，导入导出是一次性动作。
