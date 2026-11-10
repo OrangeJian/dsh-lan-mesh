@@ -19,6 +19,7 @@ import vm from 'node:vm';
 import { MeshNode } from '../lib/service.mjs';
 import { MeshServer, deliverToPeer } from '../lib/transport.mjs';
 import { RoomAttachmentLedger, receiptRefKey } from '../lib/room-attachment-ledger.mjs';
+import { createBlobHandler, sendBlob } from '../lib/room-blob-protocol.mjs';
 import { RoomBlobStore } from '../lib/room-blob-store.mjs';
 import { emptyState, createRoom, joinRoom } from '../lib/rooms.mjs';
 import { meshRootDir, readInbox } from '../lib/store.mjs';
@@ -147,6 +148,96 @@ test('#1 renewal wipes stale receipts so a captured prepare replay cannot revive
   await assert.rejects(ledger.commit(e, fakeStore(bytes, true)), /bytes were not received for this intent/);
   await ledger.recordReceived({ roomId: ROOM_ID, senderNodeId: 'node-a', ref });
   assert.equal((await ledger.commit(e, fakeStore(bytes, true))).status, 'committed');
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('#1 concurrent real PUTs each keep their own durable receipt (queued transaction)', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'm3-race-'));
+  const ledger = await RoomAttachmentLedger.open(dir);
+  const store = await RoomBlobStore.open({ dir: join(dir, 'blobs') });
+  const refA = refOf(Buffer.from('concurrent A'), 'a.txt');
+  const refB = refOf(Buffer.from('concurrent B'), 'b.txt');
+  const eA = envelope({ id: 'race-a', text: 'A', attachments: [refA] });
+  const eB = envelope({ id: 'race-b', text: 'B', attachments: [refB] });
+  await ledger.prepare(eA);
+  await ledger.prepare(eB);
+
+  // Both PUTs reach the receipt step together. Without a queued transaction each
+  // call clones the SAME snapshot, so the second save loses the first receipt.
+  // The barrier must never deadlock the suite: it releases when both PUTs have
+  // arrived OR after a short bound (the race is still exercised either way).
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  let arrived = 0;
+  const timer = setTimeout(() => release(), 3000);
+  timer.unref?.();
+  const handler = createBlobHandler({
+    store, nodeId: () => 'node-b', secret: () => 'secret', trustedPeers: () => ['node-a'],
+    authorize: async () => true,
+    onReceived: async r => {
+      arrived += 1;
+      if (arrived >= 2) release();
+      await gate;
+      return ledger.run(() => ledger.recordReceived({ roomId: r.roomId, senderNodeId: r.senderNodeId, ref: r.ref }));
+    },
+  });
+  const server = new MeshServer({ describe: () => ({ nodeId: 'node-b' }), secret: () => 'secret', trustedPeers: () => [], onMessage: async () => ({}), onBlob: handler });
+  await server.listen(0);
+  const peer = { address: '127.0.0.1', port: server.port, nodeId: 'node-b', roomBlobs: 1 };
+  t.after(() => server.close());
+  const put = (ref, body) => sendBlob({
+    peer, nodeId: 'node-a', secret: 'secret', roomId: ROOM_ID, attachment: ref,
+    readable: Readable.from([body]),
+  });
+  await Promise.all([put(refA, 'concurrent A'), put(refB, 'concurrent B')]);
+  clearTimeout(timer);
+
+  // Both receipts must survive, in ONE snapshot, and both intents can commit.
+  const messages = ledger.data.messages;
+  assert.deepEqual(messages[ledger.key(eA)].receivedRefs, [receiptRefKey(refA)], 'receipt for A survived');
+  assert.deepEqual(messages[ledger.key(eB)].receivedRefs, [receiptRefKey(refB)], 'receipt for B survived');
+
+  // A receipt may only be recorded for a still-valid prepared intent: an intent
+  // that expired while the write was queued must not gain fresh authorization.
+  const refC = refOf(Buffer.from('expired C'), 'c.txt');
+  const eC = envelope({ id: 'race-c', text: 'C', attachments: [refC] });
+  await ledger.prepare(eC);
+  await ledger.run(() => ledger.save(d => { d.messages[ledger.key(eC)].expiresAt = 1; }));
+  assert.equal(await ledger.run(() => ledger.recordReceived({ roomId: ROOM_ID, senderNodeId: 'node-a', ref: refC })), false,
+    'expired intent must not accept a late receipt');
+  await assert.rejects(ledger.commit(eC, store), /expired/);
+
+  // Reopen: both receipts are durable, so both commits are legal after restart.
+  const reopened = await RoomAttachmentLedger.open(dir);
+  assert.deepEqual(reopened.data.messages[ledger.key(eA)].receivedRefs, [receiptRefKey(refA)]);
+  assert.deepEqual(reopened.data.messages[ledger.key(eB)].receivedRefs, [receiptRefKey(refB)]);
+  assert.equal((await reopened.commit(eA, store)).status, 'committed');
+  assert.equal((await reopened.commit(eB, store)).status, 'committed');
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('#1 a receipt that cannot be made durable never acknowledges the PUT', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'm3-receipt-fail-'));
+  const ledger = await RoomAttachmentLedger.open(dir);
+  const store = await RoomBlobStore.open({ dir: join(dir, 'blobs') });
+  const ref = refOf(Buffer.from('receipt failure bytes'), 'fail.txt');
+  const e = envelope({ id: 'receipt-fail', text: 'fail', attachments: [ref] });
+  await ledger.prepare(e);
+  // Inject one durable-write failure at the ledger file boundary.
+  const original = ledger.save.bind(ledger);
+  ledger.save = async () => { throw new Error('disk full'); };
+  const handler = createBlobHandler({
+    store, nodeId: () => 'node-b', secret: () => 'secret', trustedPeers: () => ['node-a'],
+    authorize: async () => true,
+    onReceived: r => ledger.run(() => ledger.recordReceived({ roomId: r.roomId, senderNodeId: r.senderNodeId, ref: r.ref })),
+  });
+  const server = new MeshServer({ describe: () => ({ nodeId: 'node-b' }), secret: () => 'secret', trustedPeers: () => [], onMessage: async () => ({}), onBlob: handler });
+  await server.listen(0);
+  const peer = { address: '127.0.0.1', port: server.port, nodeId: 'node-b', roomBlobs: 1 };
+  t.after(() => server.close());
+  await assert.rejects(sendBlob({ peer, nodeId: 'node-a', secret: 'secret', roomId: ROOM_ID, attachment: ref, readable: Readable.from(['receipt failure bytes']) }), /RECEIPT_UNAVAILABLE|HTTP_503/);
+  ledger.save = original;
+  // Nothing was acknowledged, so no receipt exists and commit stays illegal.
+  await assert.rejects(ledger.commit(e, store), /bytes were not received for this intent/);
   await rm(dir, { recursive: true, force: true });
 });
 
