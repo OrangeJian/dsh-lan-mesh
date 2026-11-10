@@ -1289,7 +1289,11 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
        const bubbleContents = [];
        if (body !== null) bubbleContents.push(body);
        if (attachment !== null) bubbleContents.push(attachment);
-       for(const ref of message.attachments??[])bubbleContents.push(h(AttachmentCard,{key:ref.blobId,refData:ref,roomId:props.roomId}));
+       // Two attachments can share identical bytes (same blobId) but different
+       // file names, or the same file can be selected twice. The blob is still
+       // content-addressed in storage, but each card needs a stable per-message
+       // key so React never collapses or mis-orders them.
+       (message.attachments??[]).forEach((ref,index)=>bubbleContents.push(h(AttachmentCard,{key:`${ref.blobId}/${index}`,refData:ref,roomId:props.roomId})));
        // Skill references ride beside the text, never inside it: the body keeps
        // the exact words the sender typed, and the chips name the capabilities
        // they pointed at along with the node that owns each one. A reference
