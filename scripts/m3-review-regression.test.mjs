@@ -512,13 +512,15 @@ test('#7 a node missing local bytes fetches them on demand from a room holder an
 });
 
 // ---------------------------------------------------------------- #8 --------
-test('#8 an old ordinary peer receives readable text (body + filename + cannot-preview hint), never bytes or a broadcast; old Leader still fails', async t => {
+test('#8 an old ordinary peer that still supports exact references gets readable text, never bytes or a broadcast; old Leader still fails', async t => {
   const { a, b, room } = await fixture(t);
   const ref = await upload(a, room, 'legacy peer bytes');
   const received = [];
-  // An OLD ordinary node: /info advertises only nodeId (no roomAttachments/roomBlobs),
-  // and it accepts plain messages on /send, recording what it saw.
-  const old = new MeshServer({ describe: () => ({ nodeId: 'node-b' }), secret: () => 'secret', trustedPeers: () => [], onMessage: async e => { received.push(e); return {}; } });
+  // An OLD ordinary node: /info advertises nodeId and roomReferences (it can carry
+  // exact structured mentions) but NO roomAttachments/roomBlobs. It records what
+  // it actually received. This is the only legacy shape that may get a notice at
+  // all: with no exact-reference support the sender fails closed instead.
+  const old = new MeshServer({ describe: () => ({ nodeId: 'node-b', roomReferences: 1 }), secret: () => 'secret', trustedPeers: () => [], onMessage: async e => { received.push(e); return {}; } });
   await old.listen(0);
   a.resolvePeers = () => [{ nodeId: 'node-b', name: 'old', address: '127.0.0.1', httpPort: old.port }];
   // A modern Leader must still exist for the send to commit; make a 3rd node the Leader.
@@ -544,12 +546,17 @@ test('#8 an old ordinary peer receives readable text (body + filename + cannot-p
   const result = await a.sayInRoom({ room: room.id, sessionId: 'human', text: 'Body text', attachments: [ref], messageId: 'old-peer' });
   const downgraded = result.delivered.find(d => d.nodeId === 'node-b');
   assert.equal(downgraded.downgraded, true);
-  assert.equal(downgraded.delivered, 'readable-text-only');
+  assert.equal(downgraded.delivered, 'readable-text-with-exact-references');
+  // The two delivery facts are reported separately: the notice reached the node,
+  // its bytes did not. A bare ok:true must not blur that difference.
+  assert.equal(downgraded.metadataDelivered, true);
+  assert.equal(downgraded.blobDelivered, false);
   assert.equal(received.length, 1);
   const note = received[0];
   assert.equal(note.to, 'node-b', 'precise target is preserved, no @all / broadcast');
   assert.equal(note.attachments, undefined, 'no new base64 / attachment bytes');
-  assert.equal(note.mentions, undefined);
+  assert.deepEqual(note.mentions, [], 'mentions stays DEFINED so the receiver never derives targets from body/file-name tokens');
+  assert.equal(note.referencesVersion, 1, 'the notice travels on the signed exact-reference channel');
   assert.match(note.text, /Body text/);
   assert.match(note.text, /hello\.txt/);
   assert.match(note.text, /不支持附件预览/);
@@ -561,6 +568,113 @@ test('#8 an old ordinary peer receives readable text (body + filename + cannot-p
   await assert.rejects(a.sayInRoom({ room: room.id, sessionId: 'human', attachments: [ref2], messageId: 'old-leader' }), /Leader|support|leader/i);
   assert.equal(a.roomDetail({ room: room.id }).messages.filter(m => m.id === 'old-leader').length, 0, 'draft retained, not published');
   await old.close(); await leader.close();
+});
+
+// ------------------------------------------------------- Task 3 (M3 #8) ----
+// The old "readable downgrade" note stripped structured mentions and kept only
+// the node-level `to`. On an old ordinary node with more than one agent, the
+// receiving service then re-derives targets from the plain body — so an `@` in
+// the body or in a FILE NAME (including `@all`) can wake agents that were never
+// addressed. These tests observe the real receiving service's wake calls.
+
+/** Old ordinary peer: a real MeshNode (so its real receive()/#wakeRoom runs). */
+async function oldPeer(t, { nodeId, sessions, advertise }) {
+  const woke = [];
+  const agents = {
+    get: (id) => (sessions.includes(id) ? { session: { id, title: 'Same' }, followup: () => woke.push(id) } : undefined),
+    list: () => sessions.map((id) => ({ id })),
+  };
+  const node = new MeshNode({ config: { port: 0, autoWake: true, clusterSecret: 'secret', trustedPeers: [] }, agents });
+  node.started = true;
+  node.identity = { nodeId, name: nodeId };
+  node.roomsDoc = structuredClone(advertise.roomsDoc);
+  node.server = new MeshServer({
+    describe: () => ({ ...node.describe(), ...(advertise.references ? {} : { roomReferences: undefined }) }),
+    secret: () => 'secret', trustedPeers: () => [], onMessage: (e) => node.receive(e),
+  });
+  await node.server.listen(0);
+  t.after(() => node.close());
+  return { node, woke, port: node.server.port };
+}
+
+/** Room where node-a is the Leader/sender and node-b hosts two same-named agents. */
+function twoAgentRoom() {
+  const state = emptyState();
+  const room = createRoom(state, { name: 'Files', leader: { nodeId: 'node-a', sessionId: 'human', name: 'A' } }, () => ROOM_UUID);
+  joinRoom(state, room.id, { nodeId: 'node-b', sessionId: 'b-one', name: 'Same' });
+  joinRoom(state, room.id, { nodeId: 'node-b', sessionId: 'b-two', name: 'Same' });
+  return { state, room };
+}
+
+test('Task 3 an exact mention on an old reference-capable node wakes ONLY the addressed agent', async (t) => {
+  const { state, room } = twoAgentRoom();
+  const home = await mkdtemp(join(tmpdir(), 'm3-task3-'));
+  const prev = process.env.DSH_HOME; process.env.DSH_HOME = home;
+  t.after(async () => { if (prev === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = prev; await rm(home, { recursive: true, force: true }); });
+  // Sender/Leader: modern, has attachments.
+  const a = new MeshNode({ config: { port: 39111, clusterSecret: 'secret', trustedPeers: [], autoWake: false } });
+  a.started = true; a.identity = { nodeId: 'node-a', name: 'A' }; a.roomsDoc = structuredClone(state);
+  t.after(() => a.close());
+  const old = await oldPeer(t, { nodeId: 'node-b', sessions: ['b-one', 'b-two'], advertise: { roomsDoc: state, references: true } });
+  a.resolvePeers = () => [{ nodeId: 'node-b', name: 'old', address: '127.0.0.1', httpPort: old.port }];
+  const ref = await upload(a, room, 'targeted bytes');
+  const result = await a.sayInRoom({
+    room: room.id, sessionId: 'human', text: 'please look @Same',
+    mentions: [{ memberKey: 'node-b/b-one', label: 'Same' }],
+    attachments: [ref], messageId: 'legacy-exact',
+  });
+  const legacy = result.delivered.find((d) => d.nodeId === 'node-b');
+  assert.equal(legacy.blobDelivered, false, 'bytes never reach an old node');
+  assert.deepEqual(old.woke, ['b-one'], 'only the explicitly addressed member is woken');
+});
+
+test('Task 3 a file name containing @all on an old node never wakes unmentioned agents', async (t) => {
+  const { state, room } = twoAgentRoom();
+  const home = await mkdtemp(join(tmpdir(), 'm3-task3-all-'));
+  const prev = process.env.DSH_HOME; process.env.DSH_HOME = home;
+  t.after(async () => { if (prev === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = prev; await rm(home, { recursive: true, force: true }); });
+  const a = new MeshNode({ config: { port: 39112, clusterSecret: 'secret', trustedPeers: [], autoWake: false } });
+  a.started = true; a.identity = { nodeId: 'node-a', name: 'A' }; a.roomsDoc = structuredClone(state);
+  t.after(() => a.close());
+  const old = await oldPeer(t, { nodeId: 'node-b', sessions: ['b-one', 'b-two'], advertise: { roomsDoc: state, references: true } });
+  a.resolvePeers = () => [{ nodeId: 'node-b', name: 'old', address: '127.0.0.1', httpPort: old.port }];
+  const ref = await upload(a, room, 'all-named bytes', '@all.txt');
+  await a.sayInRoom({
+    room: room.id, sessionId: 'human', text: 'one file for @Same',
+    mentions: [{ memberKey: 'node-b/b-one', label: 'Same' }],
+    attachments: [ref], messageId: 'legacy-all',
+  });
+  assert.deepEqual(old.woke, ['b-one'], 'the @all inside a file name must not widen the wake set');
+});
+
+test('Task 3 a node without exact-reference support gets nothing rather than a broadcast wake', async (t) => {
+  const { state, room } = twoAgentRoom();
+  const home = await mkdtemp(join(tmpdir(), 'm3-task3-none-'));
+  const prev = process.env.DSH_HOME; process.env.DSH_HOME = home;
+  t.after(async () => { if (prev === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = prev; await rm(home, { recursive: true, force: true }); });
+  const a = new MeshNode({ config: { port: 39113, clusterSecret: 'secret', trustedPeers: [], autoWake: false } });
+  a.started = true; a.identity = { nodeId: 'node-a', name: 'A' }; a.roomsDoc = structuredClone(state);
+  t.after(() => a.close());
+  const received = [];
+  const old = new MeshServer({
+    describe: () => ({ nodeId: 'node-b' }), secret: () => 'secret', trustedPeers: () => [],
+    onMessage: async (e) => { received.push(e); return {}; },
+  });
+  await old.listen(0);
+  t.after(() => old.close());
+  a.resolvePeers = () => [{ nodeId: 'node-b', name: 'old', address: '127.0.0.1', httpPort: old.port }];
+  const ref = await upload(a, room, 'nosupport bytes');
+  const result = await a.sayInRoom({
+    room: room.id, sessionId: 'human', text: 'please look @Same',
+    mentions: [{ memberKey: 'node-b/b-one', label: 'Same' }],
+    attachments: [ref], messageId: 'legacy-nosupport',
+  });
+  const legacy = result.delivered.find((d) => d.nodeId === 'node-b');
+  assert.equal(legacy.ok, false, 'fail closed instead of guessing a target');
+  assert.equal(legacy.incompatible, true);
+  assert.equal(legacy.metadataDelivered, false);
+  assert.equal(legacy.blobDelivered, false);
+  assert.equal(received.length, 0, 'no broadcast-capable room message is sent to that node');
 });
 
 // ---------------------------------------------------------------- #9 --------
