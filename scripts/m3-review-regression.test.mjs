@@ -341,6 +341,71 @@ test('#4 concurrent same-ID sends are coalesced and network runs outside the led
   await slow.close();
 });
 
+// ------------------------------------------------------------- Task 2 --------
+// docs/superpowers/plans/2026-11-10-m3-completion-remediation.md Task 2:
+// coalescing used to key ONLY on sender+messageId, so a second request with
+// different content resolved with the first request's result before the ledger
+// fingerprint check could ever run. Content must be validated FIRST.
+test('#2 a same-ID send with different canonical content conflicts instead of borrowing the result', async t => {
+  const { a, b, room } = await fixture(t);
+  const ref = await upload(a, room);
+  const other = await upload(a, room, 'different bytes', 'other.txt');
+  b.server = new MeshServer({
+    describe: () => b.describe(), secret: () => 'secret', trustedPeers: () => [],
+    onMessage: async e => { await new Promise(r => setTimeout(r, 60)); return b.receive(e); },
+    onBlob: await b.roomAttachmentHandler(),
+  });
+  await b.server.listen(0);
+  a.resolvePeers = () => [{ nodeId: b.nodeId, name: 'B', address: '127.0.0.1', httpPort: b.server.port }];
+
+  const base = { room: room.id, sessionId: 'human', text: 'Original body', attachments: [ref], messageId: 'plan-conflict' };
+  const first = a.sayInRoom(base);
+  // Let the first request enter the in-flight map before the variants race it.
+  await new Promise(r => setTimeout(r, 20));
+
+  // Each variant differs in canonical content and MUST be rejected as a conflict,
+  // never resolved with the first send's result.
+  await assert.rejects(a.sayInRoom({ ...base, text: 'Rewritten body' }), /conflict|different content/i);
+  await assert.rejects(a.sayInRoom({ ...base, attachments: [other] }), /conflict|different content/i);
+  await assert.rejects(a.sayInRoom({ ...base, mentions: [{ memberKey: 'node-a/human', label: 'A' }] }), /conflict|different content/i);
+  await assert.rejects(a.sayInRoom({ ...base, sessionId: 'agent-1' }), /conflict|different content|not a room member/i);
+
+  // Identical canonical content shares ONE operation: no second replication, no
+  // second published message, and both callers get the same message id.
+  const second = a.sayInRoom({ ...base, text: 'Original body' });
+  const [r1, r2] = await Promise.all([first, second]);
+  assert.equal(r1.messageId, 'plan-conflict');
+  assert.equal(r2.messageId, 'plan-conflict');
+  assert.equal(b.roomDetail({ room: room.id }).messages.filter(m => m.id === 'plan-conflict').length, 1);
+
+  // Mutating the caller's objects after the call must not change what was sent:
+  // the immutable envelope is copied and normalized before it enters the map.
+  const mutated = { room: room.id, sessionId: 'human', text: 'Mutable body', attachments: [ref], messageId: 'plan-mutate' };
+  const sent = a.sayInRoom(mutated);
+  mutated.text = 'Changed after the call';
+  mutated.attachments[0] = { ...other };
+  mutated.attachments.push({ ...other });
+  assert.equal((await sent).messageId, 'plan-mutate');
+  const stored = a.attachmentService.ledger.data.messages[ledgerKey({ from: { nodeId: a.nodeId }, id: 'plan-mutate' })].envelope;
+  assert.equal(stored.text, 'Mutable body', 'the sent body is the body at call time, not a later mutation');
+  assert.equal(stored.attachments.length, 1, 'the sent ref list is the ref list at call time');
+  assert.equal(stored.attachments[0].blobId, ref.blobId);
+});
+
+test('#2 a failed send releases its coalescing entry so the same id can be retried', async t => {
+  const { a, b, room } = await fixture(t);
+  const ref = await upload(a, room);
+  const req = { room: room.id, sessionId: 'human', text: 'Offline first', attachments: [ref], messageId: 'plan-retry' };
+  a.resolvePeers = () => [];
+  await assert.rejects(a.sayInRoom(req), /LEADER_UNAVAILABLE|unavailable|replication failed/i);
+  // The entry must not survive the rejection: this would hang on a settled promise.
+  b.server = new MeshServer({ describe: () => b.describe(), secret: () => 'secret', trustedPeers: () => [], onMessage: e => b.receive(e), onBlob: await b.roomAttachmentHandler() });
+  await b.server.listen(0);
+  a.resolvePeers = () => [{ nodeId: b.nodeId, name: 'B', address: '127.0.0.1', httpPort: b.server.port }];
+  assert.equal((await a.sayInRoom(req)).messageId, 'plan-retry');
+  assert.equal(b.roomDetail({ room: room.id }).messages.filter(m => m.id === 'plan-retry').length, 1);
+});
+
 // ---------------------------------------------------------------- #5 --------
 test('#5 background retry never silently publishes an editable failed draft; operator retry still can', async t => {
   const { a, room } = await fixture(t);
