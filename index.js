@@ -14,6 +14,7 @@
  * @module dsh-lan-mesh
  */
 import { registerAttachmentGateway } from './lib/attachment-gateway.mjs';
+import packageMetadata from './package.json' with { type: 'json' };
 import { sharedDocumentTools } from './lib/shared-doc-tools.mjs';
 import { CONTEXT_SELECTION_SCHEMA } from './lib/room-context-protocol.mjs';
 import { ROOM_ATTACHMENT_LIMITS, ROOM_ATTACHMENT_WIRE_LIMITS } from './lib/room-message.mjs';
@@ -1430,7 +1431,7 @@ export function apply(ctx, rawConfig) {
           return {ok:true,value:{status:'ready',content:value.document.content,name}};
         }
         case 'snapshot':
-          return { ok: true, value: node.snapshot({ sessionId: 'human' }) };
+          return { ok: true, value: { ...node.snapshot({ sessionId: 'human' }), pluginVersion: packageMetadata.version } };
         case 'send':
           return {
             ok: true,

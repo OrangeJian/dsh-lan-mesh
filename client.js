@@ -1,6 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
+    const PLUGIN_VERSION = '0.2.0';
     const React = require('react');
     const h = React.createElement;
 
@@ -3812,6 +3813,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           'div',
           { className: 'lm-brand' },
           h('span', { className: 'lm-brandTitle' }, COPY.title),
+          h('span', { className: 'lm-brandMeta' }, `界面 v${PLUGIN_VERSION} · 服务端 ${props.pluginVersion ? `v${props.pluginVersion}` : '版本未知'}`),
+          props.pluginVersion && props.pluginVersion !== PLUGIN_VERSION
+            ? h('span', { className: 'lm-brandMeta', role: 'status' }, '版本不一致，请重新加载插件和界面') : null,
           props.self === undefined ? null : h('span', { className: 'lm-brandMeta' }, props.self.nodeId),
         ),
 
@@ -4815,6 +4819,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 
       return h(Rail, {
         self,
+        pluginVersion: data?.pluginVersion,
         selfNickname: nickname,
         onSelfNickname: setNickname,
         onSelfNicknameSave: saveNickname,
