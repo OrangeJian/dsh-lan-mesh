@@ -522,6 +522,11 @@ const fetch = async (route, init) => {
     answers.snapshot.rooms.all = answers.snapshot.rooms.all.map(room => room.id === joined.id ? joined : room);
     return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: { room: joined, added: true } } }) };
   }
+  if (endpoint === 'roomPreferences') {
+    const room = answers.snapshot.rooms.mine.find(row=>row.id===payload.roomId);
+    room.localPreferences = {...room.localPreferences,...payload.patch};
+    return {ok:true,json:async()=>({type:'server-response',rpcId:body.rpcId,result:{ok:true,value:room.localPreferences}})};
+  }
   if (answers[endpoint] === undefined) throw new Error(`unexpected endpoint ${endpoint}`);
   const value = endpoint === 'roomDetail' ? answers.roomDetail[payload.room] : answers[endpoint];
   return {
@@ -770,6 +775,7 @@ const checks = [
     lastText.includes('收件箱') && lastText.includes('任务看板') && count('lm-navBtn') >= 3,
   ],
   ['the projects section lists the rooms I joined', count('lm-roomRow') === 2],
+  ['each joined room offers local preferences', count('lm-roomPreferences') === 2 && lastText.includes('静音时被 @ 仍提醒')],
   ['the projects section shows both joined rooms', lastText.includes('Alpha room') && lastText.includes('Gamma side project')],
   ['the projects section badges unread room messages', count('lm-roomUnread') === 1 && lastText.includes('2')],
   ['the projects section offers a new project', count('lm-projectsAdd') === 1],
@@ -811,6 +817,11 @@ answers.agents.agents[0].status = 'running';
 railTimer.fn();
 await settleRail();
 checks.push(['four-second poll detects a running agent', count('lm-agentSpinner') === 1]);
+
+// Picking a channel for a held notification calls the Host's confirm endpoint,
+lastNodes.find(entry=>hasClass(entry,'lm-pref-muted')).props.onChange({target:{checked:true}});
+await settleRail();
+checks.push(['room mute saves through Host and refreshes its indicator', asked.includes('roomPreferences') && count('lm-pref-muted')===2 && lastText.includes('静音')]);
 
 // Picking a channel for a held notification calls the Host's confirm endpoint,
 // then refreshes the snapshot (the harness keeps the pending row, which is fine:

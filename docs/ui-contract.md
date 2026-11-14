@@ -3,6 +3,12 @@
 本文件是「独立操作界面」改造的接口契约。后端按此实现，前端按此调用。
 任何一方要改字段，先改本文件。
 
+## 0.3 本机房间偏好
+
+owner 面板端点 `roomPreferences({roomId,patch})`；patch 仅允许 pinned、muted、muteAtException 布尔值。要求本机人类是当前房间成员，Agent 无对应工具。缺省 false/false/true，独立本机文件串行原子保存，损坏文件报错并禁止覆盖。snapshot.rooms.mine 每行包含 localPreferences，置顶稳定优先排序；不复制到 roomsDoc。
+
+静音过滤人类 inbox、attention、房间未读和节点未读；精确 @ 本机人类且例外开启时保留。额外任务完成通知受静音抑制。显式 lan_mesh_notify 是用户主动通知，不隐式归属于某房间。消息原文、read、Agent attention 与执行不变。左栏各房间设置包含三个显式开关，保存中禁用本行操作，失败显示错误。
+
 ## 1. 人的身份
 
 人（浏览器里的你）不绑定任何 agent。加入房间时使用固定 sessionId：

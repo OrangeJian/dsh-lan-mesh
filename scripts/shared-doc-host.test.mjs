@@ -18,6 +18,9 @@ test('real owner document RPC and Agent tools bind identity and import/export th
   assert.equal(result.ok,true,JSON.stringify(result.error));return result.value;
  };
  const room=(await rpc('roomCreate',{name:'Documents'})).room;
+ assert.equal((await rpc('roomPreferences',{roomId:room.id,patch:{pinned:true,muted:true}})).pinned,true);
+ const snapshot=await rpc('snapshot',{});
+ assert.equal(snapshot.rooms.mine.find(row=>row.id===room.id).localPreferences.muted,true);
  const created=await rpc('documentCreate',{roomId:room.id,title:'Design',content:'First version',message:'initial',requestId:'host-create'});
  const documentId=created.document.documentId;
  assert.equal((await rpc('documentCreate',{roomId:room.id,title:'Design',content:'First version',message:'initial',requestId:'host-create'})).document.documentId,documentId);

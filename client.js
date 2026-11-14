@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.2.1';
+    const PLUGIN_VERSION = '0.3.0';
     const React = require('react');
     const h = React.createElement;
 
@@ -3963,7 +3963,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 'div',
                 { className: 'lm-railList' },
                 ...rooms.map((room) =>
-                  h(
+                  h('div', {key:room.id}, h(
                     'button',
                     {
                       key: room.id,
@@ -3973,9 +3973,16 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                       onClick: () => props.onSelect(room.id),
                     },
                     h('span', { className: 'lm-roomRowName' }, room.name || room.id),
+                    room.localPreferences?.pinned ? h('span',{className:'lm-badge'},'置顶') : null,
+                    room.localPreferences?.muted ? h('span',{className:'lm-badge'},'静音') : null,
                     room.isLeader === true ? h('span', { className: 'lm-badge lm-badgeLeader' }, COPY.roleLeader) : null,
                     unreadOf(room.id) > 0 ? h('span', { className: 'lm-roomUnread' }, String(unreadOf(room.id))) : null,
-                  ),
+                  ), h('details',{className:'lm-roomPreferences'},
+                    h('summary',{},'房间设置'),
+                    ...[['pinned','置顶'],['muted','静音'],['muteAtException','静音时被 @ 仍提醒']].map(([field,label])=>h('label',{key:field,className:'lm-row'},
+                      h('input',{type:'checkbox',className:`lm-pref-${field}`,checked:room.localPreferences?.[field] ?? (field==='muteAtException'),disabled:!!props.preferenceBusy,onChange:event=>props.onPreferences?.(room.id,{[field]:event.target.checked})}),label)),
+                    props.preferenceBusy===room.id ? h('span',{role:'status'},'正在保存…') : null,
+                  )),
                 ),
               ),
           joinable.length === 0 ? null : h('div', { className: 'lm-railTitle' }, COPY.joinableShort),
@@ -4663,11 +4670,15 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [newTopic, setNewTopic] = React.useState('');
       const [busy, setBusy] = React.useState('');
       const [notifyBusy, setNotifyBusy] = React.useState('');
+      const [preferenceBusy, setPreferenceBusy] = React.useState('');
+      const preferencePending = React.useRef(false);
+      const snapshotRequest = React.useRef(0);
 
       const refresh = React.useCallback(async (isActive = () => true) => {
+        const request = ++snapshotRequest.current;
         try {
           const value = await panelCall('snapshot', { sessionId: HUMAN_SESSION_ID });
-          if (!isActive()) return;
+          if (!isActive() || request !== snapshotRequest.current) return;
           setSnapshot(value);
           const name = typeof value?.self?.selfName === 'string' ? value.self.selfName : '';
           setNickname((current) => (current === '' ? name : current));
@@ -4826,6 +4837,15 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       return h(Rail, {
         self,
         pluginVersion: data?.pluginVersion,
+        preferenceBusy,
+        onPreferences: async (roomId,patch) => {
+          if (preferencePending.current) return;
+          preferencePending.current = true;
+          setPreferenceBusy(roomId);
+          try { await panelCall('roomPreferences',{roomId,patch}); await refresh(); }
+          catch(error) { notice(`设置保存失败：${errorText(error)}`,true); }
+          finally { preferencePending.current = false; setPreferenceBusy(''); }
+        },
         selfNickname: nickname,
         onSelfNickname: setNickname,
         onSelfNicknameSave: saveNickname,

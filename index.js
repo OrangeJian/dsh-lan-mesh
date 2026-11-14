@@ -1550,6 +1550,8 @@ export function apply(ctx, rawConfig) {
               self: request.self === true,
             }),
           };
+        case 'roomPreferences':
+          return { ok: true, value: await node.setRoomPreferences({roomId:str('roomId'), patch:request.patch, via:'panel'}) };
         case 'agentDial':
           return {
             ok: true,
