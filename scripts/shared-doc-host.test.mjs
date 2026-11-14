@@ -38,4 +38,14 @@ test('real owner document RPC and Agent tools bind identity and import/export th
  assert.equal(exported.content,'# imported');assert.match(exported.name,/\.md$/);
  const history=await rpc('documentHistory',{documentId:imported.document.documentId});
  assert.ok(history.events.some(event=>event.type==='document-imported'));
+ const lifecycle=await rpc('roomLifecycle',{roomId:room.id,status:'archived',baseGeneration:0,requestId:'host-archive'});
+ assert.equal(lifecycle.room.lifecycle.status,'archived');
+ const after=await rpc('snapshot',{});
+ assert.equal(after.rooms.mine.some(row=>row.id===room.id),false);
+ assert.equal(after.rooms.archived.some(row=>row.id===room.id),true);
+ assert.equal((await rpc('documentRead',{documentId})).document.content,'First version');
+ const denied=await routes.get('/api/lan-mesh').fetch(new Request('http://localhost/api/lan-mesh',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'archived-write',payload:{method:'documentCreate',payload:{roomId:room.id,title:'Denied',content:'No'}}})}));
+ assert.equal((await denied.json()).result.ok,false);
+ await rpc('roomLifecycle',{roomId:room.id,status:'active',baseGeneration:1,requestId:'host-restore'});
+ assert.equal((await rpc('snapshot',{})).rooms.mine.some(row=>row.id===room.id),true);
 });

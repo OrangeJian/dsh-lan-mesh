@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.3.0';
+    const PLUGIN_VERSION = '0.4.0';
     const React = require('react');
     const h = React.createElement;
 
@@ -2131,7 +2131,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       if (document !== null && document !== undefined) {
         const documentId = String(document.documentId ?? '');
         const body = String(document.content ?? '');
-        const tabs = ['read', 'edit', 'diff', 'history'];
+        const tabs = props.readOnly ? ['read','history'] : ['read', 'edit', 'diff', 'history'];
         const tabLabels = {
           read: COPY.docReadTab,
           edit: COPY.docEditTab,
@@ -2241,7 +2241,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                     {
                       type: 'button',
                       className: 'lm-btn lm-btnSmall lm-docCopyBtn',
-                      disabled: busy === 'copy',
+                      disabled: props.readOnly || busy === 'copy',
                       onClick: () => copyRevision(revision.revisionId),
                     },
                     COPY.docCopy,
@@ -2441,12 +2441,12 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   : h(MarkdownText, { text: body, labels: markdownLabels() }),
               )
             : null,
-          mode === 'edit' ? editorBlock : null,
+          mode === 'edit' && !props.readOnly ? editorBlock : null,
           mode === 'diff' ? diffBlock : null,
           mode === 'history' ? historyBlock : null,
-          conflictBlock,
-          pendingBlock,
-          document.isMaintainer === true
+          props.readOnly ? null : conflictBlock,
+          props.readOnly ? null : pendingBlock,
+          document.isMaintainer === true && !props.readOnly
             ? h(
                 'div',
                 { className: 'lm-docAdmin' },
@@ -2706,6 +2706,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const view = detail.room ?? props.room ?? {};
       const viewer = detail.viewer ?? { isMember: true, isLeader: props.room?.isLeader === true, role: '' };
       const isLeader = viewer.isLeader === true;
+      const roomArchived = view.lifecycle?.status === 'archived';
       const members = Array.isArray(view.members) ? view.members : [];
       const tasks = Array.isArray(view.tasks) ? view.tasks : [];
       // Only the conversation belongs in the chat: `room-task` rows are the
@@ -3329,7 +3330,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
               onContextSelect: (ref) => setContextDocuments(rows => rows.some(r => r.documentId === ref.documentId) ? rows.filter(r => r.documentId !== ref.documentId) : rows.length < 8 ? rows.concat(ref) : rows),
               roomId,
               call,
-              isMember: viewer.isMember === true,
+              isMember: viewer.isMember === true && !roomArchived,
+              readOnly: roomArchived,
               onChanged: props.onChanged,
             })
           : null,
@@ -3457,7 +3459,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 
         h(
           'fieldset',
-          { disabled:busy==='say',className: 'lm-composer', onDragOver:event=>event.preventDefault(),onDrop:event=>transferFiles(event),onPaste:event=>transferFiles(event,true) },
+          { disabled:busy==='say'||roomArchived,className: 'lm-composer', onDragOver:event=>event.preventDefault(),onDrop:event=>transferFiles(event),onPaste:event=>transferFiles(event,true) },
+          roomArchived ? h('div',{role:'status'},'房间已归档，仅供阅读。已有任务仍可核对。') : null,
           contextDocuments.length?h('div',{className:'lm-referenceRail'},h('span',{className:'lm-muted'},`已选 ${contextDocuments.length} 份文档作为上下文`),h('button',{type:'button',onClick:()=>setContextDocuments([])},'移除文档上下文')):null,
           h(
             'div',
@@ -3774,6 +3777,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const rooms = Array.isArray(props.rooms) ? props.rooms : [];
       const agents = Array.isArray(props.agents) ? props.agents : [];
       const joinable = Array.isArray(props.joinable) ? props.joinable : [];
+      const [showArchived,setShowArchived] = React.useState(false);
       // Nickname inline-editing: the input is hidden by default to keep the
       // rail clean — a click on the name opens it, and blur / Enter saves.
       const [editingNick, setEditingNick] = React.useState(false);
@@ -3957,6 +3961,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 ),
               )
             : null,
+          h('button',{type:'button',className:'lm-archivedToggle','aria-expanded':showArchived,onClick:()=>setShowArchived(value=>!value)},`已归档 (${props.archivedRooms?.length??0})`),
+          showArchived ? (props.archivedRooms??[]).map(room=>h('div',{key:room.id},
+            h('button',{type:'button',className:'lm-archivedRoom',onClick:()=>props.onSelect(room.id)},room.name),
+            room.isLeader ? h('button',{type:'button',className:'lm-restoreRoom',disabled:!!props.preferenceBusy,onClick:()=>props.onLifecycle?.(room,'active')},'恢复房间') : null)) : null,
           rooms.length === 0
             ? h('div', { className: 'lm-muted lm-railEmpty' }, COPY.noMineRooms)
             : h(
@@ -3979,6 +3987,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                     unreadOf(room.id) > 0 ? h('span', { className: 'lm-roomUnread' }, String(unreadOf(room.id))) : null,
                   ), h('details',{className:'lm-roomPreferences'},
                     h('summary',{},'房间设置'),
+                    room.isLeader ? h('button',{type:'button',className:'lm-archiveRoom',disabled:!!props.preferenceBusy,onClick:()=>props.onLifecycle?.(room,'archived')},'归档房间') : null,
                     ...[['pinned','置顶'],['muted','静音'],['muteAtException','静音时被 @ 仍提醒']].map(([field,label])=>h('label',{key:field,className:'lm-row'},
                       h('input',{type:'checkbox',className:`lm-pref-${field}`,checked:room.localPreferences?.[field] ?? (field==='muteAtException'),disabled:!!props.preferenceBusy,onChange:event=>props.onPreferences?.(room.id,{[field]:event.target.checked})}),label)),
                     props.preferenceBusy===room.id ? h('span',{role:'status'},'正在保存…') : null,
@@ -4838,6 +4847,14 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         self,
         pluginVersion: data?.pluginVersion,
         preferenceBusy,
+        archivedRooms: data?.rooms?.archived ?? [],
+        onLifecycle: async (room,status) => {
+          if(preferencePending.current)return;
+          preferencePending.current=true;setPreferenceBusy(room.id);
+          try{await panelCall('roomLifecycle',{roomId:room.id,status,baseGeneration:room.lifecycle?.generation??0,requestId:crypto.randomUUID()});await refresh();}
+          catch(error){notice(`房间操作失败：${errorText(error)}`,true);}
+          finally{preferencePending.current=false;setPreferenceBusy('');}
+        },
         onPreferences: async (roomId,patch) => {
           if (preferencePending.current) return;
           preferencePending.current = true;
@@ -5137,7 +5154,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const joinable = allRooms.filter(
         (room) => room !== null && typeof room === 'object' && room.isMember !== true && !mineIds.includes(room.id),
       );
-      const selected = rooms.find((room) => room.id === selectedRoom);
+      const selected = [...rooms,...(data?.rooms?.archived??[])].find((room) => room.id === selectedRoom);
 
       const openRoom = (roomId) => {
         patchMeshNav({ roomId, view: 'rooms' });

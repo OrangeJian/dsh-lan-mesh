@@ -452,6 +452,10 @@ const TASK_SCHEMA = {
  * Room shape produced by the room list (`roomsFor` / `allRooms`), which is
  * projected relative to the calling session.
  */
+const ROOM_LIFECYCLE_SCHEMA = {
+  type:'object', additionalProperties:false, required:['status','generation'],
+  properties:{status:{type:'string',enum:['active','archived']},generation:{type:'integer'},actorKey:{type:'string'},eventId:{type:'string'},at:{type:'string'}},
+};
 const ROOM_ROW_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -463,6 +467,7 @@ const ROOM_ROW_SCHEMA = {
     role: { type: 'string' },
     isMember: { type: 'boolean' },
     isLeader: { type: 'boolean' },
+    lifecycle: ROOM_LIFECYCLE_SCHEMA,
     members: { type: 'array', items: MEMBER_SCHEMA },
     tasks: { type: 'array', items: TASK_SCHEMA },
     updatedAt: { type: 'string' },
@@ -484,6 +489,8 @@ const ROOM_VIEW_SCHEMA = {
     leader: MEMBER_SCHEMA,
     members: { type: 'array', items: MEMBER_SCHEMA },
     memberCount: { type: 'number' },
+    lifecycle: ROOM_LIFECYCLE_SCHEMA,
+    lifecycleEvents: {type:'array',items:ROOM_LIFECYCLE_SCHEMA},
     tasks: { type: 'array', items: TASK_SCHEMA },
     createdAt: { type: 'string' },
     updatedAt: { type: 'string' },
@@ -1552,6 +1559,8 @@ export function apply(ctx, rawConfig) {
           };
         case 'roomPreferences':
           return { ok: true, value: await node.setRoomPreferences({roomId:str('roomId'), patch:request.patch, via:'panel'}) };
+        case 'roomLifecycle':
+          return {ok:true,value:await node.setRoomLifecycle({roomId:str('roomId'),status:str('status'),baseGeneration:request.baseGeneration,requestId:str('requestId'),via:'panel'})};
         case 'agentDial':
           return {
             ok: true,

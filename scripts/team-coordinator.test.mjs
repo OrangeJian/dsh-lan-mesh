@@ -30,6 +30,30 @@ async function fixture(t) {
   return { nodes, a, b, dispatch, sent, wakes: () => wakes, advance: ms => { now += ms; }, offline: value => { offline = value; }, loseAck: () => { loseAck = true; }, loseResult: () => { loseResult = true; }, opts, send };
 }
 
+test('archive blocks new Team dispatch but preserves result and reconciliation authorization', async t => {
+  const f=await fixture(t);
+  const activeRoom=f.nodes.a.getRoom('room-team');
+  const room={...activeRoom,lifecycle:{status:'archived',generation:1}};
+  f.nodes.a.getRoom=()=>room;
+  await assert.rejects(f.dispatch(),/ROOM_ARCHIVED/);
+  await f.nodes.a.allowed({roomId:'room-team',leaderKey:'a/leader',workerKey:'b/worker'},'result');
+  await f.nodes.a.tick();
+  assert.equal(f.a.read().teams['room-team'].paused,false,'archive must not manufacture an irreversible Team authority pause');
+  room.lifecycle.status='active';
+  assert.equal(f.a.read().teams['room-team'].paused,false);
+});
+
+test('archiving does not turn an already running worker uncertain or cut off its heartbeat',async t=>{
+ const f=await fixture(t);await f.dispatch();await f.nodes.b.tick();
+ assert.equal(f.b.read().workerExecutions.e1.state,'running');
+ const room={...f.nodes.a.getRoom('room-team'),lifecycle:{status:'archived',generation:1}};
+ f.nodes.a.getRoom=()=>room;f.nodes.b.getRoom=()=>room;
+ f.advance(21000);await f.nodes.a.tick();await f.nodes.b.tick();
+ assert.equal(f.b.read().workerExecutions.e1.state,'running');
+ assert.equal(f.a.read().teams['room-team'].paused,false);
+ assert.equal(f.wakes(),1);
+});
+
 test('lost dispatch acknowledgement never repeats wake; result goes to review', async t => {
   const f = await fixture(t);
   f.loseAck();

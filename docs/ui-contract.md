@@ -9,6 +9,14 @@ owner 面板端点 `roomPreferences({roomId,patch})`；patch 仅允许 pinned、
 
 静音过滤人类 inbox、attention、房间未读和节点未读；精确 @ 本机人类且例外开启时保留。额外任务完成通知受静音抑制。显式 lan_mesh_notify 是用户主动通知，不隐式归属于某房间。消息原文、read、Agent attention 与执行不变。左栏各房间设置包含三个显式开关，保存中禁用本行操作，失败显示错误。
 
+## 0.4 房间归档
+
+`roomLifecycle({roomId,status:'archived'|'active',baseGeneration,requestId})` 仅 owner 面板的本机人类 Leader 可调用。所有当前成员节点须在线并声明 roomLifecycleVersion=1，否则明确拒绝。归档独立于 deleted；状态、generation、事件审计与人类历史 participants 随 rooms.json 保存和合并，旧 active 默认值不覆盖更高代。使用过生命周期后，相关字段纳入状态签名。0.4 的有密钥 state pull 强制校验绑定请求和双方节点的回复 proof，不按响应自报能力决定是否验签；旧版无 proof 的回复明确拒绝，集群须全量升级。原普通状态请求签名字节保留兼容；不能回退旧插件继续编辑使用过生命周期的房间。空密钥集群沿用开放信任模式，不提供签名防护。
+
+snapshot.rooms.mine/all 默认排除归档；rooms.archived 仅包含本机历史人类参与过的归档房间。左栏折叠入口“已归档”，人类 Leader 可恢复。旧盘仅从现存人类成员补录可证明资格，不凭空恢复已离开成员，旧历史可能不完整。
+
+归档后聊天/文档/附件历史仅历史人类可读；禁止新聊天、文档写入、上传附件、加入/邀请、改名、新任务和新自动唤醒。已有任务状态/回执、核对、取消协调保留。Team 临时拦截新派发/开始，运行中执行仍可心跳和回报；不制造或解除永久的权限暂停标记。恢复房间不重跑 uncertain、不迁移权限，继续遵守既有授权和执行状态。归档事件保留 requestId、actorKey、generation、状态和时间，可回溯；不实现负责人迁移或本地删除。
+
 ## 1. 人的身份
 
 人（浏览器里的你）不绑定任何 agent。加入房间时使用固定 sessionId：

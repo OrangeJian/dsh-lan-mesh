@@ -522,6 +522,15 @@ const fetch = async (route, init) => {
     answers.snapshot.rooms.all = answers.snapshot.rooms.all.map(room => room.id === joined.id ? joined : room);
     return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: { room: joined, added: true } } }) };
   }
+  if (endpoint === 'roomLifecycle') {
+    const rows=answers.snapshot.rooms;
+    rows.archived??=[];
+    const room=[...rows.mine,...rows.archived].find(row=>row.id===payload.roomId);
+    room.lifecycle={status:payload.status,generation:(room.lifecycle?.generation??0)+1};
+    rows.mine=rows.mine.filter(row=>row.id!==room.id);rows.archived=rows.archived.filter(row=>row.id!==room.id);rows.all=rows.all.filter(row=>row.id!==room.id);
+    if(payload.status==='archived')rows.archived.push(room);else {rows.mine.push(room);rows.mine.sort((a,b)=>a.name.localeCompare(b.name));rows.all.push({...room,isMember:true});}
+    return {ok:true,json:async()=>({type:'server-response',rpcId:body.rpcId,result:{ok:true,value:{room}}})};
+  }
   if (endpoint === 'roomPreferences') {
     const room = answers.snapshot.rooms.mine.find(row=>row.id===payload.roomId);
     room.localPreferences = {...room.localPreferences,...payload.patch};
@@ -822,6 +831,12 @@ checks.push(['four-second poll detects a running agent', count('lm-agentSpinner'
 lastNodes.find(entry=>hasClass(entry,'lm-pref-muted')).props.onChange({target:{checked:true}});
 await settleRail();
 checks.push(['room mute saves through Host and refreshes its indicator', asked.includes('roomPreferences') && count('lm-pref-muted')===2 && lastText.includes('静音')]);
+await clickRail('lm-archiveRoom');
+checks.push(['archive hides active row and archived history is collapsed by default',count('lm-roomRow')===1&&count('lm-archivedRoom')===0]);
+await clickRail('lm-archivedToggle');
+checks.push(['archived entry offers history and Leader restore',count('lm-archivedRoom')===1&&count('lm-restoreRoom')===1]);
+await clickRail('lm-restoreRoom');
+checks.push(['restore returns archived room to active list',count('lm-roomRow')===2&&count('lm-archivedRoom')===0]);
 
 // Picking a channel for a held notification calls the Host's confirm endpoint,
 // then refreshes the snapshot (the harness keeps the pending row, which is fine:
