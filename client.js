@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.2.0';
+    const PLUGIN_VERSION = '0.2.1';
     const React = require('react');
     const h = React.createElement;
 
@@ -828,6 +828,12 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-docTab{font:inherit;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);cursor:pointer}
 .lm-docTabActive{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary);font-weight:600}
 .lm-docBody{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:12px 14px;max-height:44vh;overflow:auto}
+.lm-docRead{min-width:0;font-size:14px;line-height:1.75;overflow-wrap:anywhere}
+.lm-docRead p,.lm-docRead li,.lm-docRead blockquote{white-space:pre-wrap}
+.lm-docRead pre{max-width:100%;overflow-x:auto;white-space:pre;overflow-wrap:normal;word-break:normal;line-height:1.5}
+.lm-docRead pre code{white-space:inherit;overflow-wrap:normal;word-break:normal}
+.lm-docRead table{display:block;max-width:100%;overflow-x:auto;white-space:normal}
+.lm-docRead img{max-width:100%;height:auto}
 .lm-docEditor{min-height:160px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 .lm-docMessage{margin-top:6px}
 .lm-docDiffWrap{display:flex;flex-direction:column;gap:6px}
