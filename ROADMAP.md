@@ -1,5 +1,7 @@
 # dsh-lan-mesh 路线图
 
+2026-11-14 排期更新：当前交付 0.2.1（`ebbe235`）。负责人反馈双机基本使用及阅读换行正常，完整异常场景与 M1 三机验收仍待逐项记录。下一批启动本机置顶/静音（目标 0.3.0），随后归档/恢复、退出/本地删除、负责人移交/接管，再推进 M6。详见[剩余批次及首批实施计划](docs/superpowers/plans/2026-11-14-remaining-delivery-schedule.md)。本次已确认归档只读且保留已有任务核对，静音默认保留可关闭的 @ 例外；排期不等于代码已实现。
+
 2026-11-11 接续更新：M4/M5 业务提交到 `bd6582a`，核心修正 `2ad89a8`；完整自动化370/370，面板193/193，官方schema82/82，真实localhost文档/上下文及既有附件smoke通过。详见 [交付回执](docs/handoffs/dsh-m4-m5-development-report.md)。下方旧批次测试计数保留为历史；浏览器与物理设备仍待负责人验收。
 
 核对日期：2026-11-10。状态依据 `codex/room-collaboration` 当前代码；旧批次回执保留为历史。M3 完成交付证据见 `docs/handoffs/m3-delivery.md`，后续 DSH 启动提示词见 `docs/handoffs/dsh-after-m3-prompt.md`，本轮 DSH 连续开发的阶段结果与复核入口见 `docs/handoffs/dsh-next-development-report.md`。不合并 main、不发布 npm；测试、代码审查与真实设备验收分别记录。
