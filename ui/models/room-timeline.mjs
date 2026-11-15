@@ -19,18 +19,19 @@ export function createRoomTimeline() {
     else {
      const viewport=node.getBoundingClientRect?.();
      const first=viewport&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>row.getBoundingClientRect().bottom>viewport.top);
-     anchor=first?{id:first.getAttribute('data-message-id'),offset:first.getBoundingClientRect().top-viewport.top}:null;
+     anchor=first?{id:first.getAttribute('data-message-key')||first.getAttribute('data-message-id'),offset:first.getBoundingClientRect().top-viewport.top}:null;
     }
    }
    return view();
   },
   restore(node){
    if(following||!node)return;
-   const match=anchor&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>row.getAttribute('data-message-id')===anchor.id);
+   const match=anchor&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>(row.getAttribute('data-message-key')||row.getAttribute('data-message-id'))===anchor.id);
    if(match&&node.getBoundingClientRect){node.scrollTop+=match.getBoundingClientRect().top-node.getBoundingClientRect().top-anchor.offset;}
    else node.scrollTop=top;
    top=node.scrollTop;
   },
+  pause(){following=false;return view();},
   jump(){following=true;anchor=null;pending.clear();return view();},
   current:view,
  };

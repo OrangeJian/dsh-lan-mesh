@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.16';
+    const PLUGIN_VERSION = '0.4.17';
     const React = require('react');
     const h = React.createElement;
 
@@ -808,6 +808,7 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-messageCopy:disabled{cursor:wait;opacity:.7}
 @media(prefers-reduced-transparency:reduce){.lm-chat .lm-messageTextCollapsed{mask-image:none}}
 .lm-messageSummary{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.lm-historyToolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:none;justify-content:center;padding:4px 0 12px;font-size:11px}
     /* @ux-shell:message-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
@@ -1206,23 +1207,38 @@ function createRoomTimeline() {
     else {
      const viewport=node.getBoundingClientRect?.();
      const first=viewport&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>row.getBoundingClientRect().bottom>viewport.top);
-     anchor=first?{id:first.getAttribute('data-message-id'),offset:first.getBoundingClientRect().top-viewport.top}:null;
+     anchor=first?{id:first.getAttribute('data-message-key')||first.getAttribute('data-message-id'),offset:first.getBoundingClientRect().top-viewport.top}:null;
     }
    }
    return view();
   },
   restore(node){
    if(following||!node)return;
-   const match=anchor&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>row.getAttribute('data-message-id')===anchor.id);
+   const match=anchor&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>(row.getAttribute('data-message-key')||row.getAttribute('data-message-id'))===anchor.id);
    if(match&&node.getBoundingClientRect){node.scrollTop+=match.getBoundingClientRect().top-node.getBoundingClientRect().top-anchor.offset;}
    else node.scrollTop=top;
    top=node.scrollTop;
   },
+  pause(){following=false;return view();},
   jump(){following=true;anchor=null;pending.clear();return view();},
   current:view,
  };
 }
     /* @ux-shell:timeline-model:end */
+
+    /* @ux-shell:history-model:start */
+/** Local display cache: exact origin + message ID, order unchanged, newer metadata wins. */
+function mergeRoomTranscript(earlier,current) {
+ const result=[],positions=new Map();
+ for(const message of [...(Array.isArray(earlier)?earlier:[]),...(Array.isArray(current)?current:[])]){
+  const node=message?.from?.nodeId,id=message?.id;
+  const key=typeof node==='string'&&typeof id==='string'?JSON.stringify([node,id]):null;
+  if(key!==null&&positions.has(key))result[positions.get(key)]=message;
+  else{if(key!==null)positions.set(key,result.length);result.push(message);}
+ }
+ return result;
+}
+    /* @ux-shell:history-model:end */
 
     function messageStamp(message) {
       const value = message?.at ?? message?.receivedAt ?? message?.sentAt ?? '';
@@ -1882,7 +1898,7 @@ function MessageBody(props) {
          (props.mine === true ? ' lm-bubbleMine' : '');
        return h(
          'div',
-         { className: (props.mine ? 'lm-bubbleRow lm-bubbleRowMine' : 'lm-bubbleRow')+(props.messageRow?.continuation?' lm-messageContinuation':''), 'data-message-id':message.id??undefined },
+         { className: (props.mine ? 'lm-bubbleRow lm-bubbleRowMine' : 'lm-bubbleRow')+(props.messageRow?.continuation?' lm-messageContinuation':''), 'data-message-id':message.id??undefined,'data-message-key':typeof message.id==='string'?JSON.stringify([message.from?.nodeId??'',message.id]):undefined },
          h(
            'div',
            { className: 'lm-bubbleMeta' },
@@ -2951,6 +2967,10 @@ function MessageBody(props) {
       const documentPicker=React.useRef({alive:true,pending:false,sequence:0});
       const composerSnapshot=React.useRef({});
       React.useEffect(()=>{documentPicker.current.alive=true;return()=>{documentPicker.current.alive=false;documentPicker.current.pending=false;documentPicker.current.sequence++;};},[roomId]);
+      const [history,setHistory]=React.useState({messages:[],cursor:null,status:'idle',error:''});
+      const historyFlight=React.useRef(false);
+      const historyRoom=React.useRef(roomId);historyRoom.current=roomId;
+      React.useEffect(()=>{setHistory({messages:[],cursor:null,status:'idle',error:''});historyFlight.current=false;},[roomId]);
       const roomReadSequence=React.useRef(0);
       const [detail, setDetail] = React.useState({ status: 'loading', room: null, messages: [], viewer: null, error: '' });
       const [tasksOpen, setTasksOpen] = React.useState(false);
@@ -3032,6 +3052,7 @@ function MessageBody(props) {
         try {
           const value = await call('roomDetail', { room: roomId, sessionId });
           if(!draftLifetime.current.alive||request!==roomReadSequence.current)return;
+          setHistory(current=>({...current,messages:mergeRoomTranscript(current.messages,value?.messages)}));
           setDetail({
             status: 'ready',
             room: value?.room ?? null,
@@ -3100,14 +3121,28 @@ function MessageBody(props) {
       const tasks = Array.isArray(view.tasks) ? view.tasks : [];
       // Only the conversation belongs in the chat: `room-task` rows are the
       // assignment notices and they are already shown in the task list.
-      const messageRows = roomMessageRows(detail.messages,{self:props.self,members,peers:props.peers}).filter(row=>row.message?.kind==='room-message');
+      const messageRows = roomMessageRows(mergeRoomTranscript(history.messages,detail.messages),{self:props.self,members,peers:props.peers}).filter(row=>row.message?.kind==='room-message');
       const messages = messageRows.map(row=>row.message);
 
       // Following belongs to this chat viewport, never the document or Inbox count.
-      const transcriptIdentity=JSON.stringify(messages.map(message=>message.id??null));
+      const loadEarlier=async()=>{
+        if(historyFlight.current||!draftLifetime.current.alive)return;
+        const first=mergeRoomTranscript(history.messages,detail.messages)[0];
+        if(chatRef.current){timeline.current.observe(chatRef.current);timeline.current.pause();}
+        historyFlight.current=true;setHistory(current=>({...current,status:'loading',error:''}));
+        try{
+          const value=await call('roomHistory',{room:roomId,limit:50,...(history.cursor?{cursor:history.cursor}:first?.id&&first?.from?.nodeId?{before:{id:first.id,nodeId:first.from.nodeId}}:{})});
+          if(!draftLifetime.current.alive||historyRoom.current!==roomId)return;
+          if(!Array.isArray(value?.messages)||typeof value?.cursor!=='string')throw Error('历史返回格式不可用');
+          setHistory(current=>({...current,messages:mergeRoomTranscript(value.messages,current.messages),cursor:value.cursor,status:'ready',error:''}));
+        }catch(error){if(draftLifetime.current.alive&&historyRoom.current===roomId)setHistory(current=>({...current,status:'error',error:errorText(error)}));}
+        finally{historyFlight.current=false;}
+      };
+      const timelineMessages=messages.map(message=>({id:typeof message.id==='string'?JSON.stringify([message.from?.nodeId??'',message.id]):null}));
+      const transcriptIdentity=JSON.stringify(timelineMessages.map(message=>message.id));
       React.useEffect(()=>{
         if(detail.status!=='ready'||panelTab!=='chat')return;
-        const reading=timeline.current.update(messages);
+        const reading=timeline.current.update(timelineMessages);
         setNewMessageCount(reading.pending);
         const node=chatRef.current;
         if(node){
@@ -3845,6 +3880,7 @@ function MessageBody(props) {
         h(
           'div',
           { className: 'lm-chat', ref: chatRef, onScroll:observeChat, onLoad:followLoadedContent },
+          h('div',{className:'lm-historyToolbar'},h('button',{type:'button',className:'lm-btn lm-btnSmall lm-loadEarlier',disabled:history.status==='loading',onClick:loadEarlier},history.status==='loading'?'正在加载历史…':history.cursor===''?'重新检查更早记录':'加载更早记录'),h('span',{className:'lm-muted'},history.cursor===''?'已到本机当前保留记录的开头；不代表其他设备历史完整。':'本机历史记录'),history.error?h('span',{role:'alert',className:'lm-error'},history.error):null),
           messages.length === 0
             ? h('div', { className: 'lm-muted' }, detail.status === 'loading' ? COPY.loading : COPY.noChat)
             : messageRows.map((messageRow) => {
@@ -3866,7 +3902,7 @@ function MessageBody(props) {
                 const kind =
                   fromSession === HUMAN_SESSION_ID ? 'human' : fromSession === '' ? 'system' : 'agent';
                 return h(ChatBubble, {
-                  key: message.id ?? `${messageStamp(message)}-${senderOf(message)}`,
+                  key: typeof message.id==='string'?JSON.stringify([message.from?.nodeId??'',message.id]):`${messageStamp(message)}-${senderOf(message)}`,
                   message,
                   roomId,
                   mine,

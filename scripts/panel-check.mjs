@@ -19,7 +19,8 @@ import {webcrypto} from 'node:crypto';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(here, '..', 'client.js'), 'utf8');
 
-const h = (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat() });
+let renderedMessageKeys=[];
+const h = (type, props, ...children) => {if(type?.name==='ChatBubble')renderedMessageKeys.push(props?.key);return {type,props:props??{},children:children.flat()};};
 
 /** Hook state survives across renders, the way real hooks do. */
 const stateSlots = [];
@@ -650,6 +651,7 @@ const resetHooks = () => {
 const renderNode = (component) => {
   cursor = 0;
   queued = [];
+  renderedMessageKeys=[];
   const nodes = [];
   const text = [];
   const walk = (node) => {
@@ -927,6 +929,7 @@ await switchTo(Component);
 if (!asked.includes('roomDetail')) throw new Error('selecting a room never asked for roomDetail');
 checks.push(
   ['selecting a room opens its detail', lastText.includes('ship the panel')],
+  ['room offers explicit earlier history loading',count('lm-loadEarlier')===1],
   ['room pane renders a chat area', count('lm-chat') >= 1],
   ['historical inline files retain download links',lastNodes.some(n=>n.type==='a'&&n.props.download==='legacy.txt'&&n.props.href==='data:text/plain;base64,aGVsbG8=')],
   ['room pane renders the conversation', lastText.includes('hello from beta')],
@@ -1818,7 +1821,8 @@ checks.push(['background quick-task uses the existing endpoint exactly once desp
 const groupedTranscript=[0,1,2,3,4].map(index=>({id:'group-'+index,kind:'room-message',from:{nodeId:'node-b',sessionId:'session-9',title:'Reviewer'},text:'Line one\nLine two',sentAt:new Date(Date.UTC(2026,10,15,10,index)).toISOString()}));
 groupedTranscript.push({...groupedTranscript[4],id:'other-device',from:{nodeId:'node-c',sessionId:'session-9',title:'Reviewer'}});
 let holdGroupedRead=false,releaseGroupedRead;
-const groupedCall=async(method,payload)=>{if(method==='roomDetail'){const result={room:{id:payload.room,members:[],tasks:[]},messages:[...groupedTranscript]};if(holdGroupedRead){holdGroupedRead=false;await new Promise(resolve=>releaseGroupedRead=resolve);}return result;}return method==='roomSkills'?{status:'ready',skills:[]}:{};};
+let historyReadFailure=true;const historyRequests=[];
+const groupedCall=async(method,payload)=>{if(method==='roomHistory'){historyRequests.push(payload);if(historyReadFailure)throw Error('history temporarily unavailable');return {messages:[{id:'older-one',kind:'room-message',from:{nodeId:'node-b',sessionId:'session-9'},text:'earlier retained history',sentAt:'2026-11-14T09:00:00Z'},groupedTranscript[0]],cursor:'',scope:'local'};}if(method==='roomDetail'){const result={room:{id:payload.room,members:[],tasks:[]},messages:[...groupedTranscript]};if(holdGroupedRead){holdGroupedRead=false;await new Promise(resolve=>releaseGroupedRead=resolve);}return result;}return method==='roomSkills'?{status:'ready',skills:[]}:{};};
 const GroupedRoom=()=>h(window.__roomPane,{room:{id:'room-grouped'},sessionId:'human',self:answers.snapshot.self,call:groupedCall,peers:[{nodeId:'node-b',name:'Shared device'},{nodeId:'node-c',name:'Shared device'}]});
 await switchTo(GroupedRoom);
 checks.push(['five adjacent messages share an author header while a namesake on another device starts a new group',count('lm-bubbleRow')===6&&count('lm-bubbleWho')===2&&count('lm-messageContinuation')===4&&lastText.includes('Shared device · node-b')&&lastText.includes('Shared device · node-c')]);
@@ -1853,6 +1857,14 @@ await lastNodes.find(n=>hasClass(n,'lm-messageCopy')).props.onClick();await sett
 checks.push(['production message copy shows honest unavailable feedback when Clipboard API is absent',lastText.includes('当前环境不支持复制，请手动选择正文')]);
 while(groupedTranscript.length<41){const index=groupedTranscript.length;groupedTranscript.push({...groupedTranscript[0],id:'retained-history-'+index,text:'retained history '+index,sentAt:new Date(Date.UTC(2026,10,15,11,index)).toISOString()});}roomPoll.fn();await settleIn(GroupedRoom);
 checks.push(['Room renders more than twenty retained messages including the earliest stable id',count('lm-bubbleRow')===41&&lastNodes.some(n=>n.props['data-message-id']==='group-0')&&lastNodes.some(n=>n.props['data-message-id']==='retained-history-40')]);
+await lastNodes.find(n=>hasClass(n,'lm-loadEarlier')).props.onClick();await settleIn(GroupedRoom);
+checks.push(['earlier history failure retains all current messages and allows retry',count('lm-bubbleRow')===41&&lastText.includes('history temporarily unavailable')&&!lastNodes.find(n=>hasClass(n,'lm-loadEarlier')).props.disabled]);
+historyReadFailure=false;await lastNodes.find(n=>hasClass(n,'lm-loadEarlier')).props.onClick();await settleIn(GroupedRoom);
+checks.push(['history prepends exact older identity, deduplicates overlap and keeps reading count separate',count('lm-bubbleRow')===42&&lastNodes.find(n=>hasClass(n,'lm-bubbleRow')).props['data-message-id']==='older-one'&&count('lm-jumpLatest')===0&&historyRequests[0].before?.id==='group-0']);
+roomPoll.fn();await settleIn(GroupedRoom);
+checks.push(['subsequent live poll never erases already loaded older history',count('lm-bubbleRow')===42&&lastText.includes('earlier retained history')&&lastText.includes('已到本机当前保留记录的开头')]);
+groupedTranscript.push({...groupedTranscript[0],id:'clash',from:{nodeId:'node-b',sessionId:'session-9'},text:'first origin'}, {...groupedTranscript[0],id:'clash',from:{nodeId:'node-c',sessionId:'session-9'},text:'second origin'});roomPoll.fn();await settleIn(GroupedRoom);
+checks.push(['same message id from different origins keeps separate React keys, anchors and arrival counts',lastNodes.filter(n=>n.props['data-message-id']==='clash').length===2&&renderedMessageKeys.includes(JSON.stringify(['node-b','clash']))&&renderedMessageKeys.includes(JSON.stringify(['node-c','clash']))&&lastText.includes('2 条新消息')]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

@@ -1537,6 +1537,8 @@ export function apply(ctx, rawConfig) {
             ok: true,
             value: await node.sayInRoom({ room: str('room'), sessionId: 'human', text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, attachments: request.attachments, messageId: request.messageId,contextSelection:request.contextSelection }),
           };
+        case 'roomHistory':
+          return {ok:true,value:await node.roomHistory({room:str('room'),sessionId:'human',via:'panel',cursor:request.cursor,before:request.before,limit:request.limit})};
         case 'roomDetail':
           return { ok: true, value: await node.roomDetail({ room: str('room'), sessionId: 'human' }) };
         case 'agents':
