@@ -23,10 +23,10 @@
  *
  * @module dsh-lan-mesh/scripts/mesh-diagnostics
  */
-import { open, opendir, readFile } from 'node:fs/promises';
+import { open, opendir, readFile, realpath } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
 
 /** Schema version of the emitted report. */
 export const DIAGNOSTICS_VERSION = 1;
@@ -116,13 +116,7 @@ export function usage() {
 }
 
 /** Normalize an untrusted label to a bounded, non-revealing token. */
-export function sanitizeLabel(value) {
-  const text = typeof value === 'string' ? value : '';
-  const trimmed = text.replace(/[\\/]+$/, '');
-  const raw = basename(trimmed) || 'data-dir';
-  const cleaned = raw.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 64);
-  return cleaned.length > 0 ? cleaned : 'data-dir';
-}
+export function sanitizeLabel(_value) { return 'explicit-data-directory'; }
 
 /**
  * Parse the command line.
@@ -223,6 +217,12 @@ async function inspectFile(dir, entry) {
   const path = join(dir, entry.relativePath);
   let handle;
   try {
+    const root = await realpath(dir);
+    const target = await realpath(path);
+    const suffix = relative(root,target);
+    if(isAbsolute(suffix)||suffix==='..'||suffix.startsWith('..\\')||suffix.startsWith('../'))return {
+      record:{name:entry.name,role:entry.role,format:entry.format,present:true,bytes:null,parse:null,shape:null,sampled:false,truncated:false,read:'PATH_OUTSIDE_SCOPE'},error:'PATH_OUTSIDE_SCOPE',warning:null,
+    };
     handle = await open(path, 'r');
   } catch (error) {
     if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') {

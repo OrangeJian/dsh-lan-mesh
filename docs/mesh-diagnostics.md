@@ -83,8 +83,7 @@ The output is a whitelist of status fields. It deliberately never contains:
 
 - file contents, message text, room or member names, model prompts;
 - environment variables, tokens, keys, or any part of the configuration;
-- absolute paths or user names — the directory is identified by its sanitized
-  base name only, capped at 64 characters;
+- absolute paths or user names — the directory is identified by the fixed label `explicit-data-directory`;
 - JSON library or filesystem error messages, which can quote file content or an
   absolute path. Every failure collapses to a fixed code:
   `DIR_MISSING`, `DIR_NOT_DIRECTORY`, `FILE_READ_DENIED`, `FILE_READ_FAILED`,
@@ -121,3 +120,5 @@ node --test scripts/mesh-diagnostics.test.mjs
 
 This file adds a script and documentation only. It changes no plugin code, so
 the loaded plugin version is unchanged by this delivery.
+
+Linked entries resolving outside the explicit real root are refused with PATH_OUTSIDE_SCOPE. Concurrent hostile filesystem replacement is outside this local diagnostic guarantee.

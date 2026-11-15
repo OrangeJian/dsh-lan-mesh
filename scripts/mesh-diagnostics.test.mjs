@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -338,14 +338,7 @@ test('the catalogue records where each path came from and never guesses', () => 
   assert.ok(!FILE_CATALOGUE.some((entry) => entry.relativePath === 'identity.json'));
 });
 
-test('sanitizeLabel reduces any path to a bounded base name', () => {
-  assert.equal(sanitizeLabel('C:\\Users\\someone\\lan-mesh'), 'lan-mesh');
-  assert.equal(sanitizeLabel('/home/someone/.dsh/lan-mesh/instances/45872'), '45872');
-  assert.equal(sanitizeLabel('lan-mesh/'), 'lan-mesh');
-  assert.equal(sanitizeLabel(''), 'data-dir');
-  assert.equal(sanitizeLabel('a'.repeat(200)).length, 64);
-  assert.equal(sanitizeLabel('bad\u0000name'), 'badname');
-});
+test('directory labels are private',()=>{for(const value of ['alice','secret-project',''])assert.equal(sanitizeLabel(value),'explicit-data-directory');});
 
 test('the human and JSON reports describe the same verdict', async () => {
   await withTempDir(async (dir) => {
@@ -365,3 +358,5 @@ test('the human and JSON reports describe the same verdict', async () => {
     assert.ok(human.stdout.includes(`${size} B`));
   });
 });
+
+test('junction escape is refused',async()=>{await withTempDir(async root=>{await withTempDir(async outside=>{await writeFile(join(outside,'shared-docs.json'),'{}');await symlink(outside,join(root,'shared-docs'),process.platform==='win32'?'junction':'dir');const result=runCli(['--data-dir',root,'--json']);assert.equal(result.status,EXIT_PROBLEM);assert.ok(result.all.includes('PATH_OUTSIDE_SCOPE'));});});});
