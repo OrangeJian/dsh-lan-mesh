@@ -1,8 +1,8 @@
 # Room Composer: published DSH compatibility baseline
 
-Verified against installed DSH **0.2.2-rc.1**. Run `npm run check:composer-compat` after upgrading DSH.
+Verified against installed DSH **0.2.2-rc.3**. Run `npm run check:composer-compat` after upgrading DSH.
 The check discovers a local installation first, then `npm root -g`; it resolves package metadata and public client entry points without executing browser modules in Node.
-All four packages below are **0.2.2-rc.1**.
+All four packages below are **0.2.2-rc.3**.
 
 | Capability / public client entry | Reusable public contract | Scope requirement | Room-owned fallback |
 | --- | --- | --- | --- |
@@ -27,12 +27,12 @@ The check fails if any required client target/declaration disappears, DSH versio
 
 ```json
 {
-  "dshVersion": "0.2.2-rc.1",
+  "dshVersion": "0.2.2-rc.3",
   "privateImportsRequired": false,
   "packages": [
     {
       "id": "@deepseek-ai/dsh-client-ui-conversation",
-      "version": "0.2.2-rc.1",
+      "version": "0.2.2-rc.3",
       "exports": {
         ".": {
           "types": "./lib/types/index.d.ts",
@@ -60,7 +60,7 @@ The check fails if any required client target/declaration disappears, DSH versio
     },
     {
       "id": "@deepseek-ai/dsh-client-ui-attachment",
-      "version": "0.2.2-rc.1",
+      "version": "0.2.2-rc.3",
       "exports": {
         ".": {
           "types": "./lib/types/index.d.ts",
@@ -87,7 +87,7 @@ The check fails if any required client target/declaration disappears, DSH versio
     },
     {
       "id": "@deepseek-ai/dsh-client-ui-input-trigger",
-      "version": "0.2.2-rc.1",
+      "version": "0.2.2-rc.3",
       "exports": {
         ".": {
           "types": "./lib/types/index.d.ts",
@@ -110,7 +110,7 @@ The check fails if any required client target/declaration disappears, DSH versio
     },
     {
       "id": "@deepseek-ai/dsh-client-ui-skill",
-      "version": "0.2.2-rc.1",
+      "version": "0.2.2-rc.3",
       "exports": {
         ".": {
           "types": "./lib/types/index.d.ts",
@@ -169,3 +169,7 @@ The check fails if any required client target/declaration disappears, DSH versio
 }
 ```
 
+
+## 2026-11-15 re-audit
+
+Installed DSH rc.3: compared all four public exports/injection maps against rc.1 (identical except package versions). Re-read public client declarations: conversation bindings and input triggers still require Session scope; attachment and skill exports remain plugin apply/inject, not standalone pickers. Room-owned fallback remains required. Metadata checks and stub panel checks do not prove real browser behavior.
