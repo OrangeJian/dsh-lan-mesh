@@ -27,3 +27,7 @@
 | M6 自动编排 | P2，未开始，**实施计划已形成** | 能力描述、任务依赖 DAG、容量匹配、分解/调度/验收、人类可审查计划界面；依赖 M1 实机验收及 M5 | `docs/agent-team-v0.2-design.md`（方向）、`docs/superpowers/plans/2026-11-10-agent-team-m6-plan.md`（可实施子集 + D1-D9 待决项） | 无 M6 业务实现；9 项协议/权限待决项均标 OPEN，工具名与字段为 PROPOSAL；不自动重跑 uncertain 执行，不得以 localhost stub 代替三设备实机验收 |
 
 开发协作遵循 `docs/development-workflow.md`。架构和差距见 `docs/architecture/project-workspace.md`。交接候选稿见 `docs/handoffs/dsh-development-handoff.md`。每次交付须更新本表，附提交、实际测试与设备验收证据。
+
+### G2 增量 0.4.4
+
+直接 @共享文档：固定修订与 hash、最多 8 份、单独移除、失败保留输入及异步隔离。后续依次推进成果引用、Skill 版本、来源/过期提示，再复核 M6 门槛。物理设备与真实模型验收仍单独保留。

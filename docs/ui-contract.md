@@ -371,3 +371,11 @@ activate`）。同理两个 slot 注册都必须走 `ctx.slots.inject(key, () =>
 - `contextDeliveries {roomId,limit?}`：owner human 成员读取本节点最近投递记录，limit 最大20。返回精简 packet 版本/hash，不返回正文；服务层 Agent 调用只可读取自己收到的记录。
 - Agent 工具新增 `lan_mesh_document_list/read/propose/history`、`lan_mesh_room_context`。实际执行身份来自 exec.agent.id；无人工确认工具。
 - DocsPane 的创建/保存/读取、错误/重试、切房间失效、冲突、导入/导出、版本选择与投递记录均有组件行为测试；这些不替代真实浏览器验收。
+
+## 0.4.4：直接引用共享文档
+
+- 输入 @ 后列出匹配的成员和共享文档，文档候选明确标记类型及修订；点击、Enter、Tab 确认。
+- 选择时读取明确修订，校验房间、文档、修订和内容 hash；发送固定版本引用，不自动追随最新版本。
+- 最多 8 份文档；同文档重新选择替换版本，可分别移除。文档引用不生成成员 mention，也不唤醒同名成员。
+- 读取期间禁止发送或设为任务；失败保留草稿。输入改变或切换房间后，迟到读取结果不得覆盖草稿。
+- 本地展示标题；协议只传 documentId/revisionId/contentHash。候选总数最多 8，文档最多占 4，其余位置保留成员。

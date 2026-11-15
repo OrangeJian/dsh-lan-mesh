@@ -1599,6 +1599,82 @@ const DeferredDelivery=()=>window.__documentsPane({roomId:'room-old-audit',call:
 await switchTo(DeferredDelivery);const loadingDelivery=lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesToggle')).props.onClick();await settleIn(DeferredDelivery);checks.push(['delivery audit displays loading state',lastText.includes('正在加载投递记录')]);
 await switchTo(DeliveryComponent);releaseDelivery({status:'ready',deliveries:[{deliveryId:'stale',recipient:'STALE AGENT',status:'delivered'}]});await loadingDelivery;await settleIn(DeliveryComponent);checks.push(['old room delivery response cannot leak into new room',!lastText.includes('STALE AGENT')]);
 
+
+const docMentionCalls=[];
+const mentionDocument={documentId:'doc-bbbbbbbbbbbb',roomId:'room-doc-mention',title:'Design reference',headRevisionId:'rev-bbbbbbbbbbbb'};
+let docMentionFailure=false,docMentionRelease;
+let docMentionRows=[mentionDocument];
+const docMentionCall=async(method,payload)=>{
+ docMentionCalls.push({method,payload});
+ if(method==='roomDetail')return {room:{id:'room-doc-mention',name:'Document mention',members:[],tasks:[]},viewer:{isMember:true,isLeader:false},messages:[]};
+ if(method==='roomSkills')return {status:'ready',skills:[]};
+ if(method==='documents')return {status:'ready',documents:docMentionRows};
+ if(method==='documentRead'){if(docMentionRelease)await new Promise(resolve=>docMentionRelease=resolve);if(docMentionFailure)throw Error('document offline');return {status:'ready',document:{...docMentionRows.find(row=>row.documentId===payload.documentId),contentHash:'b'.repeat(64),content:'Pinned content'},revision:{revisionId:payload.revisionId}};}
+ if(method==='roomSay')return {delivered:[],room:{id:'room-doc-mention'}};
+ return {};
+};
+const MentionDocumentsComponent=()=>window.__roomPane({room:{id:'room-doc-mention',name:'Document mention'},sessionId:'human',self:{nodeId:'node-a'},call:docMentionCall});
+await switchTo(MentionDocumentsComponent);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
+const documentCandidate=lastNodes.find(n=>hasClass(n,'lm-mentionDocument'));
+checks.push(['at menu offers document candidates with an explicit kind',!!documentCandidate&&lastText.includes('文档')&&lastText.includes('Design reference')]);
+if(documentCandidate){
+ await documentCandidate.props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
+ checks.push(['document pick reads its exact candidate revision',docMentionCalls.some(row=>row.method==='documentRead'&&row.payload.revisionId===mentionDocument.headRevisionId)]);
+ checks.push(['document pick renders a pinned named reference',count('lm-contextDocument')===1&&lastText.includes('Design reference')]);
+ lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'Please use the selected document',selectionStart:32}});await settleIn(MentionDocumentsComponent);await lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(MentionDocumentsComponent);
+ const sent=docMentionCalls.find(row=>row.method==='roomSay');
+ checks.push(['document reference sends only stable context fields and never a member mention',sent?.payload.contextSelection?.selectedDocumentVersions[0]?.contentHash==='b'.repeat(64)&&Object.keys(sent.payload.contextSelection.selectedDocumentVersions[0]).sort().join(',')==='contentHash,documentId,revisionId'&&!sent.payload.mentions]);
+}
+
+
+await switchTo(MentionDocumentsComponent);docMentionFailure=true;
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
+lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
+checks.push(['failed document pick preserves typed token and shows a retryable error',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='@Design'&&count('lm-contextDocument')===0&&lastText.includes('document offline')]);
+docMentionFailure=false;docMentionRelease=()=>{};
+lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
+const sentBeforePending=docMentionCalls.filter(row=>row.method==='roomSay').length;
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onKeyDown({key:'Enter',shiftKey:false,isComposing:false,preventDefault(){}});await settleIn(MentionDocumentsComponent);
+checks.push(['pending document selection cannot send an incomplete context',docMentionCalls.filter(row=>row.method==='roomSay').length===sentBeforePending&&lastText.includes('正在固定文档版本')]);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'new input while reading',selectionStart:23}});await settleIn(MentionDocumentsComponent);
+const releaseDocument=docMentionRelease;docMentionRelease=undefined;releaseDocument();await settleIn(MentionDocumentsComponent);
+checks.push(['late document read cannot overwrite edited draft',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='new input while reading'&&count('lm-contextDocument')===0]);
+await switchTo(MentionDocumentsComponent);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onKeyDown({key:'Tab',preventDefault(){}});await settleIn(MentionDocumentsComponent);
+checks.push(['keyboard selects a pinned document instead of sending',count('lm-contextDocument')===1]);
+const removeReference=lastNodes.find(n=>n.props?.['aria-label']==='移除文档引用');removeReference?.props.onClick();await settleIn(MentionDocumentsComponent);
+checks.push(['one document reference can be removed without editing text',count('lm-contextDocument')===0]);
+
+
+await switchTo(MentionDocumentsComponent);docMentionRelease=()=>{};
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
+lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
+const oldRoomRelease=docMentionRelease;docMentionRelease=undefined;
+const OtherMentionRoom=()=>window.__roomPane({room:{id:'room-other',name:'Other'},sessionId:'human',self:{nodeId:'node-a'},call:async(method)=>method==='roomDetail'?{room:{id:'room-other',members:[],tasks:[]},viewer:{isMember:true},messages:[]}:method==='documents'?{status:'ready',documents:[]}:{status:'ready',skills:[]}});
+await switchTo(OtherMentionRoom);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'other room draft',selectionStart:16}});await settleIn(OtherMentionRoom);
+oldRoomRelease();await settleIn(OtherMentionRoom);
+checks.push(['old room document read cannot leak into a new room draft',count('lm-contextDocument')===0&&lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='other room draft']);
+
+
+await switchTo(MentionDocumentsComponent);
+docMentionRows=Array.from({length:9},(_,i)=>({documentId:'doc-c'+String(i).padStart(11,'0'),roomId:'room-doc-mention',title:'Limit'+i,headRevisionId:'rev-c'+String(i).padStart(11,'0')}));
+for(let i=0;i<8;i++){
+ const value='@Limit'+i;lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value,selectionStart:value.length}});await settleIn(MentionDocumentsComponent);
+ lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
+}
+checks.push(['document picks support eight distinct fixed references',count('lm-contextDocument')===8]);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Limit8',selectionStart:7}});await settleIn(MentionDocumentsComponent);
+const readsAtLimit=docMentionCalls.filter(row=>row.method==='documentRead').length;
+lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
+checks.push(['ninth document is rejected without losing references or fetching content',count('lm-contextDocument')===8&&lastText.includes('最多引用8份文档')&&docMentionCalls.filter(row=>row.method==='documentRead').length===readsAtLimit]);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Limit0',selectionStart:7}});await settleIn(MentionDocumentsComponent);
+lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
+checks.push(['reselecting a document is deduplicated even at the reference limit',count('lm-contextDocument')===8]);
+docMentionRows=[mentionDocument];
+
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

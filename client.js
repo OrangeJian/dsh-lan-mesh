@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.3';
+    const PLUGIN_VERSION = '0.4.4';
     const React = require('react');
     const h = React.createElement;
 
@@ -2535,7 +2535,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           }}) : null,
           view.offline?h('div',{className:'lm-muted lm-note'},'当前显示本机缓存，恢复连接后同步。'):null,
           view.status==='ready' ? h('button',{type:'button',onClick:async()=>{try{const value=await call('documentExport',{documentId:view.document.documentId,revisionId:view.revision?.revisionId});if(!docAccepted(value)||typeof value.content!=='string')throw new Error(value?.reason||'导出不可用');const url=URL.createObjectURL(new Blob([value.content],{type:'text/markdown;charset=utf-8'}));const link=globalThis.document.createElement('a');link.href=url;link.download=value.name||'document.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){flash(errorText(error),true);}}},'下载 Markdown') : null,
-          view.status==='ready' ? h('button',{type:'button',disabled:!view.document.contentHash,onClick:()=>props.onContextSelect?.({documentId:view.document.documentId,revisionId:view.revision?.revisionId??view.document.headRevisionId,contentHash:view.document.contentHash})},(props.contextDocuments??[]).some(r=>r.documentId===view.document.documentId)?'取消上下文文档':'选择此版本为上下文') : null,
+          view.status==='ready' ? h('button',{type:'button',disabled:!view.document.contentHash,onClick:()=>props.onContextSelect?.({documentId:view.document.documentId,revisionId:view.revision?.revisionId??view.document.headRevisionId,contentHash:view.document.contentHash,title:view.document.title})},(props.contextDocuments??[]).some(r=>r.documentId===view.document.documentId)?'取消上下文文档':'选择此版本为上下文') : null,
 
           canCreate === true
             ? h(
@@ -2573,6 +2573,11 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const localAgents = Array.isArray(props.localAgents) ? props.localAgents : [];
 
       const [contextDocuments, setContextDocuments] = React.useState([]);
+      const [documentCatalogue,setDocumentCatalogue]=React.useState({status:'idle',rows:[]});
+      const [documentPicking,setDocumentPicking]=React.useState(false);
+      const documentPicker=React.useRef({alive:true,pending:false,sequence:0});
+      const composerSnapshot=React.useRef({});
+      React.useEffect(()=>{documentPicker.current.alive=true;setContextDocuments([]);return()=>{documentPicker.current.alive=false;documentPicker.current.pending=false;documentPicker.current.sequence++;};},[roomId]);
       const [detail, setDetail] = React.useState({ status: 'loading', room: null, messages: [], viewer: null, error: '' });
       const [tasksOpen, setTasksOpen] = React.useState(false);
       const [draft, setDraft] = React.useState('');
@@ -2753,7 +2758,18 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 
       // `@` completion: the token being typed is whatever follows the last `@`
       // before the caret, so typing anywhere else never opens the list.
+      composerSnapshot.current={draft,caret,contextDocuments};
       const mention = mentionOff ? undefined : mentionAt(draft, caret);
+      React.useEffect(()=>{
+        if(mention===undefined&&contextDocuments.length===0)return;
+        let live=true;setDocumentCatalogue(current=>({...current,status:'loading'}));
+        call('documents',{roomId}).then(value=>{
+          if(!live)return;
+          if(value?.status!=='ready')throw Error(value?.reason||'文档列表暂不可用');
+          setDocumentCatalogue({status:'ready',rows:(value.documents??[]).filter(row=>row.headRevisionId&&row.archived!==true)});
+        }).catch(error=>{if(live)setDocumentCatalogue({status:'error',rows:[],reason:errorText(error)});});
+        return()=>{live=false;};
+      },[mention!==undefined,contextDocuments.length,roomId,call]);
       // Rows show disambiguated labels; the draft keeps readable text and keys
       // separately so selecting a duplicate never changes its target identity.
       const mentionLabel = mentionLabels(members);
@@ -2762,12 +2778,36 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const allEntry = { __all: true, name: COPY.mentionAll, title: COPY.mentionAll };
       const query = (mention?.query ?? '').toLowerCase();
       const showAll = mention !== undefined && (query === '' || '所有成员'.includes(query) || 'all'.startsWith(query));
-      const matches = showAll ? [allEntry, ...memberMatches] : memberMatches;
+      const memberCandidates=showAll?[allEntry,...memberMatches]:memberMatches;
+      const documentCandidates=mention===undefined?[]:documentCatalogue.rows.filter(row=>(String(row.title)+' '+row.documentId).toLowerCase().includes(query)).map(row=>({...row,__document:true}));
+      const matches=documentCandidates.length?[...memberCandidates.slice(0,8-Math.min(4,documentCandidates.length)),...documentCandidates.slice(0,4)]:memberCandidates;
       React.useEffect(() => {
         setMentionPick(0);
       }, [mention?.query]);
+      const applyDocumentMention=async(row)=>{
+        const picker=documentPicker.current;
+        if(!mention||picker.pending)return;
+        if(contextDocuments.length>=8&&!contextDocuments.some(ref=>ref.documentId===row.documentId)){flash('最多引用8份文档',true);return;}
+        const snapshot={draft,caret,token:{...mention}},sequence=++picker.sequence;
+        picker.pending=true;setDocumentPicking(true);setMentionOff(true);
+        try{
+          const result=await call('documentRead',{documentId:row.documentId,revisionId:row.headRevisionId});
+          if(!picker.alive||picker.sequence!==sequence)return;
+          const current=composerSnapshot.current;
+          if(current.draft!==snapshot.draft||current.caret!==snapshot.caret){flash('输入已变化，请重新选择文档',true);return;}
+          if(result?.status!=='ready'||result.document?.documentId!==row.documentId||result.document.roomId!==roomId||result.revision?.revisionId!==row.headRevisionId||!/^[a-f0-9]{64}$/.test(result.document.contentHash))throw Error('文档版本不可用，请刷新后重试');
+          if(current.contextDocuments.length>=8&&!current.contextDocuments.some(ref=>ref.documentId===row.documentId))throw Error('最多引用8份文档');
+          const reference={documentId:row.documentId,revisionId:row.headRevisionId,contentHash:result.document.contentHash,title:String(row.title??row.documentId)};
+          setContextDocuments(current.contextDocuments.filter(ref=>ref.documentId!==row.documentId).concat(reference));
+          const next=snapshot.draft.slice(0,snapshot.token.start)+snapshot.draft.slice(snapshot.token.start+snapshot.token.length);
+          setDraft(next);setCaret(snapshot.token.start);
+          setDraftMentions(rows=>editedMentions(rows,snapshot.draft,next,{start:snapshot.token.start,oldEnd:snapshot.token.start+snapshot.token.length,newEnd:snapshot.token.start}));
+        }catch(error){if(picker.alive&&picker.sequence===sequence){flash(errorText(error),true);setMentionOff(false);}}
+        finally{if(picker.alive&&picker.sequence===sequence){picker.pending=false;setDocumentPicking(false);}}
+      };
       const applyMention = (member) => {
         if (mention === undefined) return;
+        if(member.__document){void applyDocumentMention(member);return;}
         const insert = member.__all === true
           ? 'all '
           : `${labelOf(member)} `;
@@ -2873,6 +2913,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       };
 
       const doSay = async () => {
+        if(documentPicker.current.pending)return;
         const readableSkills = draftSkills.map((skill) => `/${skill.name}`)
           .filter((token) => !draft.split(/\s+/u).includes(token));
         const text = [draft.trim(), ...readableSkills].filter(Boolean).join('\n') || attachmentRows.map(row=>row.file.name).join(', ');
@@ -2884,7 +2925,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         const sendingDraft=attachmentDraft.current;
         setBusy('say');
         try {
-          const sayArgs = { room: roomId, sessionId, text, ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments}}:{}) };
+          const sayArgs = { room: roomId, sessionId, text, ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments.map(({documentId,revisionId,contentHash})=>({documentId,revisionId,contentHash}))}}:{}) };
           if (draftMentions.length > 0 && !/@all(?:\s|$)/i.test(text)) sayArgs.mentions = draftMentions.map(({ memberKey, label }) => ({ memberKey, label }));
           // Only confirmed picks become references. `skillRefs` is metadata for
           // the reader, never an instruction to this node: nothing is loaded,
@@ -3007,6 +3048,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       };
 
       const doAssign = async () => {
+        if(documentPicker.current.pending)return;
         if (taskTitle.trim() === '') {
           flash(COPY.needTaskTitle, true);
           return;
@@ -3019,7 +3061,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             assignee: assigneeValue,
             title: taskTitle.trim(),
             detail: taskDetail,
-            ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments}}:{}),
+            ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments.map(({documentId,revisionId,contentHash})=>({documentId,revisionId,contentHash}))}}:{}),
           });
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
           const failed = delivered.filter((row) => row.ok !== true);
@@ -3461,7 +3503,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           'fieldset',
           { disabled:busy==='say'||roomArchived,className: 'lm-composer', onDragOver:event=>event.preventDefault(),onDrop:event=>transferFiles(event),onPaste:event=>transferFiles(event,true) },
           roomArchived ? h('div',{role:'status'},'房间已归档，仅供阅读。已有任务仍可核对。') : null,
-          contextDocuments.length?h('div',{className:'lm-referenceRail'},h('span',{className:'lm-muted'},`已选 ${contextDocuments.length} 份文档作为上下文`),h('button',{type:'button',onClick:()=>setContextDocuments([])},'移除文档上下文')):null,
+          documentPicking?h('div',{role:'status'},'正在固定文档版本…'):null,
+          contextDocuments.length?h('div',{className:'lm-referenceRail'},...contextDocuments.map(ref=>h('span',{className:'lm-contextDocument lm-badge',key:ref.documentId},(ref.title||ref.documentId)+' · '+ref.revisionId,h('button',{type:'button','aria-label':'移除文档引用',onClick:()=>setContextDocuments(rows=>rows.filter(row=>row.documentId!==ref.documentId))},'×'))),h('button',{type:'button',onClick:()=>setContextDocuments([])},'移除全部文档引用')):null,
+          mention!==undefined&&documentCatalogue.status==='loading'?h('div',{role:'status'},'正在读取文档候选…'):null,
+          mention!==undefined&&documentCatalogue.status==='error'?h('div',{className:'lm-muted'},'文档候选暂不可用：'+documentCatalogue.reason):null,
           h(
             'div',
             { className: 'lm-composerCard' },
@@ -3472,8 +3517,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 { className: 'lm-mentionMenu' },
                 ...matches.slice(0, 8).map((member, index) => {
                   const isAll = member.__all === true;
-                  const displayName = isAll ? `@${COPY.mentionAll}` : mentionLabel(member);
-                  const key = isAll ? '@all' : member.key ?? `${member.nodeId}/${member.sessionId}`;
+                  const displayName = member.__document ? `文档 · ${member.title||member.documentId} · ${member.headRevisionId}` : isAll ? `@${COPY.mentionAll}` : mentionLabel(member);
+                  const key = member.__document ? 'doc:'+member.documentId : isAll ? '@all' : member.key ?? `${member.nodeId}/${member.sessionId}`;
                   return h(
                     'button',
                     {
@@ -3481,8 +3526,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                       type: 'button',
                       className:
                         index === mentionPick
-                          ? 'lm-mentionItem lm-mentionItemActive'
-                          : 'lm-mentionItem',
+                          ? 'lm-mentionItem lm-mentionItemActive'+(member.__document?' lm-mentionDocument':'')
+                          : 'lm-mentionItem'+(member.__document?' lm-mentionDocument':''),
                       // The caret must stay in the textarea while a row is
                       // clicked, or the selection would be lost on blur.
                       onMouseDown: (event) => {
@@ -3587,13 +3632,14 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
               value: draft,
               placeholder: COPY.sayHint,
               onChange: (event) => {
+                composerSnapshot.current={...composerSnapshot.current,draft:event.target.value,caret:event.target.selectionStart??event.target.value.length};
                 setDraft(event.target.value);
                 setDraftMentions((current) => editedMentions(current, draft, event.target.value));
                 setCaret(event.target.selectionStart ?? event.target.value.length);
                 if (mentionOff) setMentionOff(false);
               },
-              onKeyUp: (event) => setCaret(event.target.selectionStart ?? 0),
-              onClick: (event) => setCaret(event.target.selectionStart ?? 0),
+              onKeyUp: (event) => {composerSnapshot.current.caret=event.target.selectionStart??0;setCaret(event.target.selectionStart??0);},
+              onClick: (event) => {composerSnapshot.current.caret=event.target.selectionStart??0;setCaret(event.target.selectionStart??0);},
               onKeyDown: (event) => {
                 // The skill menu takes the keys first when it is open: Enter
                 // must confirm a reference rather than send a half-typed `/`.
@@ -3708,7 +3754,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 {
                   type: 'button',
                   className: 'lm-sendBtn',
-                  disabled: busy === 'say' || viewer.isMember !== true || attachmentRows.some(row=>row.status!=='ready'),
+                  disabled: documentPicking || busy === 'say' || viewer.isMember !== true || attachmentRows.some(row=>row.status!=='ready'),
                   title: busy === 'say' ? COPY.saying : COPY.sayAction,
                   'aria-label': busy === 'say' ? COPY.saying : COPY.sayAction,
                   onClick: doSay,
