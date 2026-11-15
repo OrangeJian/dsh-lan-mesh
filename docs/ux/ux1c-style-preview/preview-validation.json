@@ -1,0 +1,46 @@
+{
+  "screenshots": [
+    {
+      "name": "reload-1440-light-before",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "reload-1440-light-after",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "reload-1024-light-after",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 768
+    }
+  ],
+  "checks": {
+    "oneStyle": true,
+    "version": "0.4.8",
+    "brandColumn": true,
+    "projectRow": true,
+    "hostUntouched": true
+  },
+  "menu": {
+    "visible": true,
+    "left": 29,
+    "right": 267,
+    "bottom": 349,
+    "fits": true
+  },
+  "runtimeErrors": []
+}

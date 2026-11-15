@@ -90,11 +90,12 @@ const window = {
   },
   crypto: webcrypto,
 };
+const styleNodes=new Map();
 const document = {
   documentElement: { lang: 'zh', dataset: {} },
-  head: { appendChild() {} },
-  getElementById: () => undefined,
-  createElement: () => ({ set textContent(_value) {}, append() {} }),
+  head: { appendChild(node) {styleNodes.set(node.id,node);} },
+  getElementById: id => styleNodes.get(id) ?? null,
+  createElement: tag => ({tagName:tag.toUpperCase(),dataset:{},textContent:'',append() {}}),
 };
 const require = (name) => {
   if (name === 'react') return React;
@@ -760,6 +761,7 @@ const clickRail = (token, at = 0) => clickOn(RailHost, token, at);
 await switchTo(RailHost);
 
 const checks = [
+  ['boot installs current workbench CSS in the actual style slot',styleNodes.size===1&&styleNodes.get('dsh-lan-mesh-styles')?.textContent.includes('.lm-projectEntry')&&styleNodes.get('dsh-lan-mesh-styles')?.dataset.lanMeshVersion===JSON.parse(readFileSync(join(here,'..','package.json'),'utf8')).version],
   ['rail spins only for the running catalogue row', count('lm-agentSpinner') === 1 && lastNodes.some(n => hasClass(n, 'lm-agentSpinner') && n.props['aria-label'] === '运行中')],
   ['rail requests only local agents', requested.filter(r => r.endpoint === 'agents').every(r => r.payload.localOnly === true)],
   ['registered on the keyed main slot', registration?.name === 'main' && registration?.key === 'dsh-lan-mesh'],

@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.7';
+    const PLUGIN_VERSION = '0.4.8';
     const React = require('react');
     const h = React.createElement;
 
@@ -1288,15 +1288,18 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
     }
 
     /**
-     * Insert the panel stylesheet once and keep it for the life of the page.
+     * Reuse the plugin stylesheet element, updating its contents on plugin reload.
      * @returns {void}
      */
     function installStyles() {
-      if (typeof document === 'undefined' || document.getElementById(STYLE_ID) !== null) return;
-      const style = document.createElement('style');
+      if (typeof document === 'undefined') return;
+      const existing = document.getElementById(STYLE_ID);
+      const style = existing ?? document.createElement('style');
       style.id = STYLE_ID;
-      style.textContent = CSS;
-      document.head.appendChild(style);
+      // Plugin reloads keep the document: retaining the tag must not retain old CSS.
+      if (style.textContent !== CSS) style.textContent = CSS;
+      style.dataset.lanMeshVersion = PLUGIN_VERSION;
+      if (!existing) document.head.appendChild(style);
     }
 
     /**
