@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.17';
+    const PLUGIN_VERSION = '0.4.18';
     const React = require('react');
     const h = React.createElement;
 
@@ -809,6 +809,23 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 @media(prefers-reduced-transparency:reduce){.lm-chat .lm-messageTextCollapsed{mask-image:none}}
 .lm-messageSummary{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .lm-historyToolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:none;justify-content:center;padding:4px 0 12px;font-size:11px}
+.lm-roomPane>.lm-roomTabSurface{flex:1;min-height:0;max-height:none;overflow:auto;padding:18px clamp(12px,3vw,28px);margin:0;border:0}
+.lm-roomPane>.lm-docsView{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.lm-roomPane .lm-roomTabs{flex:none;gap:4px;overflow-x:auto;white-space:nowrap;padding:8px 16px 0}
+.lm-roomTabs .lm-roomTab{min-height:36px;flex:none}
+.lm-roomTab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}
+.lm-roomTabSurface .lm-memberRow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:12px}
+.lm-memberChip .lm-memberIdentity{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.lm-memberChip .lm-memberName{font-weight:600;overflow-wrap:anywhere}
+.lm-memberChip .lm-memberDevice{font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere;white-space:normal}
+.lm-roomTabSurface .lm-memberChip{padding:12px;min-width:0;align-items:flex-start;border-radius:8px}
+.lm-contextSummary{flex:none;border-top:1px solid var(--dsw-alias-border-l1);font-size:11px;color:var(--dsw-alias-label-secondary);padding:4px max(12px,calc((100% - 900px)/2))}
+.lm-contextSummary>summary{cursor:pointer;min-height:28px;padding:5px 0}
+.lm-contextSummaryBody{display:grid;gap:4px;max-height:140px;overflow:auto;overflow-wrap:anywhere;padding:4px 0 8px}
+.lm-roomTabSurface .lm-inviteRow .lm-btn{flex:none;white-space:nowrap}
+.lm-roomTabSurface .lm-inviteRow .lm-select{flex:1;min-width:0}
+.lm-roomTabSurface .lm-inviteRow>.lm-muted{flex:0 1 220px}
+@media(max-width:650px){.lm-roomTabSurface .lm-inviteRow{flex-wrap:wrap}.lm-roomTabSurface .lm-inviteRow>.lm-muted{flex-basis:100%}}
     /* @ux-shell:message-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
@@ -1633,6 +1650,8 @@ function mergeRoomTranscript(earlier,current) {
      */
     function MemberChip(props) {
       const member = props.member;
+      const deviceName=member.nodeName||(props.peers??[]).find(row=>row.nodeId===member.nodeId)?.name||(member.nodeId===props.self?.nodeId?props.self.name:'');
+      const deviceLabel=(deviceName?deviceName+' · ':'')+(member.nodeId||'来源未知');
       // A remote member has no session on this host, and the human member is not
       // a session at all: neither can be opened from here.
       const openable =
@@ -1652,8 +1671,8 @@ function mergeRoomTranscript(earlier,current) {
             member.sessionId === props.sessionId ? 'lm-memberChip lm-memberChipSelf' : 'lm-memberChip',
           title: `${member.nodeId}/${member.sessionId}`,
         },
-        h('span', { className: member.live === true ? 'lm-mdot' : 'lm-mdot lm-mdotIdle' }),
-        h('span', null, labelOf(member)),
+        h('span', { className: member.live === true ? 'lm-mdot' : 'lm-mdot lm-mdotIdle',title:member.live===true?'节点近期可见；不代表Agent正在运行':'可见状态未确认' }),
+        h('span',{className:'lm-memberIdentity'},h('span',{className:'lm-memberName'},labelOf(member)),h('span',{className:'lm-memberDevice'},(member.sessionId==='human'?'人类':'Agent')+' · '+deviceLabel)),
         member.role === 'leader' ? h('span', { className: 'lm-leaderTag' }, COPY.roleLeader) : null,
         props.onRename === undefined
           ? null
@@ -2950,6 +2969,24 @@ function MessageBody(props) {
       );
     }
 
+    /* @ux-shell:room-tabs:start */
+/** Public Room navigation only; it never grants task or membership authority. */
+function RoomTabs(props) {
+ const {h}=props,ids=['chat','docs','tasks','members'];
+ const labels=props.labels??{chat:'对话',docs:'文档',tasks:'任务',members:'成员'};
+ const count=value=>Number.isFinite(value)?' '+Math.max(0,Math.trunc(value)):'';
+ return h('div',{className:'lm-roomTabs',role:'tablist','aria-label':'房间内容'},...ids.map((id,index)=>h('button',{
+  key:id,type:'button',id:props.prefix+'-'+id+'-tab',role:'tab','data-tab':id,
+  className:'lm-roomTab lm-roomTab-'+id+(props.value===id?' lm-roomTabActive':''),
+  'aria-selected':props.value===id,'aria-controls':props.prefix+'-'+id+'-panel',tabIndex:props.value===id?0:-1,
+  onClick:()=>props.onSelect(id),onKeyDown:event=>{
+   let target;if(event.key==='ArrowRight')target=(index+1)%ids.length;else if(event.key==='ArrowLeft')target=(index+ids.length-1)%ids.length;else if(event.key==='Home')target=0;else if(event.key==='End')target=ids.length-1;else return;
+   event.preventDefault();props.onSelect(ids[target]);event.currentTarget.parentElement?.querySelectorAll('[role="tab"]')[target]?.focus();
+  },
+ },labels[id]+(id==='tasks'?count(props.tasks):id==='members'?count(props.members):''))));
+}
+    /* @ux-shell:room-tabs:end */
+
     function RoomPane(props) {
       const roomId = String(props.room?.id ?? '');
       const sessionId = props.sessionId;
@@ -2973,7 +3010,6 @@ function MessageBody(props) {
       React.useEffect(()=>{setHistory({messages:[],cursor:null,status:'idle',error:''});historyFlight.current=false;},[roomId]);
       const roomReadSequence=React.useRef(0);
       const [detail, setDetail] = React.useState({ status: 'loading', room: null, messages: [], viewer: null, error: '' });
-      const [tasksOpen, setTasksOpen] = React.useState(false);
       const [draft, setDraft] = draftField('draft','');
       const [busy, setBusy] = React.useState('');
       const [notice, setNotice] = React.useState('');
@@ -3000,7 +3036,6 @@ function MessageBody(props) {
       const [inviteSession, setInviteSession] = React.useState('');
       /** Whether the member row is expanded — collapsed by default to keep
        *  the room pane focused on conversation instead of a list of faces. */
-      const [membersOpen, setMembersOpen] = React.useState(false);
       /** Quick-task: when checked, the next message also becomes a task
        *  assigned to the first @mentioned member (or everyone if @all). */
       const [quickTask, setQuickTask] = draftField('quickTask',false);
@@ -3040,6 +3075,7 @@ function MessageBody(props) {
        * localStorage so two rooms never share a remembered tab.
        */
       const [panelTab, setPanelTab] = React.useState('chat');
+      React.useEffect(()=>setPanelTab('chat'),[roomId]);
 
       const flash = React.useCallback((text, bad) => {
         setNotice(text);
@@ -3566,98 +3602,11 @@ function MessageBody(props) {
         }
       };
 
-      return h(
-        'div',
-        { className: 'lm-roomPane' },
-
-        h(
-          'div',
-          { className: 'lm-roomHead' },
-          h(
-            'div',
-            { className: 'lm-roomTitleRow' },
-            props.onBack !== undefined
-              ? h(
-                  'button',
-                  { type: 'button', className: 'lm-backBtn', disabled: busy === 'leave', onClick: props.onBack },
-                  `${COPY.navBack}${props.backLabel !== '' && props.backLabel !== undefined ? ` ${props.backLabel}` : ''}`,
-                )
-              : null,
-            h('span', { className: 'lm-roomTitle' }, view.name || roomId),
-            view.memberCount !== undefined || members.length > 0
-              ? h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'lm-badge lm-badgeBtn',
-                    onClick: () => setMembersOpen((v) => !v),
-                    title: membersOpen === true ? COPY.collapse : COPY.expand,
-                  },
-                  `${members.length || view.memberCount} ${COPY.memberCount}`,
-                  h('span', { className: 'lm-caret' }, membersOpen === true ? '▲' : '▼'),
-                )
-              : null,
-            h(
-              'div',
-              { className: 'lm-roomHeadBtns' },
-              // Renaming is leader-only on the service, so the button only exists there.
-              isLeader && !renaming
-                ? h(
-                    'button',
-                    {
-                      type: 'button',
-                      className: 'lm-btn lm-btnSmall lm-renameBtn',
-                      onClick: () => {
-                        setNameDraft(view.name || '');
-                        setRenaming(true);
-                      },
-                    },
-                    COPY.rename,
-                  )
-                : null,
-              // The leader created the room and the service refuses to let it go.
-              viewer.isMember === true && isLeader !== true
-                ? h(
-                    'button',
-                    {
-                      type: 'button',
-                      className: 'lm-btn lm-btnSmall lm-leaveBtn',
-                      disabled: busy === 'leave',
-                      onClick: doLeave,
-                    },
-                    busy === 'leave' ? COPY.leaving : COPY.leave,
-                  )
-                : null,
-            ),
-          ),
-          view.topic ? h('span', { className: 'lm-roomTopicText' }, view.topic) : null,
-          renaming
+      const roomTabPrefix='lm-room-'+encodeURIComponent(roomId);
+      const memberContent=panelTab==='members'
             ? h(
                 'div',
-                { className: 'lm-row' },
-                h('input', {
-                  className: 'lm-input',
-                  style: { flex: '1 1 180px' },
-                  value: nameDraft,
-                  placeholder: COPY.renameHint,
-                  onChange: (event) => setNameDraft(event.target.value),
-                }),
-                h(
-                  'button',
-                  { type: 'button', className: 'lm-btn lm-btnPrimary lm-btnSmall', disabled: busy === 'rename', onClick: doRename },
-                  busy === 'rename' ? COPY.renaming : COPY.rename,
-                ),
-                h(
-                  'button',
-                  { type: 'button', className: 'lm-btn lm-btnSmall', onClick: () => setRenaming(false) },
-                  COPY.collapse,
-                ),
-              )
-            : null,
-          membersOpen === true
-            ? h(
-                'div',
-                { className: 'lm-memberPanel' },
+                { className:'lm-memberPanel lm-roomTabSurface',role:'tabpanel',id:roomTabPrefix+'-members-panel','aria-labelledby':roomTabPrefix+'-members-tab' },
                 h(
                   'div',
                   { className: 'lm-memberRow' },
@@ -3667,7 +3616,8 @@ function MessageBody(props) {
                       member,
                       sessionId,
                       nodeId: self.nodeId,
-                      isLeader,
+                      self,peers:props.peers,
+                      isLeader:isLeader&&!roomArchived,
                       busy,
                       onOpenSession: props.onOpenSession,
                       onKick: doKick,
@@ -3683,7 +3633,7 @@ function MessageBody(props) {
                 // room. Only this node's own sessions are offered, since a peer's
                 // membership belongs to the peer. The server re-derives both facts —
                 // this is a convenience, never the authorization.
-                isLeader === true || viewer.isMember === true
+                !roomArchived&&(isLeader === true || viewer.isMember === true)
                   ? h(
                       'div',
                       { className: 'lm-inviteRow' },
@@ -3742,70 +3692,11 @@ function MessageBody(props) {
                       h('button', { type: 'button', className: 'lm-btn lm-btnSmall', onClick: () => setNickMember(null) }, COPY.collapse),
                     ),
               )
-            : null,
-          detail.status === 'error'
-            ? h('div', { className: 'lm-error lm-note' }, `${COPY.detailUnavailable} ${detail.error}`)
-            : null,
-          notice === '' ? null : h('div', { className: noticeBad ? 'lm-error lm-note' : 'lm-ok lm-note' }, notice),
-        ),
-
-        // Chat is the default view; documents are one switch away and never
-        // replace the conversation without the user asking.
-        h(
+            : null;
+      const taskContent=panelTab==='tasks'?h(
           'div',
-          { className: 'lm-roomTabs', role: 'tablist' },
-          h(
-            'button',
-            {
-              type: 'button',
-              className: panelTab === 'chat' ? 'lm-roomTab lm-roomTabActive' : 'lm-roomTab',
-              role: 'tab',
-              'aria-selected': panelTab === 'chat',
-              onClick: () => setPanelTab('chat'),
-            },
-            COPY.chatTab,
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: panelTab === 'docs' ? 'lm-roomTab lm-roomTabActive' : 'lm-roomTab',
-              role: 'tab',
-              'aria-selected': panelTab === 'docs',
-              onClick: () => setPanelTab('docs'),
-            },
-            COPY.docsTab,
-          ),
-        ),
-
-        panelTab === 'docs'
-          ? h(DocumentsPane, {
-              key: `docs-${roomId}`,
-              contextDocuments,
-              onContextSelect: (ref) => setContextDocuments(rows => rows.some(r => r.documentId === ref.documentId) ? rows.filter(r => r.documentId !== ref.documentId) : rows.length < 8 ? rows.concat(ref) : rows),
-              roomId,
-              call,
-              isMember: viewer.isMember === true && !roomArchived,
-              readOnly: roomArchived,
-              onChanged: props.onChanged,
-            })
-          : null,
-
-        panelTab === 'chat'
-          ? h(
-          'div',
-          { className: 'lm-chatView' },
-
-        h(
-          'div',
-          { className: 'lm-tasksWrap' },
-          h(
-            'button',
-            { type: 'button', className: 'lm-sectionHead lm-tasksToggle', onClick: () => setTasksOpen((open) => open !== true) },
-            h('span', null, `${COPY.tasksLabel} (${tasks.length})`),
-            h('span', { style: { marginLeft: 'auto' } }, tasksOpen ? COPY.collapse : COPY.expand),
-          ),
-          tasksOpen
+          { className:'lm-tasksWrap lm-roomTabSurface',role:'tabpanel',id:roomTabPrefix+'-tasks-panel','aria-labelledby':roomTabPrefix+'-tasks-tab' },
+          panelTab==='tasks'
             ? h(
                 'div',
                 { className: 'lm-taskList' },
@@ -3821,7 +3712,7 @@ function MessageBody(props) {
                         onStatus: doStatus,
                       }),
                     ),
-                isLeader && members.length > 0
+                isLeader && !roomArchived && members.length > 0
                   ? h(
                       'div',
                       { className: 'lm-task' },
@@ -3875,7 +3766,123 @@ function MessageBody(props) {
                   : null,
               )
             : null,
+        ):null;
+
+      return h(
+        'div',
+        { className: 'lm-roomPane' },
+
+        h(
+          'div',
+          { className: 'lm-roomHead' },
+          h(
+            'div',
+            { className: 'lm-roomTitleRow' },
+            props.onBack !== undefined
+              ? h(
+                  'button',
+                  { type: 'button', className: 'lm-backBtn', disabled: busy === 'leave', onClick: props.onBack },
+                  `${COPY.navBack}${props.backLabel !== '' && props.backLabel !== undefined ? ` ${props.backLabel}` : ''}`,
+                )
+              : null,
+            h('span', { className: 'lm-roomTitle' }, view.name || roomId),
+            view.memberCount !== undefined || members.length > 0
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'lm-badge lm-badgeBtn',
+                    onClick: () => setPanelTab('members'),
+                    title:'查看成员',
+                  },
+                  `${members.length || view.memberCount} ${COPY.memberCount}`,
+                  h('span', { className: 'lm-caret' }, '→'),
+                )
+              : null,
+            h(
+              'div',
+              { className: 'lm-roomHeadBtns' },
+              // Renaming is leader-only on the service, so the button only exists there.
+              isLeader && !roomArchived && !renaming
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'lm-btn lm-btnSmall lm-renameBtn',
+                      onClick: () => {
+                        setNameDraft(view.name || '');
+                        setRenaming(true);
+                      },
+                    },
+                    COPY.rename,
+                  )
+                : null,
+              // The leader created the room and the service refuses to let it go.
+              viewer.isMember === true && isLeader !== true
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'lm-btn lm-btnSmall lm-leaveBtn',
+                      disabled: busy === 'leave',
+                      onClick: doLeave,
+                    },
+                    busy === 'leave' ? COPY.leaving : COPY.leave,
+                  )
+                : null,
+            ),
+          ),
+          view.topic ? h('span', { className: 'lm-roomTopicText' }, view.topic) : null,
+          renaming
+            ? h(
+                'div',
+                { className: 'lm-row' },
+                h('input', {
+                  className: 'lm-input',
+                  style: { flex: '1 1 180px' },
+                  value: nameDraft,
+                  placeholder: COPY.renameHint,
+                  onChange: (event) => setNameDraft(event.target.value),
+                }),
+                h(
+                  'button',
+                  { type: 'button', className: 'lm-btn lm-btnPrimary lm-btnSmall', disabled: busy === 'rename', onClick: doRename },
+                  busy === 'rename' ? COPY.renaming : COPY.rename,
+                ),
+                h(
+                  'button',
+                  { type: 'button', className: 'lm-btn lm-btnSmall', onClick: () => setRenaming(false) },
+                  COPY.collapse,
+                ),
+              )
+            : null,
+          detail.status === 'error'
+            ? h('div', { className: 'lm-error lm-note' }, `${COPY.detailUnavailable} ${detail.error}`)
+            : null,
+          notice === '' ? null : h('div', { className: noticeBad ? 'lm-error lm-note' : 'lm-ok lm-note' }, notice),
         ),
+
+        h(RoomTabs,{h,value:panelTab,prefix:roomTabPrefix,tasks:tasks.length,members:members.length,onSelect:setPanelTab,labels:{chat:COPY.chatTab,docs:COPY.docsTab,tasks:COPY.tasksLabel,members:'成员'}}),
+        memberContent,
+        taskContent,
+
+        panelTab === 'docs'
+          ? h('div',{className:'lm-docsView',role:'tabpanel',id:roomTabPrefix+'-docs-panel','aria-labelledby':roomTabPrefix+'-docs-tab'},h(DocumentsPane, {
+              key: `docs-${roomId}`,
+              contextDocuments,
+              onContextSelect: (ref) => setContextDocuments(rows => rows.some(r => r.documentId === ref.documentId) ? rows.filter(r => r.documentId !== ref.documentId) : rows.length < 8 ? rows.concat(ref) : rows),
+              roomId,
+              call,
+              isMember: viewer.isMember === true && !roomArchived,
+              readOnly: roomArchived,
+              onChanged: props.onChanged,
+            }))
+          : null,
+
+        panelTab === 'chat'
+          ? h(
+          'div',
+          { className:'lm-chatView',role:'tabpanel',id:roomTabPrefix+'-chat-panel','aria-labelledby':roomTabPrefix+'-chat-tab' },
 
         h(
           'div',
@@ -3916,6 +3923,7 @@ function MessageBody(props) {
               }),
         ),
 
+        contextDocuments.length+draftSkills.length+attachmentRows.length>0?h('details',{className:'lm-contextSummary'},h('summary',null,'本次发送上下文 · 文档 '+contextDocuments.length+' · 技能 '+draftSkills.length+' · 附件 '+attachmentRows.length),h('div',{className:'lm-contextSummaryBody'},...contextDocuments.map(ref=>h('div',{key:'doc:'+ref.documentId},'文档 · '+(ref.title||ref.documentId)+' · '+ref.revisionId)),...draftSkills.map((ref,index)=>h('div',{key:'skill:'+ref.name+index},'技能提示 · '+ref.name+' · '+(ref.sourceNodeName||ref.sourceNodeId))),...attachmentRows.map(row=>h('div',{key:row.id},'附件 · '+(row.file?.name||row.name||'文件')+' · '+row.status)))):null,
         newMessageCount>0 ? h('div',{className:'lm-newMessages'},h('span',{role:'status','aria-live':'polite'},newMessageCount+' 条新消息'),h('button',{type:'button',className:'lm-btn lm-btnSmall lm-jumpLatest',onClick:jumpToLatest},'跳到最新')):null,
         h(
           'fieldset',

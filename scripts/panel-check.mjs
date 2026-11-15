@@ -675,7 +675,7 @@ const renderNode = (component) => {
 };
 
 function captureDraftFixture(name){
- if(name.startsWith('body-')?process.env.MESH_BODY_CAPTURE!=='1':name==='grouped'?process.env.MESH_ROOM_CAPTURE!=='1':process.env.MESH_DRAFT_CAPTURE!=='1')return;
+ if(name.startsWith('tabs-')?process.env.MESH_ROOM_TABS_CAPTURE!=='1':name.startsWith('body-')?process.env.MESH_BODY_CAPTURE!=='1':name==='grouped'?process.env.MESH_ROOM_CAPTURE!=='1':process.env.MESH_DRAFT_CAPTURE!=='1')return;
  const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const render=node=>{
   if(node==null||typeof node==='boolean')return '';
@@ -688,9 +688,9 @@ function captureDraftFixture(name){
    return ' '+(key==='className'?'class':key==='tabIndex'?'tabindex':key)+'="'+escape(value===true?'':value)+'"';
   }).join('');
   const style=props.style?Object.entries(props.style).filter(([,v])=>v!=null).map(([k,v])=>k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())+':'+(typeof v==='number'&&v!==0&&!['opacity','flex','flexGrow','flexShrink','zIndex','fontWeight','lineHeight'].includes(k)?v+'px':v)).join(';'):'';
-  return '<'+type+attributes+(style?' style="'+escape(style)+'"':'')+'>'+(type==='textarea'?escape(props.value??''):(node.children??[]).map(render).join(''))+(['input','img','br','hr'].includes(type)?'':'</'+type+'>');
+  return '<'+type+attributes+(style?' style="'+escape(style)+'"':'')+'>'+(type==='textarea'?escape(props.value??''):(node.children??[]).map(child=>render(type==='select'&&child?.type==='option'?{...child,props:{...child.props,selected:child.props.value===props.value}}:child)).join(''))+(['input','img','br','hr'].includes(type)?'':'</'+type+'>');
  };
- const directory=join(here,'..','docs','ux',name.startsWith('body-')?'ux2b-body-preview':name==='grouped'?'ux2a-message-preview':'ux1e-drafts-preview');mkdirSync(directory,{recursive:true});
+ const directory=join(here,'..','docs','ux',name.startsWith('tabs-')?'ux2c-room-preview':name.startsWith('body-')?'ux2b-body-preview':name==='grouped'?'ux2a-message-preview':'ux1e-drafts-preview');mkdirSync(directory,{recursive:true});
  const css=source.match(/const CSS = `([\s\S]*?)`;/)[1];
  const html='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>草稿恢复组件取证</title><style>:root{--dsw-alias-bg-base:#fff;--dsw-alias-bg-layer-1:#f6f7f9;--dsw-alias-bg-layer-2:#edf0f5;--dsw-alias-label-primary:#20242c;--dsw-alias-label-secondary:#616b79;--dsw-alias-label-tertiary:#6a7482;--dsw-alias-border-l1:#e3e7ed;--dsw-alias-border-l2:#bbc3cf;--dsw-alias-brand-primary:#315ecc;--dsw-alias-state-warn:#8a5b12}*{box-sizing:border-box}body{margin:0;height:100dvh;font:14px/1.5 Segoe UI,Microsoft YaHei,sans-serif;color:#20242c}.fixture-note{padding:8px 14px;height:36px;background:#edf0f5;font-size:12px}main{height:calc(100dvh - 36px)}'+css+'main.lm-panel{height:calc(100dvh - 36px);min-height:0}.stubMarkdown{white-space:pre-wrap}body{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}@media(prefers-color-scheme:dark){:root{--dsw-alias-bg-base:#15191f;--dsw-alias-bg-layer-1:#1b2028;--dsw-alias-bg-layer-2:#242b35;--dsw-alias-label-primary:#e6eaf0;--dsw-alias-label-secondary:#acb7c7;--dsw-alias-border-l1:#343e4d;--dsw-alias-border-l2:#455166;--dsw-alias-brand-primary:#8baaff}.fixture-note{background:#242b35}}</style><div class="fixture-note">实际Room组件 / 模拟Host · '+escape(name)+' · 缩略图为静态导出占位</div><main class="lm-panel">'+render(lastTree)+'</main></html>';
  writeFileSync(join(directory,name+'.html'),html);if(name==='restored'||name==='grouped'||name==='body-collapsed')writeFileSync(join(directory,'index.html'),html);
@@ -986,15 +986,25 @@ checks.push(
 
 // The member row is collapsed by default to keep the room focused on the
 // conversation; expand it before checking chips and kick buttons.
+checks.push(['Room exposes four separate content tabs with one selected conversation',lastNodes.filter(n=>n.props.role==='tab').length===4&&lastNodes.filter(n=>n.props.role==='tab'&&n.props['aria-selected']===true).length===1&&lastNodes.some(n=>n.props.role==='tabpanel'&&hasClass(n,'lm-chatView'))]);
+await typeInto('lm-composerInput','draft survives room tabs');
 await click('lm-badgeBtn');
-// Tasks are also collapsed by default; expand the section to check the list.
-await click('lm-tasksToggle');
+checks.push(['member summary enters a dedicated panel with exact device identities',count('lm-memberDevice')===4&&count('lm-composerInput')===0&&lastNodes.some(n=>n.props.role==='tabpanel'&&hasClass(n,'lm-memberPanel'))]);
+captureDraftFixture('tabs-members');
+const memberObservation={dots:count('lm-mdot'),idle:count('lm-mdotIdle'),kicks:count('lm-kickBtn'),invites:count('lm-inviteRow'),humanSafe:!chipHasKick('node-a/human')&&chipHasKick('node-b/session-9')&&chipHasKick('node-c/session-7')};
+await click('lm-roomTab-tasks');const taskListVisible=lastText.includes('Split the panel');
+captureDraftFixture('tabs-tasks');
+checks.push(['tasks have a dedicated panel with original assignment form and no chat overlay',count('lm-taskList')===1&&count('lm-assignBtn')===1&&count('lm-chat')===0]);
+await click('lm-roomTab-chat');
+captureDraftFixture('tabs-chat');
+checks.push(['switching member and task tabs retains the chat draft',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='draft survives room tabs']);
+await typeInto('lm-composerInput','');
 checks.push(
   // Every chip has the base dot class; the offline one adds the idle modifier.
-  ['every member chip carries a dot', count('lm-mdot') === 4],
-  ['offline member gets the idle dot', count('lm-mdotIdle') === 1],
+  ['every member chip carries a dot', memberObservation.dots === 4],
+  ['offline member gets the idle dot', memberObservation.idle === 1],
   ['leader sees the rename button', count('lm-renameBtn') === 1],
-  ['room pane lists its tasks', lastText.includes('Split the panel')],
+  ['room pane lists its tasks', taskListVisible],
   ['room pane has a composer', count('lm-sendBtn') === 1],
   // The composer is the shell-shaped card (22px radius, elevation stroke) with
   // the attachment and quick-task affordances in a toolbar under the input,
@@ -1006,14 +1016,14 @@ checks.push(
   ['room pane has a back button', count('lm-backBtn') === 1],
   // v0.2.1: the leader may kick peers (never the human, never itself, and only
   // when this pane actually owns the leader role).
-  ['leader sees a kick button per peer', count('lm-kickBtn') === 2],
+  ['leader sees a kick button per peer', memberObservation.kicks === 2],
   // v0.2.1: the leader may pull a local session into the room it leads.
-  ['the leader sees the invite row', count('lm-inviteRow') === 1],
+  ['the leader sees the invite row', memberObservation.invites === 1],
   // The kick button belongs to the chip of a remote peer, never to the chip of
   // the human member (a human session is not something a leader may eject).
   [
     'the human member has no kick button',
-    !chipHasKick('node-a/human') && chipHasKick('node-b/session-9') && chipHasKick('node-c/session-7'),
+    memberObservation.humanSafe,
   ],
 );
 
@@ -1305,14 +1315,17 @@ checks.push(
 
 // Switching to a room this session only belongs to hides the leader controls.
 await click('lm-roomRow', 1);
+await click('lm-roomTab-members');
+const nonLeaderMembers={kicks:count('lm-kickBtn'),invites:count('lm-inviteRow')};
+await click('lm-roomTab-chat');
 checks.push(
   ['switching rooms re-reads the detail', asked.filter((name) => name === 'roomDetail').length >= 2],
   ['non-leader sees no rename button', count('lm-renameBtn') === 0],
   ['non-leader may leave the room', count('lm-leaveBtn') === 1],
-  ['non-leader sees no kick button', count('lm-kickBtn') === 0],
+  ['non-leader sees no kick button', nonLeaderMembers.kicks===0],
   // A human member who is not the leader may still pull a local session in; the
   // panel only mirrors the server rule, it never decides it.
-  ['a human member still sees the invite row', count('lm-inviteRow') === 1],
+  ['a human member still sees the invite row', nonLeaderMembers.invites===1],
   ['member sees the disabled task entry with an explanation', lastNodes.some(n => hasClass(n, 'lm-taskPill') && n.props.disabled === true && n.props.title.includes('只有 leader'))],
   ['empty conversation says so', lastText.includes('房间里还没有消息')],
 );
@@ -1796,6 +1809,11 @@ uploadGate=null;releaseRetainedUpload();await settleIn(DraftRoomB);
 checks.push(['detached upload does not leak draft or attachment into another room',count('lm-fileChip')===0&&lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='independent room B']);
 await switchTo(DraftRoomA);
 captureDraftFixture('restored');
+await clickOn(DraftRoomA,'lm-roomTab-docs');
+checks.push(['documents remain available as an independent Room tab',count('lm-docsView')===1&&count('lm-chat')===0]);
+captureDraftFixture('tabs-docs');
+await clickOn(DraftRoomA,'lm-roomTab-chat');
+checks.push(['selected context has a readable summary without changing reference payload',count('lm-contextSummary')===1&&lastText.includes('本次发送上下文')]);
 checks.push(['returning restores text, fixed references and completed image without reupload',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value===preservedText&&count('lm-contextDocument')===1&&count('lm-skillChip')===1&&count('lm-fileChip')===1&&lastText.includes('已上传')&&uploaded.length===uploadsBeforeRetain+1]);
 await lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);
 checks.push(['failed retained draft keeps its message and image',retainedCalls.length===1&&lastText.includes('retry after navigation')&&count('lm-fileChip')===1]);
@@ -1865,6 +1883,12 @@ roomPoll.fn();await settleIn(GroupedRoom);
 checks.push(['subsequent live poll never erases already loaded older history',count('lm-bubbleRow')===42&&lastText.includes('earlier retained history')&&lastText.includes('已到本机当前保留记录的开头')]);
 groupedTranscript.push({...groupedTranscript[0],id:'clash',from:{nodeId:'node-b',sessionId:'session-9'},text:'first origin'}, {...groupedTranscript[0],id:'clash',from:{nodeId:'node-c',sessionId:'session-9'},text:'second origin'});roomPoll.fn();await settleIn(GroupedRoom);
 checks.push(['same message id from different origins keeps separate React keys, anchors and arrival counts',lastNodes.filter(n=>n.props['data-message-id']==='clash').length===2&&renderedMessageKeys.includes(JSON.stringify(['node-b','clash']))&&renderedMessageKeys.includes(JSON.stringify(['node-c','clash']))&&lastText.includes('2 条新消息')]);
+const archivedTabCall=async(method,args)=>method==='roomDetail'?{room:{id:args.room,name:'Archived tabs',members:[human,remoteAgent],tasks:[{id:'old-task',title:'Existing archived task',status:'done',assignee:human}],lifecycle:{status:'archived'}},viewer:{isMember:true,isLeader:true},messages:[]}:method==='roomSkills'?{status:'ready',skills:[]}:{status:'ready',documents:[]};
+const ArchivedTabsRoom=()=>h(window.__roomPane,{room:{id:'room-archived-tabs'},sessionId:'human',self:answers.snapshot.self,call:archivedTabCall});
+await switchTo(ArchivedTabsRoom);await clickOn(ArchivedTabsRoom,'lm-roomTab-tasks');
+checks.push(['archived tasks remain viewable while new task assignment is absent',lastText.includes('Existing archived task')&&count('lm-assignBtn')===0]);
+await clickOn(ArchivedTabsRoom,'lm-roomTab-members');
+checks.push(['archived members remain viewable without invite or kick controls',count('lm-memberDevice')===2&&count('lm-inviteRow')===0&&count('lm-kickBtn')===0]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

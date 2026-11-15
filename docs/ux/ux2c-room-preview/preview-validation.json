@@ -1,0 +1,41 @@
+{
+  "screenshots": [
+    {
+      "name": "tabs-members-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "tabs-tasks-1024-dark-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 768
+    },
+    {
+      "name": "tabs-chat-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "tabs-docs-1024-light-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 768
+    }
+  ],
+  "runtimeErrors": []
+}
