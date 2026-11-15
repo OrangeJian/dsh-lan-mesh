@@ -1,0 +1,16 @@
+{
+  "before": {
+    "id": "m16",
+    "offset": -8
+  },
+  "afterPrepend": {
+    "id": "m16",
+    "offset": -8
+  },
+  "afterImage": {
+    "id": "m16",
+    "offset": -8
+  },
+  "prependPreserved": true,
+  "imagePreserved": true
+}

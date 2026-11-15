@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.12';
+    const PLUGIN_VERSION = '0.4.13';
     const React = require('react');
     const h = React.createElement;
 
@@ -795,6 +795,8 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-chat .lm-messageContinuation{margin-top:-8px}
 .lm-chat .lm-messageContinuation .lm-bubbleMeta{justify-content:flex-end}
 @media(max-width:650px){.lm-chat{padding:12px 10px}.lm-chat .lm-bubbleWhen{margin-left:0}.lm-chat .lm-bubble{padding:8px 10px}.lm-chat .lm-messageDevice{flex-basis:100%}}
+.lm-newMessages{display:flex;align-items:center;justify-content:center;gap:12px;flex:none;padding:6px 12px;background:var(--dsw-alias-bg-layer-1);border-top:1px solid var(--dsw-alias-border-l1);font-size:12px}
+.lm-jumpLatest:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
     /* @ux-shell:message-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
@@ -1170,6 +1172,46 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
   });
 }
     /* @ux-shell:message-model:end */
+
+    /* @ux-shell:timeline-model:start */
+/** Local reading position only; does not change Room/Inbox read state. */
+function createRoomTimeline() {
+ let ids=[],pending=new Set(),following=true,top=0,anchor=null;
+ const view=()=>({follow:following,pending:pending.size,top});
+ return {
+  update(messages){
+   const next=[...new Set((Array.isArray(messages)?messages:[]).map(row=>typeof row?.id==='string'?row.id:'').filter(Boolean))];
+   const known=new Set(ids);const anchor=ids.length?next.lastIndexOf(ids[ids.length-1]):-1;
+   const arrivals=(anchor>=0?next.slice(anchor+1):next).filter(id=>!known.has(id));
+   const retained=new Set(next);pending=new Set([...pending].filter(id=>retained.has(id)));
+   if(following)pending.clear();else for(const id of arrivals)pending.add(id);
+   ids=next;return view();
+  },
+  observe(node){
+   const height=Number(node?.scrollHeight),size=Number(node?.clientHeight),position=Number(node?.scrollTop);
+   if([height,size,position].every(Number.isFinite)){
+    top=Math.max(0,position);following=height-size-top<=80;
+    if(following){pending.clear();anchor=null;}
+    else {
+     const viewport=node.getBoundingClientRect?.();
+     const first=viewport&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>row.getBoundingClientRect().bottom>viewport.top);
+     anchor=first?{id:first.getAttribute('data-message-id'),offset:first.getBoundingClientRect().top-viewport.top}:null;
+    }
+   }
+   return view();
+  },
+  restore(node){
+   if(following||!node)return;
+   const match=anchor&&[...(node.querySelectorAll?.('[data-message-id]')??[])].find(row=>row.getAttribute('data-message-id')===anchor.id);
+   if(match&&node.getBoundingClientRect){node.scrollTop+=match.getBoundingClientRect().top-node.getBoundingClientRect().top-anchor.offset;}
+   else node.scrollTop=top;
+   top=node.scrollTop;
+  },
+  jump(){following=true;anchor=null;pending.clear();return view();},
+  current:view,
+ };
+}
+    /* @ux-shell:timeline-model:end */
 
     function messageStamp(message) {
       const value = message?.at ?? message?.receivedAt ?? message?.sentAt ?? '';
@@ -2859,6 +2901,7 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
       const documentPicker=React.useRef({alive:true,pending:false,sequence:0});
       const composerSnapshot=React.useRef({});
       React.useEffect(()=>{documentPicker.current.alive=true;return()=>{documentPicker.current.alive=false;documentPicker.current.pending=false;documentPicker.current.sequence++;};},[roomId]);
+      const roomReadSequence=React.useRef(0);
       const [detail, setDetail] = React.useState({ status: 'loading', room: null, messages: [], viewer: null, error: '' });
       const [tasksOpen, setTasksOpen] = React.useState(false);
       const [draft, setDraft] = draftField('draft','');
@@ -2915,6 +2958,12 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
       const [skillQuery, setSkillQuery] = React.useState('');
       const [skillPick, setSkillPick] = React.useState(0);
       const chatRef = React.useRef(null);
+      const timeline = React.useRef(null);
+      if(timeline.current===null)timeline.current=createRoomTimeline();
+      const [newMessageCount,setNewMessageCount]=React.useState(0);
+      const jumpToLatest=()=>{timeline.current.jump();setNewMessageCount(0);const node=chatRef.current;if(node)node.scrollTop=node.scrollHeight;};
+      const observeChat=event=>setNewMessageCount(timeline.current.observe(event.currentTarget).pending);
+      const followLoadedContent=()=>{const node=chatRef.current;if(node){if(timeline.current.current().follow)node.scrollTop=node.scrollHeight;else timeline.current.restore(node);}};
       /**
        * Which content view the room shows. Chat is the default and the state is
        * deliberately per-mount: docs/ui-contract.md keeps it out of
@@ -2929,9 +2978,10 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
 
       const load = React.useCallback(async () => {
         if(!draftLifetime.current.alive)return;
+        const request=++roomReadSequence.current;
         try {
           const value = await call('roomDetail', { room: roomId, sessionId });
-          if(!draftLifetime.current.alive)return;
+          if(!draftLifetime.current.alive||request!==roomReadSequence.current)return;
           setDetail({
             status: 'ready',
             room: value?.room ?? null,
@@ -2941,7 +2991,7 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
           });
         } catch (error) {
           // A transient failure keeps the last good transcript on screen.
-          if(draftLifetime.current.alive)setDetail((current) => ({ ...current, status: 'error', error: errorText(error) }));
+          if(draftLifetime.current.alive&&request===roomReadSequence.current)setDetail((current) => ({ ...current, status: 'error', error: errorText(error) }));
         }
       }, [call, roomId, sessionId]);
 
@@ -3003,18 +3053,18 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
       const messageRows = roomMessageRows(detail.messages,{self:props.self,members,peers:props.peers}).filter(row=>row.message?.kind==='room-message');
       const messages = messageRows.map(row=>row.message);
 
-      // Entering a room (or a new message arriving) must land the chat on the
-      // latest message, not on whatever scroll position the room had before.
-      // The ref is stable; the length drives the effect so a new message scrolls
-      // to the bottom each time.
-      React.useEffect(() => {
-        const node = chatRef.current;
-        if (node === null || node === undefined) return;
-        node.scrollTop = node.scrollHeight;
-        if (node.scrollHeight > node.clientHeight && typeof node.scrollIntoView === 'function') {
-          node.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+      // Following belongs to this chat viewport, never the document or Inbox count.
+      const transcriptIdentity=JSON.stringify(messages.map(message=>message.id??null));
+      React.useEffect(()=>{
+        if(detail.status!=='ready'||panelTab!=='chat')return;
+        const reading=timeline.current.update(messages);
+        setNewMessageCount(reading.pending);
+        const node=chatRef.current;
+        if(node){
+          if(reading.follow)node.scrollTop=node.scrollHeight;
+          else timeline.current.restore(node);
         }
-      }, [detail.status, messages.length]);
+      },[detail.status,transcriptIdentity,panelTab]);
       const self = props.self ?? {};
       const selfMember = members.find((member) => member.sessionId === sessionId);
       const selfName = selfMember?.name || self.name || '';
@@ -3744,7 +3794,7 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
 
         h(
           'div',
-          { className: 'lm-chat', ref: chatRef },
+          { className: 'lm-chat', ref: chatRef, onScroll:observeChat, onLoad:followLoadedContent },
           messages.length === 0
             ? h('div', { className: 'lm-muted' }, detail.status === 'loading' ? COPY.loading : COPY.noChat)
             : messageRows.map((messageRow) => {
@@ -3779,6 +3829,7 @@ function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {})
               }),
         ),
 
+        newMessageCount>0 ? h('div',{className:'lm-newMessages'},h('span',{role:'status','aria-live':'polite'},newMessageCount+' 条新消息'),h('button',{type:'button',className:'lm-btn lm-btnSmall lm-jumpLatest',onClick:jumpToLatest},'跳到最新')):null,
         h(
           'fieldset',
           { disabled:busy==='say'||roomArchived,className: 'lm-composer', onDragOver:event=>event.preventDefault(),onDrop:event=>transferFiles(event),onPaste:event=>transferFiles(event,true) },

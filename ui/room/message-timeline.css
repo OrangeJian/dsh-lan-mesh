@@ -10,3 +10,5 @@
 .lm-chat .lm-messageContinuation{margin-top:-8px}
 .lm-chat .lm-messageContinuation .lm-bubbleMeta{justify-content:flex-end}
 @media(max-width:650px){.lm-chat{padding:12px 10px}.lm-chat .lm-bubbleWhen{margin-left:0}.lm-chat .lm-bubble{padding:8px 10px}.lm-chat .lm-messageDevice{flex-basis:100%}}
+.lm-newMessages{display:flex;align-items:center;justify-content:center;gap:12px;flex:none;padding:6px 12px;background:var(--dsw-alias-bg-layer-1);border-top:1px solid var(--dsw-alias-border-l1);font-size:12px}
+.lm-jumpLatest:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
