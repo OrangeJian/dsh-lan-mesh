@@ -7,7 +7,7 @@ import { openTeamStore } from '../lib/team-store.mjs';
 import { TeamCoordinator } from '../lib/team-coordinator.mjs';
 
 async function fixture(t) {
-  const directory = await mkdtemp(join(process.cwd(), '.test-tmp/team-coord-'));
+  const directory = await mkdtemp(join(tmpdir(), 'team-coord-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const a = await openTeamStore({ directory: join(directory, 'a') });
   const b = await openTeamStore({ directory: join(directory, 'b') });

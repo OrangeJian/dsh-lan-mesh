@@ -12,3 +12,12 @@
 已读前两项目根LICENSE均为MIT，归属分别为LinYanZhi及dsh-mesh contributors、maestro preset maintainers；若后续复制任何代码须保留版权及许可，此次未复制。根许可不自动代替全部依赖许可证审核，也没有验证发布包与源码完全一致。
 
 下一步：补齐另两项目固定源码研究；以现有Coordinator为唯一执行核心，禁止因参考项目有相近功能另建一套状态机。
+
+## 补充核查：另两项目关键机制
+
+2026-11-15，通过GitHub固定SHA目录树与raw源码读取，并逐文件计算Git blob SHA-1与该目录树匹配。选择文件存于同名研究目录，SOURCE-SELECTION.txt明确“仅选取文件，完整克隆未完成”，不冒充完整仓库审计。
+
+- dsh-agent-teams（上表SHA）：src/scheduler.ts在withTeamLock内重新readTeam，检查halted/staged、成员可用性、已占任务、依赖满足后beginTaskAttempt；观察到idle但仍持有open attempt会停放等待显式重新分配。采用“事务内重读、依赖与容量原子门禁”的原则，保留本项目跨节点Coordinator和uncertain规则，不照搬其冷恢复自动重试。根LICENSE为MIT，版权程序员阿江(Relakkes)。
+- Orca（上表SHA）：src/main/runtime/orchestration/coordinator/decision-gates/coordinator-decision-gates.ts将gate绑定taskId/dispatchId，pending gate重新阻塞任务，消费者过期会拒绝；dispatch/coordinator-task-dispatch.ts区分dispatched与dispatched-unobserved，结合派发身份及stale-base判断。借鉴“批准绑定具体尝试、投递不等于启动、工作区基线检查”，不引入Orca完整工作台。task-deps-flag.ts另外处理PowerShell原生参数丢引号，仅作为CLI兼容参考，不使用宽松解析替代插件JSON Schema。根LICENSE为MIT，版权Lovecast Inc.。
+
+四项目关键机制/源码路径/许可证/等效实现与采用理由的最小研究矩阵至此补齐。没有运行其测试或产品，没有复制其业务实现，未验证发布包与全部依赖许可；后续只在对应具体模块实施前再深入所需接口。
