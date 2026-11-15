@@ -70,7 +70,8 @@ function makeNode(context, name, port) {
     },
     log: () => {},
   });
-  context.after(() => node.close());
+  // home() owns teardown: nodes must flush while the isolated DSH_HOME exists.
+  (context.meshNodes ??= []).push(node);
   return node;
 }
 
@@ -101,9 +102,13 @@ async function home(t) {
   const prior = process.env.DSH_HOME;
   process.env.DSH_HOME = dir;
   t.after(async () => {
-    if (prior === undefined) delete process.env.DSH_HOME;
-    else process.env.DSH_HOME = prior;
-    await rm(dir, { recursive: true, force: true });
+    try {
+      for (const node of [...(t.meshNodes ?? [])].reverse()) await node.close();
+    } finally {
+      if (prior === undefined) delete process.env.DSH_HOME;
+      else process.env.DSH_HOME = prior;
+      await rm(dir, { recursive: true, force: true });
+    }
   });
   return dir;
 }
