@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.9';
+    const PLUGIN_VERSION = '0.4.10';
     const React = require('react');
     const h = React.createElement;
 
@@ -211,6 +211,7 @@ window.__ModuleLoader__.load({
           navRooms: '我的房间',
           navInbox: '收件箱',
           navNetwork:'网络总览',navManage:'管理与诊断',
+          projectSearch:'搜索已加入项目',projectSearchEmpty:'没有匹配的项目',sidebarUnavailable:'当前宿主不支持导航栏切换，仍可使用工作区选择器。',navigationLabels:{},
           surfaceLabels:{},networkLabels:{},managementLabels:{},
           navBoard: '任务看板',
           navBack: '← 返回',
@@ -452,6 +453,7 @@ window.__ModuleLoader__.load({
           navRooms: 'My rooms',
           navInbox: 'Inbox',
           navNetwork:'Network',navManage:'Manage and diagnose',
+          projectSearch:'Search joined projects',projectSearchEmpty:'No matching projects',sidebarUnavailable:'This host cannot toggle the sidebar; use the workspace switcher.',navigationLabels:{back:'Back to conversation',backHint:'Return to native DSH conversation',toggle:'Toggle navigation sidebar',nav:'Navigation',switch:'Switch workspace or project',workspaces:'Workspaces',projects:'My projects',archived:'Archived',network:'Network',inbox:'Inbox',board:'Tasks',manage:'Manage and diagnose',rooms:'Projects',agents:'Sessions'},
           surfaceLabels:{loading:'Loading collaboration data…',failed:'Cannot read local collaboration data',stale:'Read failed; showing the last successful snapshot',hint:'Messages and projects have not been cleared. Check the local service or retry.',retry:'Retry'},
           networkLabels:{title:'Network',refresh:'Refresh',intro:'This node and recently discovered peers. Links between remote peers are not inferred.',local:'This node',peer:'Discovery record',unknown:'Unverified',sessions:'Catalogue sessions',running:'Local running',identity:'Node ID',empty:'No other devices discovered. Check DSH and the plugin on the other machine.',time:'seconds since observation',stale:'Historical snapshot; current state unverified',permissions:'Peer visibility, session presence and dispatch permission are separate facts.'},
           managementLabels:{title:'Manage and diagnose',intro:'Local identity and published configuration flags.',node:'Node ID',name:'Device name',ui:'UI version',host:'Host version',secret:'Cluster secret',autoWake:'Automatic wake',configured:'Configured',notConfigured:'Not configured',enabled:'Enabled',disabled:'Disabled',unknown:'Unknown',agents:'Manage sessions',diagnostics:'Diagnostic guidance',diagnosticHint:'Read-only reports are generated locally. This page does not run system commands; unchecked states are not healthy.',nickname:'Click the identity at the bottom of the sidebar to edit its display name.'},
@@ -644,6 +646,34 @@ function ManagementWorkspace({h,self,uiVersion,hostVersion,onOpenAgents,labels={
  return h('section',{className:'lm-workspacePage lm-managementWorkspace'},h('header',{className:'lm-workspacePageHead'},h('div',null,h('h1',null,copy.title),h('p',null,copy.intro))),h('dl',{className:'lm-managementFacts'},...[[copy.name,self?.selfName||self?.name||copy.unknown],[copy.node,self?.nodeId||copy.unknown],[copy.ui,uiVersion||copy.unknown],[copy.host,hostVersion||copy.unknown],[copy.secret,self?.secured===true?copy.configured:self?.secured===false?copy.notConfigured:copy.unknown],[copy.autoWake,flag(self?.autoWake)]].flatMap(([label,value])=>[h('dt',{key:label+'-label'},label),h('dd',{key:label},value)])),h('p',{className:'lm-workspaceHint'},copy.nickname),h('button',{type:'button',className:'lm-btn lm-managementAgents',onClick:onOpenAgents},copy.agents),h('details',{className:'lm-diagnosticHelp'},h('summary',null,copy.diagnostics),h('p',null,copy.diagnosticHint)));
 }
     /* @ux-shell:workspace-components:end */
+    /* @ux-shell:workspace-nav-model:start */
+function filterJoinedProjects(input,query='') {
+ const needle=String(query??'').trim().toLocaleLowerCase(),seen=new Set();
+ return (Array.isArray(input)?input:[]).filter(room=>room&&typeof room.id==='string'&&room.id&&room.deleted!==true&&room.lifecycle?.status!=='archived').filter(room=>{if(seen.has(room.id))return false;seen.add(room.id);return true;}).filter(room=>!needle||[room.name,room.topic,room.id].some(value=>typeof value==='string'&&value.toLocaleLowerCase().includes(needle)));
+}
+function workspaceNavigationTarget(value,rooms=[]) {
+ if(typeof value!=='string')return null;
+ if(value.startsWith('view:')){const view=value.slice(5);return ['network','inbox','board','manage','rooms','agents'].includes(view)?{view,roomId:''}:null;}
+ if(value.startsWith('room:')){const id=value.slice(5);return (Array.isArray(rooms)?rooms:[]).some(room=>room?.id===id&&room.deleted!==true)?{view:'rooms',roomId:id}:null;}
+ return null;
+}
+    /* @ux-shell:workspace-nav-model:end */
+    /* @ux-shell:workspace-nav:start */
+/** Native sidebar geometry stays with DSH. This toolbar keeps routes reachable. */
+function WorkbenchNavigation({h,rooms=[],archivedRooms=[],view,roomId,onExit,onToggle,onNavigate,notice='',resolveTarget,labels={}}) {
+ const copy={back:'返回对话',backHint:'回到 DSH 原生对话',toggle:'展开或收起导航',nav:'导航',switch:'切换工作区或项目',workspaces:'工作区',projects:'我的项目',archived:'已归档',network:'网络总览',inbox:'收件箱',board:'任务看板',manage:'管理与诊断',rooms:'项目列表',agents:'会话管理',...labels};
+ const mine=(Array.isArray(rooms)?rooms:[]).filter(r=>r&&typeof r.id==='string'),past=(Array.isArray(archivedRooms)?archivedRooms:[]).filter(r=>r&&typeof r.id==='string'),allowed=[...mine,...past];
+ const current=roomId&&allowed.some(r=>r.id===roomId)?'room:'+roomId:'view:'+(['network','inbox','board','manage','rooms','agents'].includes(view)?view:'inbox');
+ return h('div',{className:'lm-workbenchNavigationWrap'},h('nav',{className:'lm-workbenchNavigation','aria-label':copy.switch},
+   h('button',{type:'button',className:'lm-navBtn lm-workbenchReturn lm-mainReturn','aria-label':copy.back,title:copy.backHint,onClick:onExit},h('span',{'aria-hidden':true},'←'),h('span',null,copy.back)),
+   h('button',{type:'button',className:'lm-navBtn lm-sidebarToggle','aria-label':copy.toggle,title:copy.toggle,onClick:onToggle},h('span',{'aria-hidden':true},'☰'),h('span',{className:'lm-sidebarToggleLabel'},copy.nav)),
+   h('select',{className:'lm-workspaceSwitch',value:current,'aria-label':copy.switch,onChange:event=>{const target=resolveTarget?.(event.target.value,allowed);if(target)onNavigate(target);}},
+     h('optgroup',{label:copy.workspaces},...['network','inbox','board','manage','rooms','agents'].map(id=>h('option',{key:id,value:'view:'+id},copy[id]))),
+     mine.length?h('optgroup',{label:copy.projects},...mine.map(room=>h('option',{key:room.id,value:'room:'+room.id},`${room.name||room.id} · ${room.id}`))):null,
+     past.length?h('optgroup',{label:copy.archived},...past.map(room=>h('option',{key:room.id,value:'room:'+room.id},`${room.name||room.id} · ${room.id}`))):null)),
+   notice?h('p',{className:'lm-navigationNotice',role:'status'},notice):null);
+}
+    /* @ux-shell:workspace-nav:end */
     const STYLE_ID = 'dsh-lan-mesh-styles';
     /** The session id the backend reserves for "me, the human". */
     const HUMAN_SESSION_ID = 'human';
@@ -700,7 +730,13 @@ function ManagementWorkspace({h,self,uiVersion,hostVersion,onOpenAgents,labels={
 .lm-shellStale{flex:none;margin:0 20px 12px;padding:12px 14px;border:1px solid var(--dsw-alias-state-warn);border-radius:8px;font-size:12px}.lm-shellStale p{margin:5px 0;overflow-wrap:anywhere}.lm-shellStale .lm-shellRetry{margin-top:6px}
 .lm-archivedToggle{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;text-align:left;padding:7px 9px;min-height:30px;border-radius:6px;cursor:pointer}.lm-archivedToggle:hover{background:var(--dsw-alias-bg-layer-2)}
 @media(max-width:900px){.lm-workspacePage{padding:18px}.lm-deviceRow{align-items:flex-start;flex-direction:column;gap:12px}.lm-deviceFacts{width:100%;min-width:0}.lm-managementFacts{grid-template-columns:100px minmax(0,1fr);padding:16px;gap:12px}.lm-shellStale{margin:0 12px 10px}}
+
+.lm-workspacePageHead>.lm-btn{flex:none;white-space:nowrap}
     /* @ux-shell:workspace-styles:end */
+/* @ux-shell:workspace-nav-styles:start */
+.lm-workbenchNavigationWrap{flex:none;min-width:0}.lm-workbenchNavigation{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 12px;min-height:44px;border-bottom:1px solid var(--dsw-alias-border-l1)}.lm-workbenchNavigation>.lm-mainReturn{position:static;margin:0;white-space:nowrap;align-self:auto}.lm-sidebarToggle{font-size:12px;min-height:32px;gap:6px}.lm-workspaceSwitch{min-width:140px;max-width:340px;flex:1;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;padding:6px 8px;min-height:32px;overflow:hidden;text-overflow:ellipsis}.lm-workspaceSwitch:focus-visible,.lm-sidebarToggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.lm-navigationNotice{font-size:12px;color:var(--dsw-alias-label-secondary);margin:6px 20px;overflow-wrap:anywhere}.lm-projectSearch{font-size:12px;min-height:32px;box-sizing:border-box;flex:none;margin:2px 0 6px}.lm-rail .lm-projectSearch{width:100%}
+@media(max-width:600px){.lm-workbenchNavigation{padding:5px 8px;gap:5px}.lm-sidebarToggleLabel{display:none}.lm-workspaceSwitch{min-width:120px}.lm-sidebarToggle{padding:6px 8px}}
+    /* @ux-shell:workspace-nav-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
@@ -3979,6 +4015,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const agents = Array.isArray(props.agents) ? props.agents : [];
       const joinable = Array.isArray(props.joinable) ? props.joinable : [];
       const [showArchived,setShowArchived] = React.useState(false);
+      const [projectQuery,setProjectQuery]=React.useState('');
+      const visibleRooms=filterJoinedProjects(rooms,projectQuery);
       const [showDiscover,setShowDiscover]=React.useState(false);
       const [discoverQuery,setDiscoverQuery]=React.useState('');
       const discoverRef=React.useRef(null),discoverTriggerRef=React.useRef(null),discoverCycle=React.useRef(0);
@@ -4157,12 +4195,13 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           showArchived ? (props.archivedRooms??[]).map(room=>h('div',{key:room.id},
             h('button',{type:'button',className:'lm-archivedRoom',onClick:()=>props.onSelect(room.id)},room.name),
             room.isLeader ? h('button',{type:'button',className:'lm-restoreRoom',disabled:!!props.preferenceBusy,onClick:()=>props.onLifecycle?.(room,'active')},'恢复房间') : null)) : null,
-          rooms.length === 0
-            ? h('div', { className: 'lm-muted lm-railEmpty' }, COPY.noMineRooms)
+          h('input',{className:'lm-input lm-projectSearch',type:'search',maxLength:200,value:projectQuery,'aria-label':COPY.projectSearch,placeholder:COPY.projectSearch,onChange:event=>setProjectQuery(event.target.value)}),
+          visibleRooms.length === 0
+            ? h('div', { className: 'lm-muted lm-railEmpty' }, projectQuery?COPY.projectSearchEmpty:COPY.noMineRooms)
             : h(
                 'div',
                 { className: 'lm-railList' },
-                ...rooms.map((room) =>
+                ...visibleRooms.map((room) =>
                   h('div', {key:room.id,className:'lm-projectEntry'}, h(
                     'button',
                     {
@@ -5100,6 +5139,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       // ones the person opened. It lives here so its hook position is stable
       // no matter which nav view is showing.
       const [expandedMessages, setExpandedMessages] = React.useState({});
+      const [navigationNotice,setNavigationNotice]=React.useState('');
 
       const call = React.useCallback(async (endpoint, payload) => panelCall(endpoint, payload), []);
 
@@ -5347,7 +5387,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         h(
           'div',
           { className: 'lm-main' },
-          h(WorkbenchReturnButton,{h,main:true,label:COPY.returnNative,hint:COPY.exitHint,onExit:()=>props?.leavePanel?.(nav.lastSessionId)}),
+          h(WorkbenchNavigation,{h,resolveTarget:workspaceNavigationTarget,rooms,archivedRooms:data?.rooms?.archived??[],view,roomId:selectedRoom,labels:COPY.navigationLabels,notice:navigationNotice,onExit:()=>props?.leavePanel?.(nav.lastSessionId),onToggle:()=>{setNavigationNotice(props?.toggleSidebar?.()===true?'':COPY.sidebarUnavailable);},onNavigate:target=>patchMeshNav(target)}),
           state.status==='error'&&state.data!==null ? h(WorkspaceReadState,{h,model:shellReadState(state),onRetry:refreshAll,labels:COPY.surfaceLabels}):null,
           state.data===null ? h(WorkspaceReadState,{h,model:shellReadState(state),onRetry:refreshAll,labels:COPY.surfaceLabels}) : selected !== undefined
             ? h(RoomPane, {
@@ -5564,6 +5604,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             if (typeof sessionId === 'string' && sessionId !== '') openSession(sessionId);
             navigation.leaveLanMesh();
           };
+          const toggleSidebar=()=>{try{const layout=serviceOf('layout');if(typeof layout?.toggleSidebar!=='function')return false;layout.toggleSidebar();return true;}catch(error){console.error('[dsh-lan-mesh] cannot toggle sidebar',error);return false;}};
           const enterLanMesh = () => {
             navigation.enterLanMesh();
             try {
@@ -5622,7 +5663,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           register('the fixed main panel', () =>
             ctx.slots.inject('main', () =>
               ctx.slots.register({ name: 'main', key: LANMESH_PANEL_ID, priority: -100 },
-                () => h(MeshPanel, { openSession, leavePanel })),
+                () => h(MeshPanel, { openSession, leavePanel, toggleSidebar })),
             ),
           );
 

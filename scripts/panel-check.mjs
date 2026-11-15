@@ -571,9 +571,10 @@ const loaded = window.__loaded;
 
 const opened = [];
 const selectPanelCalls = [];
+let sidebarToggleCount=0;
 const registrations = [];
 const navigation = {
-  layout: { selectPanel: (id) => selectPanelCalls.push(id) },
+  layout: { selectPanel: (id) => selectPanelCalls.push(id),toggleSidebar:()=>{sidebarToggleCount++;} },
   uiWorkspace: { openSession: (id) => opened.push(id) },
   // The host's session catalog: openSession() consults it and refuses ids the
   // host does not carry (a remote or archived session would fail silently).
@@ -813,6 +814,12 @@ const checks = [
   ['the pending notification can be dismissed', count('lm-notifyDismiss') === 1],
 ];
 
+lastNodes.find(n=>hasClass(n,'lm-projectSearch')).props.onChange({target:{value:'Alpha'}});await settleRail();
+checks.push(['joined project search filters without changing room identity',count('lm-roomRow')===1&&lastText.includes('Alpha room')]);
+lastNodes.find(n=>hasClass(n,'lm-projectSearch')).props.onChange({target:{value:'missing project'}});await settleRail();
+checks.push(['joined search distinguishes no match from no membership',count('lm-roomRow')===0&&lastText.includes('没有匹配')]);
+lastNodes.find(n=>hasClass(n,'lm-projectSearch')).props.onChange({target:{value:''}});await settleRail();
+checks.push(['clearing project search restores original joined rows',count('lm-roomRow')===2]);
 // Drive the rail's actual timer. Slow calls cannot queue another poll, and a
 // subsequent local catalogue change must replace the running indicator.
 const railTimer = [...intervals.values()].find(timer => timer.ms === 4000);
@@ -1702,7 +1709,7 @@ checks.push(['main return releases plugin main slot and restores native chrome',
 await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Component);
 checks.push(['network workspace uses current snapshot identity and discovered devices',count('lm-networkWorkspace')===1&&count('lm-deviceRow')>=1&&lastText.includes('node-a')&&!lastText.includes('允许派发：是')]);
 await switchTo(RailHost);await clickRail('lm-nav-manage');await switchTo(Component);
-checks.push(['management exposes actual UI version and existing session-management route',count('lm-managementWorkspace')===1&&lastText.includes('0.4.9')&&count('lm-managementAgents')===1]);
+checks.push(['management exposes actual UI version and existing session-management route',count('lm-managementWorkspace')===1&&lastText.includes(JSON.parse(readFileSync(join(here,'..','package.json'),'utf8')).version)&&count('lm-managementAgents')===1]);
 await click('lm-managementAgents');checks.push(['management opens the existing agent catalogue',count('lm-agentImport')>0||lastText.includes('stored-one')]);
 await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Component);
 const mainPoll=[...intervals.values()].filter(timer=>timer.ms===4000).at(-1);
@@ -1721,6 +1728,14 @@ checks.push(['pending initial read resolves into the selected workspace',count('
 let releaseOldSnapshot;snapshotGate=new Promise(resolve=>releaseOldSnapshot=resolve);snapshotOverride=structuredClone(answers.snapshot);snapshotOverride.self.name='OLD SNAPSHOT';snapshotOverride.self.selfName='OLD SNAPSHOT';await switchTo(Component);
 snapshotGate=null;snapshotOverride=undefined;await switchTo(Component);releaseOldSnapshot();await settle();
 checks.push(['snapshot from an unmounted workspace cannot overwrite the new view',count('lm-networkWorkspace')===1&&!lastText.includes('OLD SNAPSHOT')]);
+const togglesBefore=sidebarToggleCount;await click('lm-sidebarToggle');
+checks.push(['workbench sidebar control invokes the public host toggle',sidebarToggleCount===togglesBefore+1]);
+const sidebarAction=navigation.layout.toggleSidebar;delete navigation.layout.toggleSidebar;await click('lm-sidebarToggle');
+checks.push(['missing sidebar API leaves workspace switcher and native return usable',count('lm-navigationNotice')===1&&count('lm-workspaceSwitch')===1&&count('lm-mainReturn')===1]);navigation.layout.toggleSidebar=sidebarAction;
+lastNodes.find(n=>hasClass(n,'lm-workspaceSwitch')).props.onChange({target:{value:'room:room-1'}});await settle();
+checks.push(['compact navigation opens the exact listed room',count('lm-roomPane')===1&&lastText.includes('hello from beta')]);
+const detailsBeforeForeign=requested.filter(r=>r.endpoint==='roomDetail').length;lastNodes.find(n=>hasClass(n,'lm-workspaceSwitch')).props.onChange({target:{value:'room:foreign'}});await settle();
+checks.push(['compact selector rejects an unlisted room identity',requested.filter(r=>r.endpoint==='roomDetail').length===detailsBeforeForeign]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

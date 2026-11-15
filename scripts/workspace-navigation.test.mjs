@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { filterJoinedProjects,workspaceNavigationTarget } from '../ui/models/workspace-navigation.mjs';
+import { WorkbenchNavigation } from '../ui/shell/workbench-navigation.mjs';
+const h=(type,props,...children)=>({type,props:props??{},children:children.flat()});
+const nodes=n=>n&&typeof n==='object'?[n,...(n.children??[]).flatMap(nodes)]:[];
+const rooms=[{id:'room-a',name:'同名项目',topic:'Windows'},{id:'room-b',name:'同名项目',topic:'Linux'},{id:'room-c',name:'Other'}];
+test('joined search preserves exact identities, ordering, and source objects',()=>{assert.equal(filterJoinedProjects(rooms,'Linux')[0],rooms[1]);assert.deepEqual(filterJoinedProjects(rooms,'同名').map(r=>r.id),['room-a','room-b']);assert.deepEqual(filterJoinedProjects(rooms,'room-c').map(r=>r.id),['room-c']);assert.equal(filterJoinedProjects(null).length,0);});
+test('quick navigation accepts only published views and authorized listed room IDs',()=>{assert.deepEqual(workspaceNavigationTarget('view:network',rooms),{view:'network',roomId:''});assert.deepEqual(workspaceNavigationTarget('room:room-b',rooms),{view:'rooms',roomId:'room-b'});assert.equal(workspaceNavigationTarget('room:foreign',rooms),null);assert.equal(workspaceNavigationTarget('view:teamPlan',rooms),null);});
+test('navigation keeps native exit, host sidebar toggle and exact project selection independent',()=>{const events=[];const tree=WorkbenchNavigation({h,resolveTarget:workspaceNavigationTarget,rooms,archivedRooms:[],view:'network',roomId:'',onExit:()=>events.push('exit'),onToggle:()=>events.push('sidebar'),onNavigate:t=>events.push(t),labels:{}});const all=nodes(tree);all.find(n=>n.props.className==='lm-navBtn lm-sidebarToggle').props.onClick();all.find(n=>n.type==='select').props.onChange({target:{value:'room:room-b'}});assert.deepEqual(events,['sidebar',{view:'rooms',roomId:'room-b'}]);assert.ok(all.some(n=>n.props.className?.includes('lm-mainReturn')));all.find(n=>n.type==='select').props.onChange({target:{value:'room:foreign'}});assert.equal(events.length,2);});
