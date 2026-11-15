@@ -60,6 +60,8 @@ test('service exact mentions control wake, inbox attention, unread and persisten
   const r = createRoom(state,{name:'References',leader:{nodeId:'node-a',sessionId:'session-a',name:'Same'}},()=> 'aaaaaaaaaaaa-1111-2222-3333-444444444444');
   for(const suffix of ['b','c']) joinRoom(state,r.id,{nodeId:`node-${suffix}`,sessionId:`session-${suffix}`,name:'Same'});
   for(const suffix of ['a','b','c']) {
+    // Each simulated physical node needs its own durable store.
+    process.env.DSH_HOME=join(home,suffix);
     const woke=[];
     const node=new MeshNode({config:{port:0,autoWake:true,clusterSecret:''},agents:{get:id=>({session:{id,title:'Same'},followup:()=>woke.push(id)}),list:()=>[]}});
     node.started=true;node.identity={nodeId:`node-${suffix}`,name:`Node ${suffix}`};node.roomsDoc=structuredClone(state);

@@ -123,3 +123,17 @@ test('long room history filters by exact room before displaying retained records
   for(let index=0;index<60;index++)await node.receive(message('mixed-'+index,'remote-node','human',{kind:'room-message',room:index%2?first.room.id:second.room.id}));
   const detail=node.roomDetail({room:first.room.id,sessionId:'human'});assert.equal(detail.messages.length,30);assert.ok(detail.messages.every(row=>row.room===first.room.id));assert.equal(detail.messages[0].id,'mixed-1');
 });
+
+test('read and shutdown checkpoints never truncate durable history beyond the memory window',async t=>{
+ const {open}=await fixture(t);
+ for(let i=0;i<620;i++)await appendInbox({envelope:message('archive-'+i,'remote-node','human',{kind:'room-message',room:'room-retained'}),receivedAt:new Date(1700000000000+i).toISOString(),read:false},{port:0});
+ let node=await open();assert.equal(node.messages.length,500);await node.markAllRead();await node.close();
+ let records=await readInbox({port:0,limit:1000});assert.equal(records.length,620);assert.equal(records[0].envelope.id,'archive-0');assert.equal(records.at(-1).read,true);
+ node=await open();await node.close();records=await readInbox({port:0,limit:1000});assert.equal(records.length,620);assert.equal(records[0].envelope.text,'archive-0');
+});
+test('preserving checkpoint keeps concurrent appends and distinguishes same ids from different origins',async t=>{
+ await fixture(t);const a={envelope:message('same','a'),read:false},b={envelope:message('same','b'),read:false};
+ await appendInbox(a,{port:1});await appendInbox(b,{port:1});
+ await Promise.all([rewriteInbox([{...a,read:true}],{port:1,preserveUnlisted:true}),appendInbox({envelope:message('new','c'),read:false},{port:1})]);
+ const rows=await readInbox({port:1,limit:1000});assert.equal(rows.length,3);assert.equal(rows[0].read,true);assert.equal(rows[1].envelope.from.nodeId,'b');assert.equal(rows[2].envelope.id,'new');
+});

@@ -1,6 +1,6 @@
 {
   "name": "dsh-lan-mesh",
-  "version": "0.4.15",
+  "version": "0.4.16",
   "type": "module",
   "scripts": {
     "check:composer-compat": "node scripts/composer-compat-check.mjs",
