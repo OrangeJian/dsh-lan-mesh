@@ -1,0 +1,72 @@
+{
+  "branch": "codex/room-collaboration",
+  "head": "dfd801355dc73cec09eaa2c97755487cd2beff35",
+  "staged": "",
+  "files": [
+    {
+      "status": " M",
+      "path": "client.js",
+      "sha256": "239ae2b64ea8fa35a1ae8e7d4a9be2895951a89541abe2d19133d7ddf1c36c31"
+    },
+    {
+      "status": " M",
+      "path": "index.js",
+      "sha256": "dc3fc027a11a40775752ccc2a3e9252af213e14021963ed81bfa984bdb3c5310"
+    },
+    {
+      "status": " M",
+      "path": "lib/room-context-protocol.mjs",
+      "sha256": "8e4ab8586fc322beb2753e04b4d9024b336e065ca6ef979ed5fc9880fed17171"
+    },
+    {
+      "status": " M",
+      "path": "lib/room-context.mjs",
+      "sha256": "9a1f8d78a4ddc22a9e7e9ada6dbc73af9e48e67662d4924cede5208bfcac26cb"
+    },
+    {
+      "status": " M",
+      "path": "lib/service.mjs",
+      "sha256": "97112a591fc5bdfe2a13b5fcfe59b02ff693eaa259c82c6f196993b3611d6e0b"
+    },
+    {
+      "status": " M",
+      "path": "lib/team-coordinator.mjs",
+      "sha256": "ffefb103a0392f05c9dc4899c6161c3c1f078436798866f4e0f261b7432271e9"
+    },
+    {
+      "status": " M",
+      "path": "lib/team-store.mjs",
+      "sha256": "9dd07f42a178e9da623fe5991cf84ba5e69cf3d0742b6f55dc43add958b3cc7a"
+    },
+    {
+      "status": " M",
+      "path": "lib/team-tools.mjs",
+      "sha256": "24abded9e7fbe5d026d7736d64d54198ac9e946a720e4324835c69c58dc1d6b3"
+    },
+    {
+      "status": "??",
+      "path": "docs/superpowers/plans/2026-11-15-task-result-context.md",
+      "sha256": "c0fd7dd68ce7fd4be38e4ed21c00cf54fc45c2a97f99030cc3f930cfc5a05f23"
+    },
+    {
+      "status": "??",
+      "path": "lib/task-result-context.mjs",
+      "sha256": "2260bf03157d1a84e7b4135375ac46c5ffb1f686a5061429a6cf8459955d0a69"
+    },
+    {
+      "status": "??",
+      "path": "lib/team-plan.mjs",
+      "sha256": "b7ae6722865dce91a1da4553ddce676b335debbd4f38577c653ed4f41e767f17"
+    },
+    {
+      "status": "??",
+      "path": "scripts/task-result-context.test.mjs",
+      "sha256": "0f1e58dd91ca3ee3807edf868a866f2af60bb9e118e395bdd7eb20a2e6507f21"
+    },
+    {
+      "status": "??",
+      "path": "scripts/team-plan.test.mjs",
+      "sha256": "bab403112e841b4bdfb98dff19ec8877addc943f677bb519d6976b45030ed9e4"
+    }
+  ]
+}

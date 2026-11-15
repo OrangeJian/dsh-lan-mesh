@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.4';
+    const PLUGIN_VERSION = '0.4.6';
     const React = require('react');
     const h = React.createElement;
 
@@ -215,6 +215,8 @@ window.__ModuleLoader__.load({
           // takeover sidebar (v0.3.0)
           conversation: '对话',
           exitHint: '回到原生对话',
+          returnNative: '返回对话',
+          versionLabels: {versions:'身份与版本',ui:'界面',host:'服务端',unknown:'版本未知',node:'节点',mismatch:'版本不一致，请重新加载插件和界面'},
           projects: '项目',
           joinableShort: '可加入',
           noAgentsRail: '还没有 Agent',
@@ -449,6 +451,8 @@ window.__ModuleLoader__.load({
           // takeover sidebar (v0.3.0)
           conversation: 'Chat',
           exitHint: 'Back to the conversation',
+          returnNative: 'Back to conversation',
+          versionLabels: {versions:'Identity and versions',ui:'UI',host:'Host',unknown:'Unknown version',node:'Node',mismatch:'Version mismatch; reload the plugin and UI'},
           projects: 'Projects',
           joinableShort: 'Joinable',
           noAgentsRail: 'No agent yet',
@@ -545,10 +549,53 @@ window.__ModuleLoader__.load({
       done: 'lm-status lm-statusDone',
     };
 
+    /* @ux-shell:model:start */
+/** Pure projection: identity and version are not evidence of connection health. */
+function workbenchIdentityView(self, uiVersion, hostVersion) {
+  const value=x=>typeof x==='string'?x.trim():'';
+  const ui=value(uiVersion),host=value(hostVersion);
+  return { nodeId:value(self?.nodeId), name:value(self?.selfName)||value(self?.name), uiVersion:ui, hostVersion:host||null, versionMismatch:!!ui&&!!host&&ui!==host, connectionHealth:'unknown' };
+}
+    /* @ux-shell:model:end */
+    /* @ux-shell:components:start */
+/** Presentational only. The caller owns DSH navigation and all side effects. */
+function WorkbenchReturnButton({h,onExit,label,hint,main=false}) {
+  return h('button',{type:'button',className:main?'lm-navBtn lm-workbenchReturn lm-mainReturn':'lm-navBtn lm-conversation lm-workbenchReturn','aria-label':label,title:hint,onClick:onExit},
+    h('span',{'aria-hidden':true,className:'lm-returnGlyph'},'←'),h('span',{className:'lm-returnLabel'},label));
+}
+function WorkbenchHeader({h,model,title,subtitle,backLabel,backHint,onExit,labels={}}) {
+  const copy={versions:'身份与版本',ui:'界面',host:'服务端',unknown:'版本未知',node:'节点',mismatch:'版本不一致，请重新加载插件和界面',...labels};
+  return h('header',{className:'lm-workbenchHeader'},
+    WorkbenchReturnButton({h,onExit,label:backLabel,hint:backHint}),
+    h('div',{className:'lm-brand'},h('strong',{className:'lm-brandTitle'},title),h('span',{className:'lm-brandSubtitle'},subtitle)),
+    h('details',{className:'lm-versionDetails'},h('summary',null,copy.versions),
+      h('div',{className:'lm-versionContent'},h('span',null,`${copy.ui} v${model.uiVersion}`),h('span',null,`${copy.host} ${model.hostVersion?`v${model.hostVersion}`:copy.unknown}`),
+        model.nodeId?h('span',{className:'lm-nodeIdentity',title:model.nodeId},`${copy.node} · ${model.nodeId}`):null)),
+    model.versionMismatch?h('div',{className:'lm-versionMismatch',role:'status'},copy.mismatch):null);
+}
+    /* @ux-shell:components:end */
+
     const STYLE_ID = 'dsh-lan-mesh-styles';
     /** The session id the backend reserves for "me, the human". */
     const HUMAN_SESSION_ID = 'human';
     const CSS = `
+/* @ux-shell:styles:start */
+.lm-workbenchHeader{position:sticky;top:-12px;z-index:2;background:var(--dsw-alias-bg-base);padding:8px 0 12px;border-bottom:1px solid var(--dsw-alias-border-l1);flex:none}
+.lm-workbenchHeader .lm-workbenchReturn{width:100%;justify-content:flex-start;gap:8px;padding:8px 10px;margin-bottom:12px;min-height:34px;background:transparent}
+.lm-returnGlyph{font-size:16px;line-height:1;flex:none}
+.lm-workbenchHeader .lm-brand{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:0 8px 8px;min-width:0}
+.lm-workbenchHeader .lm-brandTitle{font-size:20px;line-height:1.4;font-weight:600;white-space:nowrap}
+.lm-brandSubtitle{font-size:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.lm-versionDetails{font-size:11px;color:var(--dsw-alias-label-secondary);padding:0 8px}
+.lm-versionDetails summary{cursor:pointer;min-height:28px;display:list-item;list-style-position:inside;padding:4px 0}
+.lm-versionContent{display:flex;flex-direction:column;gap:5px;padding:4px 0 8px}
+.lm-nodeIdentity{overflow-wrap:anywhere;user-select:text}
+.lm-versionMismatch{margin:6px 6px 0;padding:8px;font-size:12px;color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-state-warn);border-radius:6px}
+.lm-mainReturn{align-self:flex-start;flex:none;margin:6px 12px;min-height:32px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.lm-workbenchReturn:focus-visible,.lm-versionDetails summary:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+@media(max-width:1100px){.lm-mainReturn{position:sticky;top:0;z-index:3;background:var(--dsw-alias-bg-base);margin:4px 8px;min-height:32px}.lm-mainReturn .lm-returnLabel{display:inline}}
+@media(prefers-reduced-motion:reduce){.lm-workbenchReturn{transition:none}}
+    /* @ux-shell:styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
@@ -3865,21 +3912,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       return h(
         'div',
         { className: 'lm-rail' },
-        h(
-          'div',
-          { className: 'lm-brand' },
-          h('span', { className: 'lm-brandTitle' }, COPY.title),
-          h('span', { className: 'lm-brandMeta' }, `界面 v${PLUGIN_VERSION} · 服务端 ${props.pluginVersion ? `v${props.pluginVersion}` : '版本未知'}`),
-          props.pluginVersion && props.pluginVersion !== PLUGIN_VERSION
-            ? h('span', { className: 'lm-brandMeta', role: 'status' }, '版本不一致，请重新加载插件和界面') : null,
-          props.self === undefined ? null : h('span', { className: 'lm-brandMeta' }, props.self.nodeId),
-        ),
-
-        h(
-          'button',
-          { type: 'button', className: 'lm-navBtn lm-conversation', title: COPY.exitHint, onClick: props.onExit },
-          h('span', null, `‹ ${COPY.conversation}`),
-        ),
+        h(WorkbenchHeader,{h,model:workbenchIdentityView(props.self,PLUGIN_VERSION,props.pluginVersion),title:'LAN Mesh',subtitle:COPY.title,backLabel:COPY.returnNative,backHint:COPY.exitHint,onExit:props.onExit,labels:COPY.versionLabels}),
 
         props.railNotice === ''
           ? null
@@ -5215,6 +5248,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         h(
           'div',
           { className: 'lm-main' },
+          h(WorkbenchReturnButton,{h,main:true,label:COPY.returnNative,hint:COPY.exitHint,onExit:()=>props?.leavePanel?.(nav.lastSessionId)}),
           selected !== undefined
             ? h(RoomPane, {
                 key: selected.id,
@@ -5489,7 +5523,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           register('the fixed main panel', () =>
             ctx.slots.inject('main', () =>
               ctx.slots.register({ name: 'main', key: LANMESH_PANEL_ID, priority: -100 },
-                () => h(MeshPanel, { openSession })),
+                () => h(MeshPanel, { openSession, leavePanel })),
             ),
           );
 

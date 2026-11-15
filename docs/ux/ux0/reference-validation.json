@@ -1,0 +1,43 @@
+{
+  "orcaSha": "8728a3260052cb71b4d005dde2dbc7657a21a682",
+  "orcaFiles": [
+    {
+      "path": "src/renderer/src/components/AgentStateDot.tsx",
+      "expected": "187b7492b03f48baecf51718fe1e39fc6e0de27b",
+      "actual": "187b7492b03f48baecf51718fe1e39fc6e0de27b",
+      "pass": true
+    },
+    {
+      "path": "src/renderer/src/components/AgentWorkingSpinner.tsx",
+      "expected": "56ce94ad0e5374d95c08243070049b74d8c608ea",
+      "actual": "56ce94ad0e5374d95c08243070049b74d8c608ea",
+      "pass": true
+    },
+    {
+      "path": "src/renderer/src/app-shell/AppWorkspaceShell.tsx",
+      "expected": "01e32732df2236c98eedb2d75c79deb033d20a07",
+      "actual": "01e32732df2236c98eedb2d75c79deb033d20a07",
+      "pass": true
+    },
+    {
+      "path": "src/renderer/src/components/task-page/TaskPage.tsx",
+      "expected": "8f37666a72d718708eb93919848815bd7d7dbc3b",
+      "actual": "8f37666a72d718708eb93919848815bd7d7dbc3b",
+      "pass": true
+    },
+    {
+      "path": "src/renderer/src/components/task-page/Frame.tsx",
+      "expected": "d9e0dc7f7786b0f2c5602ba6a8fb41110ffda010",
+      "actual": "d9e0dc7f7786b0f2c5602ba6a8fb41110ffda010",
+      "pass": true
+    },
+    {
+      "path": "src/renderer/src/components/task-page/ListChrome.tsx",
+      "expected": "5dd58fd13734583c9980bcaf1fcd3b40efeb3ae7",
+      "actual": "5dd58fd13734583c9980bcaf1fcd3b40efeb3ae7",
+      "pass": true
+    }
+  ],
+  "dshMeshSha": "8e105334218613930e4b1473e6d23c7d1ba08616",
+  "dshUiVersion": "0.0.87"
+}

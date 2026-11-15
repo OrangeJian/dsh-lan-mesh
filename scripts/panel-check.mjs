@@ -778,6 +778,8 @@ const checks = [
   ['never asks the host for its sessions', !asked.includes('sessions')],
   ['the rail renders in the native sidebar', count('lm-rail') === 1],
   ['the rail offers a way back to the conversation', count('lm-conversation') === 1 && lastText.includes('对话')],
+  ['return to native conversation has an explicit accessible name', lastNodes.some(n=>hasClass(n,'lm-conversation')&&n.props['aria-label']==='返回对话')],
+  ['workbench brand separates versions into expandable identity details',count('lm-workbenchHeader')===1&&count('lm-versionDetails')===1],
   ['the rail shows the configured identity', lastText.includes('建哥') && lastText.includes('node-a')],
   [
     'the rail shows inbox and the task board',
@@ -1675,6 +1677,11 @@ lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDe
 checks.push(['reselecting a document is deduplicated even at the reference limit',count('lm-contextDocument')===8]);
 docMentionRows=[mentionDocument];
 
+await switchTo(Component);
+checks.push(['main content keeps a native return entry when sidebar is unavailable',count('lm-mainReturn')===1&&lastNodes.find(n=>hasClass(n,'lm-mainReturn')).props['aria-label']==='返回对话']);
+const beforeMainReturn=selectPanelCalls.length;
+await click('lm-mainReturn');
+checks.push(['main return releases plugin main slot and restores native chrome',selectPanelCalls.length>beforeMainReturn&&selectPanelCalls.slice(beforeMainReturn).every(id=>id===null)&&document.documentElement.dataset.lanMeshMode===undefined]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

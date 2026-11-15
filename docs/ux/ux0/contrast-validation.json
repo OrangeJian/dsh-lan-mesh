@@ -1,0 +1,89 @@
+{
+  "scope": "Only listed prototype text pairs; not a full accessibility audit",
+  "pairs": [
+    {
+      "name": "正文",
+      "fg": "#20242c",
+      "bg": "#ffffff",
+      "ratio": 15.55,
+      "pass": true
+    },
+    {
+      "name": "次要正文",
+      "fg": "#616b79",
+      "bg": "#f6f7f9",
+      "ratio": 5.04,
+      "pass": true
+    },
+    {
+      "name": "选中",
+      "fg": "#315ecc",
+      "bg": "#edf2ff",
+      "ratio": 5.2,
+      "pass": true
+    },
+    {
+      "name": "正常",
+      "fg": "#247451",
+      "bg": "#eaf5ef",
+      "ratio": 5.09,
+      "pass": true
+    },
+    {
+      "name": "警告",
+      "fg": "#8a5b12",
+      "bg": "#fff4de",
+      "ratio": 5.37,
+      "pass": true
+    },
+    {
+      "name": "错误",
+      "fg": "#ae3546",
+      "bg": "#fff0f2",
+      "ratio": 5.59,
+      "pass": true
+    },
+    {
+      "name": "深色正文",
+      "fg": "#e7eaf0",
+      "bg": "#191c22",
+      "ratio": 14.16,
+      "pass": true
+    },
+    {
+      "name": "深色次要正文",
+      "fg": "#a0aaba",
+      "bg": "#14171c",
+      "ratio": 7.66,
+      "pass": true
+    },
+    {
+      "name": "深色选中",
+      "fg": "#a3bbff",
+      "bg": "#252f48",
+      "ratio": 7.04,
+      "pass": true
+    },
+    {
+      "name": "深色正常",
+      "fg": "#96d5b0",
+      "bg": "#20352c",
+      "ratio": 7.74,
+      "pass": true
+    },
+    {
+      "name": "深色警告",
+      "fg": "#ecc88a",
+      "bg": "#382f21",
+      "ratio": 8.26,
+      "pass": true
+    },
+    {
+      "name": "深色错误",
+      "fg": "#f3a7b3",
+      "bg": "#38252b",
+      "ratio": 7.49,
+      "pass": true
+    }
+  ]
+}

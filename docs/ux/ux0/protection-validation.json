@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "path": "client.js",
+      "unchanged": true
+    },
+    {
+      "path": "index.js",
+      "unchanged": true
+    },
+    {
+      "path": "lib/room-context-protocol.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "lib/room-context.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "lib/service.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "lib/team-coordinator.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "lib/team-store.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "lib/team-tools.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/superpowers/plans/2026-11-15-task-result-context.md",
+      "unchanged": true
+    },
+    {
+      "path": "lib/task-result-context.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "lib/team-plan.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/task-result-context.test.mjs",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/team-plan.test.mjs",
+      "unchanged": true
+    }
+  ],
+  "headUnchanged": true,
+  "indexUnchanged": true
+}

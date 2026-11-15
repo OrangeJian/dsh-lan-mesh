@@ -1,0 +1,341 @@
+{
+  "screenshots": [
+    {
+      "name": "network-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "composerBottom": 858.953125,
+      "windowHeight": 900
+    },
+    {
+      "name": "inbox-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 26,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-dark-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "composerBottom": 858.953125,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1024-light-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1024,
+      "rows": 0,
+      "windowHeight": 768
+    },
+    {
+      "name": "room-1024-light-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1024,
+      "rows": 0,
+      "composerBottom": 726.953125,
+      "windowHeight": 768
+    },
+    {
+      "name": "inbox-1024-light-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1024,
+      "rows": 26,
+      "windowHeight": 768
+    },
+    {
+      "name": "room-390-light-default",
+      "width": 390,
+      "height": 844,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 390,
+      "rows": 0,
+      "composerBottom": 808.953125,
+      "windowHeight": 844
+    },
+    {
+      "name": "network-1440-light-empty",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-loading",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-failed",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-offline",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-stale",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-denied",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-light-empty",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "composerBottom": 858.953125,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-light-loading",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-light-failed",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-light-offline",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "composerBottom": 858.953125,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-light-stale",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "composerBottom": 858.953125,
+      "windowHeight": 900
+    },
+    {
+      "name": "room-1440-light-denied",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "inbox-1440-light-empty",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "inbox-1440-light-loading",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "inbox-1440-light-failed",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "inbox-1440-light-offline",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 26,
+      "windowHeight": 900
+    },
+    {
+      "name": "inbox-1440-light-stale",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 26,
+      "windowHeight": 900
+    },
+    {
+      "name": "inbox-1440-light-denied",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1440,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1920-light-default",
+      "width": 1920,
+      "height": 1080,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1920,
+      "rows": 0,
+      "windowHeight": 1080
+    },
+    {
+      "name": "room-1280-light-default",
+      "width": 1280,
+      "height": 720,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1265,
+      "rows": 0,
+      "composerBottom": 678.953125,
+      "windowHeight": 720
+    },
+    {
+      "name": "inbox-1280-light-default",
+      "width": 1280,
+      "height": 720,
+      "ready": "complete",
+      "overflow": false,
+      "appWidth": 1265,
+      "rows": 26,
+      "windowHeight": 720
+    }
+  ],
+  "interactions": [
+    {
+      "test": "26 unread rows",
+      "pass": true
+    },
+    {
+      "test": "task filter changes rows",
+      "pass": true
+    },
+    {
+      "test": "preview never sends or clears draft",
+      "pass": true
+    },
+    {
+      "test": "theme preserves room draft",
+      "pass": true
+    },
+    {
+      "test": "individual reference remove",
+      "pass": true
+    },
+    {
+      "test": "network list is equivalent entry",
+      "pass": true
+    },
+    {
+      "test": "selected peer opens its own device detail",
+      "pass": true
+    },
+    {
+      "test": "dark theme toggle",
+      "pass": true
+    },
+    {
+      "test": "offline has no healthy badge or running spinner",
+      "pass": true
+    }
+  ],
+  "runtimeErrors": []
+}
