@@ -1,0 +1,32 @@
+{
+  "screenshots": [
+    {
+      "name": "body-collapsed-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "body-collapsed-1024-dark-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 768
+    },
+    {
+      "name": "body-expanded-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    }
+  ],
+  "runtimeErrors": []
+}

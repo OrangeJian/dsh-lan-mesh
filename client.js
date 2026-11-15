@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.13';
+    const PLUGIN_VERSION = '0.4.14';
     const React = require('react');
     const h = React.createElement;
 
@@ -797,6 +797,17 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 @media(max-width:650px){.lm-chat{padding:12px 10px}.lm-chat .lm-bubbleWhen{margin-left:0}.lm-chat .lm-bubble{padding:8px 10px}.lm-chat .lm-messageDevice{flex-basis:100%}}
 .lm-newMessages{display:flex;align-items:center;justify-content:center;gap:12px;flex:none;padding:6px 12px;background:var(--dsw-alias-bg-layer-1);border-top:1px solid var(--dsw-alias-border-l1);font-size:12px}
 .lm-jumpLatest:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.lm-messageBody{min-width:0}
+.lm-messageText{min-width:0}
+.lm-chat .lm-messageTextCollapsed{max-height:13.6em;overflow:hidden;mask-image:linear-gradient(to bottom,#000 80%,transparent)}
+.lm-chat .lm-messageTextCollapsed.lm-messageCodePreview{max-height:20.4em}
+.lm-messageBodyActions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:5px;min-height:24px;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
+.lm-messageExpand,.lm-messageCopy{font:inherit;color:var(--dsw-alias-label-secondary);background:transparent;border:0;border-radius:3px;padding:3px 1px;cursor:pointer;min-height:28px}
+.lm-messageExpand:hover,.lm-messageCopy:hover{color:var(--dsw-alias-brand-primary)}
+.lm-messageExpand:focus-visible,.lm-messageCopy:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.lm-messageCopy:disabled{cursor:wait;opacity:.7}
+@media(prefers-reduced-transparency:reduce){.lm-chat .lm-messageTextCollapsed{mask-image:none}}
+.lm-messageSummary{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
     /* @ux-shell:message-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
@@ -1726,6 +1737,50 @@ function createRoomTimeline() {
         error?h('span',{role:'alert'},error,h('button',{type:'button',onClick:()=>{setError('');setRetry(n=>n+1);}},COPY.attachmentRetry)):null);
     }
 
+    /* @ux-shell:body-model:start */
+/** Preserve the exact Markdown source; folding changes only its visible height. */
+function messageBodyView(value) {
+ const source=typeof value==='string'?value:String(value??'');
+ const code=source.match(/^\s*(`{3,}|~{3,})[^\n]*\r?\n([\s\S]*?)\r?\n\1\s*$/);
+ const previewLines=code?12:8;
+ const lineCount=(code?code[2]:source).split(/\r?\n/).length;
+ return {source,previewLines,codeOnly:!!code,collapsible:lineCount>previewLines||source.length>900};
+}
+const copyMessageSource = async (source,clipboard) => {
+ if(typeof clipboard?.writeText!=='function')return {status:'unavailable'};
+ try{await clipboard.writeText(source);return {status:'copied'};}catch{return {status:'failed'};}
+};
+    /* @ux-shell:body-model:end */
+    /* @ux-shell:body-component:start */
+/** Rendering only: original source always reaches the host Markdown component. */
+function MessageBody(props) {
+ const {h,React}=props;
+ const view=props.viewOf(props.text);
+ const [expanded,setExpanded]=React.useState(false);
+ const [copyState,setCopyState]=React.useState('idle');
+ const lifetime=React.useRef({alive:true,pending:false});
+ React.useEffect(()=>{lifetime.current.alive=true;return()=>{lifetime.current.alive=false;};},[]);
+ React.useEffect(()=>{props.onLayoutChanged?.();},[expanded]);
+ const copy=async()=>{
+  if(lifetime.current.pending)return;
+  lifetime.current.pending=true;setCopyState('copying');
+  const result=await props.copySource(view.source,props.clipboard);
+  lifetime.current.pending=false;if(lifetime.current.alive)setCopyState(result.status);
+ };
+ if(view.source==='')return null;
+ const collapsed=view.collapsible&&!expanded;
+ const feedback=copyState==='copied'?'已复制全文':copyState==='failed'?'复制失败，请重试':copyState==='unavailable'?'当前环境不支持复制，请手动选择正文':'';
+ return h('div',{className:'lm-messageBody'},
+  collapsed?h('span',{className:'lm-messageSummary'},view.source.slice(0,180)+'…正文已折叠，展开全文阅读'):null,
+  h('div',{id:props.bodyId,ref:node=>{if(node)node.inert=collapsed;},className:'lm-messageText'+(collapsed?' lm-messageTextCollapsed':'')+(view.codeOnly?' lm-messageCodePreview':'')},
+   props.MarkdownText?h(props.MarkdownText,{text:view.source,labels:props.labels}):h('div',{className:'lm-bubblePlain'},view.source)),
+  h('div',{className:'lm-messageBodyActions'},
+   view.collapsible?h('button',{type:'button',className:'lm-messageExpand','aria-expanded':expanded,'aria-controls':props.bodyId,onClick:()=>setExpanded(value=>!value)},expanded?'收起全文':'展开全文'):null,
+   h('button',{type:'button',className:'lm-messageCopy',disabled:copyState==='copying',onClick:copy},copyState==='copying'?'正在复制…':'复制全文'),
+   feedback?h('span',{className:'lm-messageCopyState',role:'status','aria-live':'polite'},feedback):null));
+}
+    /* @ux-shell:body-component:end */
+
      function ChatBubble(props) {
        const message = props.message;
        // Own messages show "我" / "me" instead of the user's own name — every
@@ -1740,12 +1795,7 @@ function createRoomTimeline() {
          sender = senderOf(message);
        }
        const text = String(message.text ?? '');
-       const body =
-         text === ''
-           ? null
-           : MarkdownText === undefined
-           ? h('div', { className: 'lm-bubblePlain' }, text)
-           : h(MarkdownText, { text, labels: markdownLabels() });
+       const body = text===''?null:h(MessageBody,{h,React,text,viewOf:messageBodyView,copySource:copyMessageSource,clipboard:window.navigator?.clipboard,MarkdownText,labels:markdownLabels(),bodyId:message.id?'lm-message-body-'+encodeURIComponent(message.id):undefined,onLayoutChanged:props.onLayoutChanged});
        // File attachment block: renders below the text when present.
        const file = message?.file && typeof message.file === 'object' ? message.file : null;
        const attachment =
@@ -3823,6 +3873,7 @@ function createRoomTimeline() {
                   kind,
                   senderLabel,
                   messageRow,
+                  onLayoutChanged:followLoadedContent,
                   selfLabel: selfLabel,
                   skills: available,
                 });

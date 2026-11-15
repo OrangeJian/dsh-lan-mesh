@@ -673,7 +673,7 @@ const renderNode = (component) => {
 };
 
 function captureDraftFixture(name){
- if(name==='grouped'?process.env.MESH_ROOM_CAPTURE!=='1':process.env.MESH_DRAFT_CAPTURE!=='1')return;
+ if(name.startsWith('body-')?process.env.MESH_BODY_CAPTURE!=='1':name==='grouped'?process.env.MESH_ROOM_CAPTURE!=='1':process.env.MESH_DRAFT_CAPTURE!=='1')return;
  const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const render=node=>{
   if(node==null||typeof node==='boolean')return '';
@@ -688,10 +688,10 @@ function captureDraftFixture(name){
   const style=props.style?Object.entries(props.style).filter(([,v])=>v!=null).map(([k,v])=>k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())+':'+(typeof v==='number'&&v!==0&&!['opacity','flex','flexGrow','flexShrink','zIndex','fontWeight','lineHeight'].includes(k)?v+'px':v)).join(';'):'';
   return '<'+type+attributes+(style?' style="'+escape(style)+'"':'')+'>'+(type==='textarea'?escape(props.value??''):(node.children??[]).map(render).join(''))+(['input','img','br','hr'].includes(type)?'':'</'+type+'>');
  };
- const directory=join(here,'..','docs','ux',name==='grouped'?'ux2a-message-preview':'ux1e-drafts-preview');mkdirSync(directory,{recursive:true});
+ const directory=join(here,'..','docs','ux',name.startsWith('body-')?'ux2b-body-preview':name==='grouped'?'ux2a-message-preview':'ux1e-drafts-preview');mkdirSync(directory,{recursive:true});
  const css=source.match(/const CSS = `([\s\S]*?)`;/)[1];
- const html='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>草稿恢复组件取证</title><style>:root{--dsw-alias-bg-base:#fff;--dsw-alias-bg-layer-1:#f6f7f9;--dsw-alias-bg-layer-2:#edf0f5;--dsw-alias-label-primary:#20242c;--dsw-alias-label-secondary:#616b79;--dsw-alias-label-tertiary:#6a7482;--dsw-alias-border-l1:#e3e7ed;--dsw-alias-border-l2:#bbc3cf;--dsw-alias-brand-primary:#315ecc;--dsw-alias-state-warn:#8a5b12}*{box-sizing:border-box}body{margin:0;height:100dvh;font:14px/1.5 Segoe UI,Microsoft YaHei,sans-serif;color:#20242c}.fixture-note{padding:8px 14px;height:36px;background:#edf0f5;font-size:12px}main{height:calc(100dvh - 36px)}'+css+'main.lm-panel{height:calc(100dvh - 36px);min-height:0}</style><div class="fixture-note">实际Room组件 / 模拟Host · '+escape(name)+' · 缩略图为静态导出占位</div><main class="lm-panel">'+render(lastTree)+'</main></html>';
- writeFileSync(join(directory,name+'.html'),html);if(name==='restored'||name==='grouped')writeFileSync(join(directory,'index.html'),html);
+ const html='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>草稿恢复组件取证</title><style>:root{--dsw-alias-bg-base:#fff;--dsw-alias-bg-layer-1:#f6f7f9;--dsw-alias-bg-layer-2:#edf0f5;--dsw-alias-label-primary:#20242c;--dsw-alias-label-secondary:#616b79;--dsw-alias-label-tertiary:#6a7482;--dsw-alias-border-l1:#e3e7ed;--dsw-alias-border-l2:#bbc3cf;--dsw-alias-brand-primary:#315ecc;--dsw-alias-state-warn:#8a5b12}*{box-sizing:border-box}body{margin:0;height:100dvh;font:14px/1.5 Segoe UI,Microsoft YaHei,sans-serif;color:#20242c}.fixture-note{padding:8px 14px;height:36px;background:#edf0f5;font-size:12px}main{height:calc(100dvh - 36px)}'+css+'main.lm-panel{height:calc(100dvh - 36px);min-height:0}.stubMarkdown{white-space:pre-wrap}body{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}@media(prefers-color-scheme:dark){:root{--dsw-alias-bg-base:#15191f;--dsw-alias-bg-layer-1:#1b2028;--dsw-alias-bg-layer-2:#242b35;--dsw-alias-label-primary:#e6eaf0;--dsw-alias-label-secondary:#acb7c7;--dsw-alias-border-l1:#343e4d;--dsw-alias-border-l2:#455166;--dsw-alias-brand-primary:#8baaff}.fixture-note{background:#242b35}}</style><div class="fixture-note">实际Room组件 / 模拟Host · '+escape(name)+' · 缩略图为静态导出占位</div><main class="lm-panel">'+render(lastTree)+'</main></html>';
+ writeFileSync(join(directory,name+'.html'),html);if(name==='restored'||name==='grouped'||name==='body-collapsed')writeFileSync(join(directory,'index.html'),html);
 }
 
 /** Effects this render queued run right after it, like React. */
@@ -938,6 +938,7 @@ checks.push(
   // The body goes through the shell's Markdown renderer, and each bubble names
   // its sender in bold so two dense messages never blur into one another.
   ['both message bodies render as markdown', count('stubMarkdown') === 3],
+  ['room message bodies expose original-source copy actions',count('lm-messageCopy')===3],
   ['every bubble names its sender in bold', count('lm-bubbleWho') === 3],
   ['room author rows expose speaker kind and exact device identity', count('lm-messageKind')===3 && count('lm-messageDevice')===3 && lastText.includes('node-b')],
   ['every room message keeps an exact timestamp and stable message id', lastNodes.filter(n=>hasClass(n,'lm-bubbleRow')).every(n=>typeof n.props['data-message-id']==='string') && lastNodes.filter(n=>n.type==='time'&&hasClass(n,'lm-bubbleWhen')).length===3],
@@ -1842,6 +1843,14 @@ holdGroupedRead=true;roomPoll.fn();await settleIn(GroupedRoom);
 groupedTranscript.push({...groupedTranscript[0],id:'latest-before-old-response',text:'latest result survives late response',sentAt:'2026-11-15T10:08:00Z'});roomPoll.fn();await settleIn(GroupedRoom);
 releaseGroupedRead();await settleIn(GroupedRoom);
 checks.push(['late older room response never replaces a newer transcript or its reading state',lastText.includes('latest result survives late response')]);
+groupedTranscript.push({...groupedTranscript[0],id:'long-reading',text:Array(20).fill('完整正文与换行需要保留').join('\n'),sentAt:'2026-11-15T10:09:00Z'});roomPoll.fn();await settleIn(GroupedRoom);
+checks.push(['long Room text is folded with full Markdown source still supplied',count('lm-messageTextCollapsed')===1&&lastNodes.some(n=>hasClass(n,'stubMarkdown')&&n.children.includes(groupedTranscript.at(-1).text))]);
+captureDraftFixture('body-collapsed');
+lastNodes.find(n=>hasClass(n,'lm-messageExpand')).props.onClick();await settleIn(GroupedRoom);
+captureDraftFixture('body-expanded');
+checks.push(['long text expands without replacing the original message or its id',count('lm-messageTextCollapsed')===0&&lastNodes.find(n=>hasClass(n,'lm-messageExpand')).props['aria-expanded']===true&&lastNodes.some(n=>n.props['data-message-id']==='long-reading')]);
+await lastNodes.find(n=>hasClass(n,'lm-messageCopy')).props.onClick();await settleIn(GroupedRoom);
+checks.push(['production message copy shows honest unavailable feedback when Clipboard API is absent',lastText.includes('当前环境不支持复制，请手动选择正文')]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

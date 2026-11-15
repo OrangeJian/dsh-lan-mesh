@@ -1,3 +1,5 @@
+import { MessageBody } from '../ui/room/message-body.mjs';
+import { messageBodyView, copyMessageSource } from '../ui/models/message-body.mjs';
 /**
  * M3 final-review regression tests.
  *
@@ -703,6 +705,7 @@ test('#9 two attachments with identical bytes but different names get distinct s
     h,
     COPY: { me: 'me', download: 'download', skillRefsAria: 'skills', skillRefsLabel: 'Skills', skillMissing: 'missing', skillNamesake: 'namesake', skillSourceOf: 'from', skillRefBadge: '' },
     MarkdownText: undefined,
+    MessageBody,messageBodyView,copyMessageSource,React:{},window:{},
     AttachmentCard: function AttachmentCard() {},
     senderOf: () => 'sender',
     messageStamp: () => '',
