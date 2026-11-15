@@ -30,6 +30,13 @@ test('auth covers bytes, path, target and rejects concurrent replay', async t =>
   await assert.rejects(f.verify(req, { store: reopened }), { code: 'REPLAY' });
 });
 
+test('unimplemented standalone event-ack is rejected before durable nonce intake',async t=>{
+ const f=await fixture(t),body=JSON.parse(f.make().bytes.toString()).body;
+ const request=encodeTeamRequest({operation:'event-ack',body,identity:'node-a',target:'node-b',secret:f.policy.secret,now:1000000,nonce:'nonce-unsupported-ack'});
+ await assert.rejects(f.verify(request),{code:'BAD_REQUEST'});
+ assert.equal(Object.keys(f.store.read().nonces).length,0);
+});
+
 test('signed malformed descriptors and oversized requests are rejected before persistence', async t => {
   const f = await fixture(t);
   await assert.rejects(f.verify(f.make('nonce-bad-descriptor', { executionId: '__proto__' })), { code: 'BAD_REQUEST' });

@@ -2,6 +2,8 @@
 
 开发中的 M1 功能，默认关闭，使用独立执行账本。支持远端显式派发、进度、结果和故障核对；自动拆解、能力匹配、DAG、验收工具与专用界面留至后续里程碑。
 
+0.4.2协议澄清：事件确认由progress/result等签名响应中的eventAck捎带，没有独立event-ack处理器。独立event-ack操作在协议校验阶段返回BAD_REQUEST，不再先写入nonce再到业务层失败；不改变现有重复投递、结果留档和人工对账语义。
+
 ## 先建立协作项目
 
 DSH 本地工作目录不会自动成为协作项目。先在 Leader Agent 会话中调用 `lan_mesh_room_member action=create room=Team试运行`，记下 roomId，再让每个 Worker 在自己的会话中调用 `lan_mesh_room_member action=join room=<roomId>`。
