@@ -4,6 +4,21 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSocket } from 'node:dgram';
+import { Discovery } from '../lib/discovery.mjs';
+
+test('same peer restarting on another HTTP port triggers a fresh synchronization callback',async t=>{
+ const seen=[];
+ const discovery=new Discovery({nodeId:'self',port:0,describe:()=>({name:'Self',httpPort:1}),onPeer:peer=>seen.push({...peer})});
+ const sender=createSocket('udp4');
+ t.after(async()=>{sender.close();await discovery.close();});
+ await discovery.start();
+ const send=port=>new Promise((resolve,reject)=>sender.send(Buffer.from(JSON.stringify({tag:'dsh-lan-mesh/1',nodeId:'peer',name:'Peer',httpPort:port})),discovery.socket.address().port,'127.0.0.1',error=>error?reject(error):resolve()));
+ await send(12345);await send(12345);await send(12346);
+ const deadline=Date.now()+1000;
+ while(discovery.list()[0]?.httpPort!==12346&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(discovery.list()[0].httpPort,12346);
+ assert.deepEqual(seen.map(peer=>peer.httpPort),[12345,12346]);
+});
 import { MeshNode } from '../lib/service.mjs';
 import { MeshServer } from '../lib/transport.mjs';
 import { emptyState, createRoom } from '../lib/rooms.mjs';
