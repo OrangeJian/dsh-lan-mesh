@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.2';
+    const PLUGIN_VERSION = '0.4.3';
     const React = require('react');
     const h = React.createElement;
 

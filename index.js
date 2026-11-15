@@ -19,6 +19,7 @@ import { sharedDocumentTools } from './lib/shared-doc-tools.mjs';
 import { CONTEXT_SELECTION_SCHEMA } from './lib/room-context-protocol.mjs';
 import { ROOM_ATTACHMENT_LIMITS, ROOM_ATTACHMENT_WIRE_LIMITS } from './lib/room-message.mjs';
 import { MeshNode } from './lib/service.mjs';
+import { normalizeStaticPeers } from './lib/static-peers.mjs';
 import { Notifier } from './lib/notify.mjs';
 import { teamToolDefinitions } from './lib/team-tools.mjs';
 
@@ -92,6 +93,7 @@ function resolveConfig(raw) {
   if (roomAttachmentLimits.maxAttachments > ROOM_ATTACHMENT_WIRE_LIMITS.maxAttachments) throw new Error('attachment count limit exceeds wire bound');
   return {
     roomAttachmentLimits,
+    staticPeers: normalizeStaticPeers(value.staticPeers).map(({source,...peer})=>peer),
     displayName:
       envName ?? (typeof value.displayName === 'string' ? value.displayName : DEFAULTS.displayName),
     port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : DEFAULTS.port,

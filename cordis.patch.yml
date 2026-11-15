@@ -8,6 +8,10 @@
         clusterSecret: ''
         autoWake: true
         trustedPeers: []
+        # Optional explicit addresses for broadcast-blocked networks.
+        # Discovery hints only; do not grant trust or Worker permissions.
+        # - { nodeId: node-xxxx, address: 192.168.1.20, httpPort: 45871, name: laptop }
+        staticPeers: []
         # Reliable Team execution is opt-in and requires explicit local grants.
         teamEnabled: false
         teamAuthorizations: []
