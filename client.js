@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.11';
+    const PLUGIN_VERSION = '0.4.12';
     const React = require('react');
     const h = React.createElement;
 
@@ -782,6 +782,20 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-workbenchNavigationWrap{flex:none;min-width:0}.lm-workbenchNavigation{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 12px;min-height:44px;border-bottom:1px solid var(--dsw-alias-border-l1)}.lm-workbenchNavigation>.lm-mainReturn{position:static;margin:0;white-space:nowrap;align-self:auto}.lm-sidebarToggle{font-size:12px;min-height:32px;gap:6px}.lm-workspaceSwitch{min-width:140px;max-width:340px;flex:1;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;padding:6px 8px;min-height:32px;overflow:hidden;text-overflow:ellipsis}.lm-workspaceSwitch:focus-visible,.lm-sidebarToggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.lm-navigationNotice{font-size:12px;color:var(--dsw-alias-label-secondary);margin:6px 20px;overflow-wrap:anywhere}.lm-projectSearch{font-size:12px;min-height:32px;box-sizing:border-box;flex:none;margin:2px 0 6px}.lm-rail .lm-projectSearch{width:100%}
 @media(max-width:600px){.lm-workbenchNavigation{padding:5px 8px;gap:5px}.lm-sidebarToggleLabel{display:none}.lm-workspaceSwitch{min-width:120px}.lm-sidebarToggle{padding:6px 8px}}
     /* @ux-shell:workspace-nav-styles:end */
+/* @ux-shell:message-styles:start */
+.lm-chat{gap:14px;padding:20px clamp(12px,3vw,32px)}
+.lm-chat .lm-bubbleRow{box-sizing:border-box;width:100%;max-width:900px;margin-inline:auto;align-self:center;align-items:stretch;min-width:0}
+.lm-chat .lm-bubbleMeta{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;padding:0 2px;line-height:1.5}
+.lm-chat .lm-bubbleWho{color:var(--dsw-alias-label-primary);overflow-wrap:anywhere}
+.lm-messageKind{font-size:10px;border:1px solid var(--dsw-alias-border-l2);border-radius:4px;padding:0 4px;color:var(--dsw-alias-label-secondary)}
+.lm-messageDevice{font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-chat .lm-bubbleWhen{font-size:11px;margin-left:auto;white-space:nowrap}
+.lm-chat .lm-bubble{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l2);border-radius:8px;font-size:14px;line-height:1.7;min-width:0;overflow-wrap:anywhere}
+.lm-chat .lm-bubbleMine{border-inline-start:3px solid var(--dsw-alias-brand-primary)}
+.lm-chat .lm-messageContinuation{margin-top:-8px}
+.lm-chat .lm-messageContinuation .lm-bubbleMeta{justify-content:flex-end}
+@media(max-width:650px){.lm-chat{padding:12px 10px}.lm-chat .lm-bubbleWhen{margin-left:0}.lm-chat .lm-bubble{padding:8px 10px}.lm-chat .lm-messageDevice{flex-basis:100%}}
+    /* @ux-shell:message-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
@@ -1134,6 +1148,29 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
      * @param {object} message - room message record.
      * @returns {string}
      */
+    /* @ux-shell:message-model:start */
+/** Display-only rows. Exact author identities and transcript order remain authoritative. */
+function roomMessageRows(messages, { self = {}, members = [], peers = [] } = {}) {
+  const rows=Array.isArray(messages)?messages:[];
+  const text=value=>typeof value==='string'?value.trim():'';
+  const stamp=message=>message?.at??message?.receivedAt??message?.sentAt??'';
+  const identity=message=>{const from=message?.from;return text(from?.nodeId)&&text(from?.sessionId)?JSON.stringify([from.nodeId,from.sessionId]):null;};
+  const boundary=message=>message?.kind!=='room-message'||['skillRefs','documentRefs','structuredMentions','mentions','attachments'].some(key=>Array.isArray(message?.[key])&&message[key].length>0)||!!message?.file||!!message?.contextSelection||!!message?.contextPack;
+  return rows.map((message,index)=>{
+    const previous=rows[index-1];const timestamp=stamp(message),before=stamp(previous);
+    const time=typeof timestamp==='string'&&timestamp!==''?Date.parse(timestamp):NaN;
+    const prior=typeof before==='string'&&before!==''?Date.parse(before):NaN;
+    const sameDay=Number.isFinite(time)&&Number.isFinite(prior)&&new Date(time).toDateString()===new Date(prior).toDateString();
+    const continuation=!!previous&&identity(message)!==null&&identity(message)===identity(previous)&&!boundary(message)&&!boundary(previous)&&sameDay&&time>=prior&&time-prior<=180000;
+    const nodeId=text(message?.from?.nodeId),sessionId=text(message?.from?.sessionId);
+    const member=members.find(row=>row.nodeId===nodeId&&row.sessionId===sessionId);
+    const peer=peers.find(row=>row.nodeId===nodeId);
+    const deviceName=nodeId&&nodeId===self.nodeId?text(self.name):text(member?.nodeName)||text(peer?.name);
+    return {message,continuation,timestamp:typeof timestamp==='string'?timestamp:'',kind:sessionId==='human'?'human':sessionId?'agent':'system',nodeId,sessionId,deviceLabel:nodeId?(deviceName?deviceName+' · '+nodeId:nodeId):'来源设备未知'};
+  });
+}
+    /* @ux-shell:message-model:end */
+
     function messageStamp(message) {
       const value = message?.at ?? message?.receivedAt ?? message?.sentAt ?? '';
       return String(value).replace('T', ' ').slice(0, 19);
@@ -1753,12 +1790,14 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
          (props.mine === true ? ' lm-bubbleMine' : '');
        return h(
          'div',
-         { className: props.mine ? 'lm-bubbleRow lm-bubbleRowMine' : 'lm-bubbleRow' },
+         { className: (props.mine ? 'lm-bubbleRow lm-bubbleRowMine' : 'lm-bubbleRow')+(props.messageRow?.continuation?' lm-messageContinuation':''), 'data-message-id':message.id??undefined },
          h(
            'div',
            { className: 'lm-bubbleMeta' },
-           h('strong', { className: 'lm-bubbleWho lm-bubbleWho' + (kind === 'human' ? 'Human' : kind === 'agent' ? 'Agent' : 'System') }, sender),
-           h('span', { className: 'lm-bubbleWhen' }, ` · ${messageStamp(message)}`),
+           props.messageRow?.continuation ? null : h('strong', { className: 'lm-bubbleWho lm-bubbleWho' + (kind === 'human' ? 'Human' : kind === 'agent' ? 'Agent' : 'System') }, sender),
+           props.messageRow?.continuation ? null : h('span',{className:'lm-messageKind'},kind==='human'?'人类':kind==='agent'?'Agent':'系统'),
+           props.messageRow?.continuation ? null : h('span',{className:'lm-messageDevice'},props.messageRow?.deviceLabel||'来源设备未知'),
+           h('time', { className: 'lm-bubbleWhen', dateTime:props.messageRow?.timestamp||undefined,title:props.messageRow?.timestamp||messageStamp(message),'aria-label':sender+' · '+(props.messageRow?.timestamp||messageStamp(message)) }, messageStamp(message)),
          ),
          h('div', { className: bubbleClass }, ...bubbleContents),
        );
@@ -2961,9 +3000,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const tasks = Array.isArray(view.tasks) ? view.tasks : [];
       // Only the conversation belongs in the chat: `room-task` rows are the
       // assignment notices and they are already shown in the task list.
-      const messages = (Array.isArray(detail.messages) ? detail.messages : []).filter(
-        (message) => message?.kind === 'room-message',
-      );
+      const messageRows = roomMessageRows(detail.messages,{self:props.self,members,peers:props.peers}).filter(row=>row.message?.kind==='room-message');
+      const messages = messageRows.map(row=>row.message);
 
       // Entering a room (or a new message arriving) must land the chat on the
       // latest message, not on whatever scroll position the room had before.
@@ -3709,7 +3747,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           { className: 'lm-chat', ref: chatRef },
           messages.length === 0
             ? h('div', { className: 'lm-muted' }, detail.status === 'loading' ? COPY.loading : COPY.noChat)
-            : messages.map((message) => {
+            : messageRows.map((messageRow) => {
+                const message=messageRow.message;
                 // Look up the sender in the member list so remote humans and
                 // agents show their room display name (nickname / title) instead
                 // of just the node name that rides in the envelope.
@@ -3733,6 +3772,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                   mine,
                   kind,
                   senderLabel,
+                  messageRow,
                   selfLabel: selfLabel,
                   skills: available,
                 });
@@ -5445,6 +5485,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 attachmentLimits: state.data?.roomAttachmentLimits,
                 sessionId: HUMAN_SESSION_ID,
                 self,
+                peers,
                 call,
                 localAgents: agents.local,
                 onChanged: refresh,

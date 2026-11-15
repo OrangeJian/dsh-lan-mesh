@@ -673,7 +673,7 @@ const renderNode = (component) => {
 };
 
 function captureDraftFixture(name){
- if(process.env.MESH_DRAFT_CAPTURE!=='1')return;
+ if(name==='grouped'?process.env.MESH_ROOM_CAPTURE!=='1':process.env.MESH_DRAFT_CAPTURE!=='1')return;
  const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const render=node=>{
   if(node==null||typeof node==='boolean')return '';
@@ -688,10 +688,10 @@ function captureDraftFixture(name){
   const style=props.style?Object.entries(props.style).filter(([,v])=>v!=null).map(([k,v])=>k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())+':'+(typeof v==='number'&&v!==0&&!['opacity','flex','flexGrow','flexShrink','zIndex','fontWeight','lineHeight'].includes(k)?v+'px':v)).join(';'):'';
   return '<'+type+attributes+(style?' style="'+escape(style)+'"':'')+'>'+(type==='textarea'?escape(props.value??''):(node.children??[]).map(render).join(''))+(['input','img','br','hr'].includes(type)?'':'</'+type+'>');
  };
- const directory=join(here,'..','docs','ux','ux1e-drafts-preview');mkdirSync(directory,{recursive:true});
+ const directory=join(here,'..','docs','ux',name==='grouped'?'ux2a-message-preview':'ux1e-drafts-preview');mkdirSync(directory,{recursive:true});
  const css=source.match(/const CSS = `([\s\S]*?)`;/)[1];
  const html='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>草稿恢复组件取证</title><style>:root{--dsw-alias-bg-base:#fff;--dsw-alias-bg-layer-1:#f6f7f9;--dsw-alias-bg-layer-2:#edf0f5;--dsw-alias-label-primary:#20242c;--dsw-alias-label-secondary:#616b79;--dsw-alias-label-tertiary:#6a7482;--dsw-alias-border-l1:#e3e7ed;--dsw-alias-border-l2:#bbc3cf;--dsw-alias-brand-primary:#315ecc;--dsw-alias-state-warn:#8a5b12}*{box-sizing:border-box}body{margin:0;height:100dvh;font:14px/1.5 Segoe UI,Microsoft YaHei,sans-serif;color:#20242c}.fixture-note{padding:8px 14px;height:36px;background:#edf0f5;font-size:12px}main{height:calc(100dvh - 36px)}'+css+'main.lm-panel{height:calc(100dvh - 36px);min-height:0}</style><div class="fixture-note">实际Room组件 / 模拟Host · '+escape(name)+' · 缩略图为静态导出占位</div><main class="lm-panel">'+render(lastTree)+'</main></html>';
- writeFileSync(join(directory,name+'.html'),html);if(name==='restored')writeFileSync(join(directory,'index.html'),html);
+ writeFileSync(join(directory,name+'.html'),html);if(name==='restored'||name==='grouped')writeFileSync(join(directory,'index.html'),html);
 }
 
 /** Effects this render queued run right after it, like React. */
@@ -939,6 +939,8 @@ checks.push(
   // its sender in bold so two dense messages never blur into one another.
   ['both message bodies render as markdown', count('stubMarkdown') === 3],
   ['every bubble names its sender in bold', count('lm-bubbleWho') === 3],
+  ['room author rows expose speaker kind and exact device identity', count('lm-messageKind')===3 && count('lm-messageDevice')===3 && lastText.includes('node-b')],
+  ['every room message keeps an exact timestamp and stable message id', lastNodes.filter(n=>hasClass(n,'lm-bubbleRow')).every(n=>typeof n.props['data-message-id']==='string') && lastNodes.filter(n=>n.type==='time'&&hasClass(n,'lm-bubbleWhen')).length===3],
   // The speaker kind decides the tint: a remote agent and the local person must
   // not read as the same bubble.
   ['a person speaks in the human tint', count('lm-bubbleHuman') === 1],
@@ -1812,6 +1814,13 @@ lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:
 let releaseQuick;retainedSendGate=new Promise(resolve=>releaseQuick=resolve);const quickOne=lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);await switchTo(DraftRoomB);await switchTo(DraftRoomA);
 const quickTwo=lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);retainedSendGate=null;releaseQuick();await Promise.all([quickOne,quickTwo]);await settleIn(DraftRoomA);
 checks.push(['background quick-task uses the existing endpoint exactly once despite concurrent retry',retainedTasks.length===1&&retainedTasks[0].room==='room-draft-a'&&retainedCalls.at(-1).messageId===retainedCalls.at(-2).messageId&&lastNodes.find(n=>hasClass(n,'lm-taskPill')).props['aria-pressed']===false]);
+const groupedTranscript=[0,1,2,3,4].map(index=>({id:'group-'+index,kind:'room-message',from:{nodeId:'node-b',sessionId:'session-9',title:'Reviewer'},text:'Line one\nLine two',sentAt:new Date(Date.UTC(2026,10,15,10,index)).toISOString()}));
+groupedTranscript.push({...groupedTranscript[4],id:'other-device',from:{nodeId:'node-c',sessionId:'session-9',title:'Reviewer'}});
+const GroupedRoom=()=>h(window.__roomPane,{room:{id:'room-grouped'},sessionId:'human',self:answers.snapshot.self,call:async(method,payload)=>method==='roomDetail'?{room:{id:payload.room,members:[],tasks:[]},messages:groupedTranscript}:method==='roomSkills'?{status:'ready',skills:[]}: {},peers:[{nodeId:'node-b',name:'Shared device'},{nodeId:'node-c',name:'Shared device'}]});
+await switchTo(GroupedRoom);
+checks.push(['five adjacent messages share an author header while a namesake on another device starts a new group',count('lm-bubbleRow')===6&&count('lm-bubbleWho')===2&&count('lm-messageContinuation')===4&&lastText.includes('Shared device · node-b')&&lastText.includes('Shared device · node-c')]);
+checks.push(['grouping retains six individual exact times and original multiline bodies',lastNodes.filter(n=>n.type==='time'&&hasClass(n,'lm-bubbleWhen')).length===6&&lastNodes.filter(n=>hasClass(n,'lm-bubbleRow')).every(n=>n.props['data-message-id'])&&count('stubMarkdown')===6]);
+captureDraftFixture('grouped');
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;
