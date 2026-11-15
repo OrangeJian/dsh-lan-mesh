@@ -492,7 +492,7 @@ const answers = {
 
 const asked = [];
 const requested = [];
-let agentsGate;
+let agentsGate,snapshotGate,snapshotFailure=false,snapshotOverride;
 let uploadFailure=false,sendFailure=false,uploadGate,joinFailure=false;
 const uploaded=[];
 const fetch = async (route, init) => {
@@ -508,6 +508,7 @@ const fetch = async (route, init) => {
   const payload = body.payload.payload ?? {};
   asked.push(endpoint);
   requested.push({ endpoint, payload });
+  if(endpoint==='snapshot'){const gate=snapshotGate,override=snapshotOverride;if(gate)await gate;if(snapshotFailure)throw Error('Local service unreachable');if(override)return {ok:true,json:async()=>({type:'server-response',rpcId:body.rpcId,result:{ok:true,value:override}})};}
   if(endpoint==='roomSay'&&sendFailure)throw Error('Leader unavailable');
   if (endpoint === 'markRead') {
     for (const message of answers.snapshot.inbox.messages) {
@@ -1698,6 +1699,28 @@ checks.push(['main content keeps a native return entry when sidebar is unavailab
 const beforeMainReturn=selectPanelCalls.length;
 await click('lm-mainReturn');
 checks.push(['main return releases plugin main slot and restores native chrome',selectPanelCalls.length>beforeMainReturn&&selectPanelCalls.slice(beforeMainReturn).every(id=>id===null)&&document.documentElement.dataset.lanMeshMode===undefined]);
+await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Component);
+checks.push(['network workspace uses current snapshot identity and discovered devices',count('lm-networkWorkspace')===1&&count('lm-deviceRow')>=1&&lastText.includes('node-a')&&!lastText.includes('允许派发：是')]);
+await switchTo(RailHost);await clickRail('lm-nav-manage');await switchTo(Component);
+checks.push(['management exposes actual UI version and existing session-management route',count('lm-managementWorkspace')===1&&lastText.includes('0.4.9')&&count('lm-managementAgents')===1]);
+await click('lm-managementAgents');checks.push(['management opens the existing agent catalogue',count('lm-agentImport')>0||lastText.includes('stored-one')]);
+await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Component);
+const mainPoll=[...intervals.values()].filter(timer=>timer.ms===4000).at(-1);
+snapshotFailure=true;mainPoll.fn();await settle();
+checks.push(['failed refresh retains network data and explains stale snapshot at the top',count('lm-shellStale')===1&&count('lm-networkWorkspace')===1&&lastText.includes('上次成功读取')]);
+snapshotFailure=false;await click('lm-shellRetry');checks.push(['retry recovers the retained snapshot without a stale banner',count('lm-shellStale')===0&&count('lm-networkWorkspace')===1]);
+snapshotFailure=true;await switchTo(Component);
+checks.push(['first snapshot failure is not presented as an empty workspace',count('lm-shellReadState')===1&&count('lm-networkWorkspace')===0&&count('lm-mainReturn')===1&&lastText.includes('无法读取')]);
+snapshotFailure=false;await click('lm-shellRetry');checks.push(['first-load retry restores selected workspace',count('lm-networkWorkspace')===1&&count('lm-shellReadState')===0]);
+let releaseSnapshot;snapshotGate=new Promise(resolve=>releaseSnapshot=resolve);await switchTo(Component);
+checks.push(['initial pending read shows loading while native exit stays available',count('lm-shellSkeleton')===2&&count('lm-mainReturn')===1&&lastText.includes('正在读取')]);
+const snapshotsBeforePoll=asked.filter(method=>method==='snapshot').length;const pendingPoll=[...intervals.values()].filter(timer=>timer.ms===4000).at(-1);pendingPoll.fn();pendingPoll.fn();await settle();
+checks.push(['overlapping snapshot polls share one pending request',asked.filter(method=>method==='snapshot').length===snapshotsBeforePoll]);
+snapshotGate=null;releaseSnapshot();await settle();
+checks.push(['pending initial read resolves into the selected workspace',count('lm-networkWorkspace')===1&&count('lm-shellSkeleton')===0]);
+let releaseOldSnapshot;snapshotGate=new Promise(resolve=>releaseOldSnapshot=resolve);snapshotOverride=structuredClone(answers.snapshot);snapshotOverride.self.name='OLD SNAPSHOT';snapshotOverride.self.selfName='OLD SNAPSHOT';await switchTo(Component);
+snapshotGate=null;snapshotOverride=undefined;await switchTo(Component);releaseOldSnapshot();await settle();
+checks.push(['snapshot from an unmounted workspace cannot overwrite the new view',count('lm-networkWorkspace')===1&&!lastText.includes('OLD SNAPSHOT')]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

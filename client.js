@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.8';
+    const PLUGIN_VERSION = '0.4.9';
     const React = require('react');
     const h = React.createElement;
 
@@ -210,6 +210,8 @@ window.__ModuleLoader__.load({
           // navigation (v0.2.0)
           navRooms: '我的房间',
           navInbox: '收件箱',
+          navNetwork:'网络总览',navManage:'管理与诊断',
+          surfaceLabels:{},networkLabels:{},managementLabels:{},
           navBoard: '任务看板',
           navBack: '← 返回',
           // takeover sidebar (v0.3.0)
@@ -449,6 +451,10 @@ window.__ModuleLoader__.load({
           // navigation (v0.2.0)
           navRooms: 'My rooms',
           navInbox: 'Inbox',
+          navNetwork:'Network',navManage:'Manage and diagnose',
+          surfaceLabels:{loading:'Loading collaboration data…',failed:'Cannot read local collaboration data',stale:'Read failed; showing the last successful snapshot',hint:'Messages and projects have not been cleared. Check the local service or retry.',retry:'Retry'},
+          networkLabels:{title:'Network',refresh:'Refresh',intro:'This node and recently discovered peers. Links between remote peers are not inferred.',local:'This node',peer:'Discovery record',unknown:'Unverified',sessions:'Catalogue sessions',running:'Local running',identity:'Node ID',empty:'No other devices discovered. Check DSH and the plugin on the other machine.',time:'seconds since observation',stale:'Historical snapshot; current state unverified',permissions:'Peer visibility, session presence and dispatch permission are separate facts.'},
+          managementLabels:{title:'Manage and diagnose',intro:'Local identity and published configuration flags.',node:'Node ID',name:'Device name',ui:'UI version',host:'Host version',secret:'Cluster secret',autoWake:'Automatic wake',configured:'Configured',notConfigured:'Not configured',enabled:'Enabled',disabled:'Disabled',unknown:'Unknown',agents:'Manage sessions',diagnostics:'Diagnostic guidance',diagnosticHint:'Read-only reports are generated locally. This page does not run system commands; unchecked states are not healthy.',nickname:'Click the identity at the bottom of the sidebar to edit its display name.'},
           navBoard: 'Task board',
           navBack: '← Back',
           // takeover sidebar (v0.3.0)
@@ -604,6 +610,40 @@ function DiscoverProjectsPanel({h,rows,query,onQuery,onJoin,onClose,busy,labels=
       h('button',{type:'button',className:'lm-btn lm-btnPrimary lm-joinBtn',disabled:!!busy,onClick:()=>onJoin(row.id),'aria-label':`${copy.join} ${row.name} · ${row.id}`},busy===row.id?copy.joining:copy.join)))));
 }
     /* @ux-shell:discovery:end */
+    /* @ux-shell:workspace-model:start */
+function shellReadState(state={}) {
+ const hasData=state.data!==null&&state.data!==undefined;
+ return {kind:!hasData?(state.status==='error'?'failed':'loading'):(state.status==='error'?'stale':'ready'),error:typeof state.error==='string'?state.error:'',observedAt:state.observedAt??null};
+}
+function networkWorkspaceView({self,peers,agents,agentsStatus,stale=false}={}) {
+ const nodes=[],seen=new Set(),catalogueReady=agentsStatus==='ready';
+ const list=Array.isArray(peers)?peers:[];
+ if(typeof self?.nodeId==='string'&&self.nodeId){seen.add(self.nodeId);const local=Array.isArray(agents?.local)?agents.local:[];nodes.push({id:self.nodeId,name:self.selfName||self.name||self.nodeId,local:true,ageSeconds:null,sessions:catalogueReady?local.length:null,running:catalogueReady?local.filter(a=>a.status==='running').length:null});}
+ for(const peer of list){if(!peer||typeof peer.nodeId!=='string'||!peer.nodeId||seen.has(peer.nodeId))continue;seen.add(peer.nodeId);nodes.push({id:peer.nodeId,name:typeof peer.name==='string'&&peer.name?peer.name:peer.nodeId,local:false,ageSeconds:Number.isFinite(peer.ageSeconds)&&peer.ageSeconds>=0?peer.ageSeconds:null,sessions:null,running:null});}
+ // The remote catalogue can be partial. A positive match is evidence, absence isn't zero.
+ if(catalogueReady)for(const n of nodes.filter(n=>!n.local)){const matches=(Array.isArray(agents?.remote)?agents.remote:[]).filter(a=>a.nodeId===n.id);if(matches.length)n.sessions=matches.length;}
+ return {nodes,peerCount:Array.isArray(peers)?nodes.filter(n=>!n.local).length:null,stale};
+}
+    /* @ux-shell:workspace-model:end */
+    /* @ux-shell:workspace-components:start */
+/** Pure surface components. Data access and navigation stay with the existing controller. */
+function WorkspaceReadState({h,model,onRetry,labels={}}) {
+ const copy={loading:'正在读取协作工作台…',failed:'暂时无法读取本机协作数据',stale:'连接或读取失败，当前显示上次成功读取的数据',hint:'这不表示消息或项目已被清空。请检查本机服务或重试。',retry:'重试',...labels};
+ if(model.kind==='ready')return null;
+ if(model.kind==='loading')return h('section',{className:'lm-shellReadState',role:'status'},h('h2',null,copy.loading),h('div',{className:'lm-shellSkeleton','aria-hidden':true}),h('div',{className:'lm-shellSkeleton','aria-hidden':true}));
+ return h('section',{className:model.kind==='stale'?'lm-shellStale':'lm-shellReadState',role:'alert'},h('strong',null,model.kind==='stale'?copy.stale:copy.failed),model.kind==='failed'?h('p',null,copy.hint):null,model.error?h('p',{className:'lm-shellErrorText'},model.error):null,model.observedAt?h('p',{className:'lm-muted'},model.observedAt):null,h('button',{className:'lm-btn lm-shellRetry',type:'button',onClick:onRetry},copy.retry));
+}
+function NetworkWorkspace({h,model,onRefresh,labels={}}) {
+ const copy={title:'网络总览',refresh:'刷新',intro:'当前展示本机和最近发现的设备，不推断其他设备之间的连接。',local:'本机',peer:'发现记录',unknown:'未核对',sessions:'目录会话',running:'本机执行中',identity:'节点身份',empty:'尚未发现其他设备。请确认另一端 DSH 和插件均已启动。',time:'秒前观测',stale:'历史快照 · 当前状态待核对',permissions:'设备可见、会话存活与允许派发是不同状态；派发仍按现有权限核对。',...labels};
+ return h('section',{className:'lm-workspacePage lm-networkWorkspace'},h('header',{className:'lm-workspacePageHead'},h('div',null,h('h1',null,copy.title),h('p',null,copy.intro)),h('button',{type:'button',className:'lm-btn',onClick:onRefresh},copy.refresh)),model.stale?h('p',{className:'lm-workspaceHint'},copy.stale):null,
+ h('div',{className:'lm-deviceList'},model.nodes.map(node=>h('article',{className:'lm-deviceRow',key:node.id},h('div',{className:'lm-deviceIdentity'},h('strong',null,node.name),h('span',{className:'lm-badge'},node.local?copy.local:copy.peer),h('p',{className:'lm-deviceId'},`${copy.identity} · ${node.id}`)),h('dl',{className:'lm-deviceFacts'},h('dt',null,copy.sessions),h('dd',null,model.stale||node.sessions===null?copy.unknown:String(node.sessions)),h('dt',null,node.local?copy.running:copy.peer),h('dd',null,model.stale?copy.unknown:node.local?(node.running===null?copy.unknown:String(node.running)):(node.ageSeconds===null?copy.unknown:`${node.ageSeconds} ${copy.time}`)))))),model.peerCount===0?h('p',{className:'lm-workspaceHint'},copy.empty):null,h('p',{className:'lm-workspaceHint'},copy.permissions));
+}
+function ManagementWorkspace({h,self,uiVersion,hostVersion,onOpenAgents,labels={}}) {
+ const copy={title:'管理与诊断',intro:'本机身份与已公开的配置状态。',node:'节点身份',name:'本机名称',ui:'界面版本',host:'服务端版本',secret:'群组密钥',autoWake:'自动唤醒',configured:'已配置',notConfigured:'未配置',enabled:'已开启',disabled:'已关闭',unknown:'未知',agents:'会话管理',diagnostics:'诊断说明',diagnosticHint:'只读诊断报告需在本机生成。此页面不会执行系统命令；未检查的连接、授权和传输状态均不视为正常。',nickname:'本机显示名可在侧栏底部点击修改。',...labels};
+ const flag=value=>value===true?copy.enabled:value===false?copy.disabled:copy.unknown;
+ return h('section',{className:'lm-workspacePage lm-managementWorkspace'},h('header',{className:'lm-workspacePageHead'},h('div',null,h('h1',null,copy.title),h('p',null,copy.intro))),h('dl',{className:'lm-managementFacts'},...[[copy.name,self?.selfName||self?.name||copy.unknown],[copy.node,self?.nodeId||copy.unknown],[copy.ui,uiVersion||copy.unknown],[copy.host,hostVersion||copy.unknown],[copy.secret,self?.secured===true?copy.configured:self?.secured===false?copy.notConfigured:copy.unknown],[copy.autoWake,flag(self?.autoWake)]].flatMap(([label,value])=>[h('dt',{key:label+'-label'},label),h('dd',{key:label},value)])),h('p',{className:'lm-workspaceHint'},copy.nickname),h('button',{type:'button',className:'lm-btn lm-managementAgents',onClick:onOpenAgents},copy.agents),h('details',{className:'lm-diagnosticHelp'},h('summary',null,copy.diagnostics),h('p',null,copy.diagnosticHint)));
+}
+    /* @ux-shell:workspace-components:end */
     const STYLE_ID = 'dsh-lan-mesh-styles';
     /** The session id the backend reserves for "me, the human". */
     const HUMAN_SESSION_ID = 'human';
@@ -650,6 +690,17 @@ function DiscoverProjectsPanel({h,rows,query,onQuery,onJoin,onClose,busy,labels=
 @media(max-width:1100px){.lm-discoverPanel{left:16px;right:16px;top:56px;bottom:16px;width:auto;max-width:720px;margin-left:auto}}
 @media(max-width:600px){.lm-discoverPanel{left:8px;right:8px;top:48px;bottom:8px;padding:14px}.lm-discoverProject{gap:10px}.lm-discoverHead h2{font-size:16px}}
     /* @ux-shell:project-styles:end */
+/* @ux-shell:workspace-styles:start */
+.lm-workspacePage{padding:24px;overflow:auto;min-height:0;flex:1;color:var(--dsw-alias-label-primary)}
+.lm-workspacePageHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}.lm-workspacePageHead h1{margin:0;font-size:20px;font-weight:600}.lm-workspacePageHead p{margin:6px 0 0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
+.lm-deviceList{max-width:1040px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;overflow:hidden}.lm-deviceRow{padding:18px;display:flex;gap:24px;align-items:center;border-bottom:1px solid var(--dsw-alias-border-l1)}.lm-deviceRow:last-child{border-bottom:0}.lm-deviceIdentity{flex:1;min-width:0}.lm-deviceIdentity>strong{margin-right:8px;font-size:14px;overflow-wrap:anywhere}.lm-deviceId{margin:6px 0 0;font-size:12px;overflow-wrap:anywhere;user-select:text;color:var(--dsw-alias-label-secondary)}
+.lm-deviceFacts{display:grid;grid-template-columns:100px minmax(80px,1fr);gap:6px 16px;font-size:12px;margin:0;min-width:220px}.lm-deviceFacts dt,.lm-managementFacts dt{color:var(--dsw-alias-label-secondary)}.lm-deviceFacts dd,.lm-managementFacts dd{margin:0;overflow-wrap:anywhere}.lm-workspaceHint{max-width:900px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.7;margin:18px 0}
+.lm-managementFacts{max-width:800px;display:grid;grid-template-columns:130px 1fr;gap:16px 24px;padding:22px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;font-size:13px}.lm-diagnosticHelp{margin:24px 0;max-width:800px;font-size:13px}.lm-diagnosticHelp summary{cursor:pointer;padding:8px 0}.lm-diagnosticHelp p{color:var(--dsw-alias-label-secondary);line-height:1.7}
+.lm-shellReadState{flex:1;padding:40px 24px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;max-width:900px}.lm-shellReadState h2{font-size:16px;font-weight:600;margin:0}.lm-shellReadState p{margin:0;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary)}.lm-shellErrorText{overflow-wrap:anywhere;font-size:12px}.lm-shellSkeleton{height:12px;width:min(480px,100%);background:var(--dsw-alias-bg-layer-2);border-radius:5px}.lm-shellSkeleton+ .lm-shellSkeleton{width:min(320px,85%)}
+.lm-shellStale{flex:none;margin:0 20px 12px;padding:12px 14px;border:1px solid var(--dsw-alias-state-warn);border-radius:8px;font-size:12px}.lm-shellStale p{margin:5px 0;overflow-wrap:anywhere}.lm-shellStale .lm-shellRetry{margin-top:6px}
+.lm-archivedToggle{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;text-align:left;padding:7px 9px;min-height:30px;border-radius:6px;cursor:pointer}.lm-archivedToggle:hover{background:var(--dsw-alias-bg-layer-2)}
+@media(max-width:900px){.lm-workspacePage{padding:18px}.lm-deviceRow{align-items:flex-start;flex-direction:column;gap:12px}.lm-deviceFacts{width:100%;min-width:0}.lm-managementFacts{grid-template-columns:100px minmax(0,1fr);padding:16px;gap:12px}.lm-shellStale{margin:0 12px 10px}}
+    /* @ux-shell:workspace-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
@@ -4035,7 +4086,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 onClick: () => props.onNav(view.id),
               },
               h('span', null, view.label()),
-              h('span', { className: 'lm-navCount' }, String(navCount(view.id))),
+              ['inbox','board'].includes(view.id)?h('span', { className: 'lm-navCount' }, String(navCount(view.id))):null,
             ),
           ),
         ),
@@ -4239,8 +4290,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
      * view; a selected room shows live instead of a pane (handled in MeshPanel).
      */
     const NAV_ORDER = [
+      {id:'network',label:()=>COPY.navNetwork},
       { id: 'inbox', label: () => COPY.navInbox },
       { id: 'board', label: () => COPY.navBoard },
+      {id:'manage',label:()=>COPY.navManage},
     ];
     const navLabel = (view) => (view === undefined ? '' : NAV_ORDER.find((entry) => entry.id === view)?.label?.() ?? '');
     /**
@@ -4253,6 +4306,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const view = props.view ?? 'inbox';
       const agents = props.agents ?? { local: [], remote: [] };
       const workspaces = Array.isArray(props.workspaces) ? props.workspaces : [];
+      if(view==='network')return h(NetworkWorkspace,{h,model:networkWorkspaceView({self:props.self,peers:props.peerSource,agents:props.agents,agentsStatus:props.agentsStatus,stale:props.snapshotStale}),onRefresh:props.onRefresh,labels:COPY.networkLabels});
+      if(view==='manage')return h(ManagementWorkspace,{h,self:props.self,uiVersion:PLUGIN_VERSION,hostVersion:props.pluginVersion,onOpenAgents:props.onOpenAgents,labels:COPY.managementLabels});
       if (view === 'rooms') return RoomListPane(props);
       if (view === 'inbox') return InboxPane(props);
       if (view === 'board') return BoardPane(props);
@@ -5028,6 +5083,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [state, setState] = React.useState({ status: 'loading', data: null, error: '' });
       const [joinBusy, setJoinBusy] = React.useState('');
       const [agents, setAgents] = React.useState({ local: [], remote: [] });
+      const [agentsStatus,setAgentsStatus]=React.useState('loading');
+      const mounted=React.useRef(true),snapshotRequest=React.useRef(0),snapshotFlight=React.useRef(null),catalogueRequest=React.useRef(0);
+      React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;snapshotRequest.current++;catalogueRequest.current++;snapshotFlight.current=null;};},[]);
       const [agentBusy, setAgentBusy] = React.useState('');
       const [agentNotice, setAgentNotice] = React.useState('');
       const [agentNoticeBad, setAgentNoticeBad] = React.useState(false);
@@ -5045,13 +5103,15 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 
       const call = React.useCallback(async (endpoint, payload) => panelCall(endpoint, payload), []);
 
-      const refresh = React.useCallback(async () => {
-        try {
-          const value = await call('snapshot', { sessionId: HUMAN_SESSION_ID });
-          setState({ status: 'ready', data: value, error: '' });
-        } catch (error) {
-          setState((current) => ({ status: 'error', data: current.data, error: errorText(error) }));
-        }
+      const refresh = React.useCallback(() => {
+        if(snapshotFlight.current)return snapshotFlight.current;
+        const request=++snapshotRequest.current;
+        const pending=(async()=>{try {
+          const value=await call('snapshot',{sessionId:HUMAN_SESSION_ID});
+          if(mounted.current&&request===snapshotRequest.current)setState({status:'ready',data:value,error:'',observedAt:new Date().toISOString()});
+        }catch(error){if(mounted.current&&request===snapshotRequest.current)setState(current=>({...current,status:'error',error:errorText(error)}));}
+        finally{if(request===snapshotRequest.current)snapshotFlight.current=null;}})();
+        snapshotFlight.current=pending;return pending;
       }, [call]);
 
       const flashRail = React.useCallback((message, bad) => {
@@ -5072,14 +5132,18 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
        * its listing, which is one round trip per node.
        */
       const loadAgents = React.useCallback(async () => {
+        const request=++catalogueRequest.current;
         try {
           const value = await call('agents');
+          if(!mounted.current||request!==catalogueRequest.current)return;
+          setAgentsStatus(Array.isArray(value?.agents)?'ready':'error');
           setAgents({
             local: Array.isArray(value?.agents) ? value.agents : [],
             remote: Array.isArray(value?.remote) ? value.remote : [],
           });
         } catch (error) {
-          setAgents({ local: [], remote: [] });
+          if(!mounted.current||request!==catalogueRequest.current)return;
+          setAgentsStatus('error');
           flashAgent(`${COPY.error}: ${errorText(error)}`, true);
         }
       }, [call, flashAgent]);
@@ -5284,7 +5348,8 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           'div',
           { className: 'lm-main' },
           h(WorkbenchReturnButton,{h,main:true,label:COPY.returnNative,hint:COPY.exitHint,onExit:()=>props?.leavePanel?.(nav.lastSessionId)}),
-          selected !== undefined
+          state.status==='error'&&state.data!==null ? h(WorkspaceReadState,{h,model:shellReadState(state),onRetry:refreshAll,labels:COPY.surfaceLabels}):null,
+          state.data===null ? h(WorkspaceReadState,{h,model:shellReadState(state),onRetry:refreshAll,labels:COPY.surfaceLabels}) : selected !== undefined
             ? h(RoomPane, {
                 key: selected.id,
                 room: selected,
@@ -5305,8 +5370,9 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 expandedMessages,
                 onToggleMessage: (id) =>
                   setExpandedMessages((current) => ({ ...current, [id]: current[id] !== true })),
-                peers,
-                agents,
+                peers,peerSource:data?.peers,
+                agents,agentsStatus,snapshotStale:state.status==='error',pluginVersion:data?.pluginVersion,
+                onOpenAgents:()=>patchMeshNav({view:'agents',roomId:''}),
                 messages: inbox,
                 unread: unreadCount,
                 rooms,
@@ -5340,9 +5406,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 onDial: dialAgent,
                 onCreateAgent: createAgent,
               }),
-          state.status === 'error'
-            ? h('div', { className: 'lm-error lm-note', style: { padding: '0 20px 16px' } }, `${COPY.error}: ${state.error}`)
-            : null,
+
         ),
       );
     }
