@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.10';
+    const PLUGIN_VERSION = '0.4.11';
     const React = require('react');
     const h = React.createElement;
 
@@ -674,6 +674,51 @@ function WorkbenchNavigation({h,rooms=[],archivedRooms=[],view,roomId,onExit,onT
    notice?h('p',{className:'lm-navigationNotice',role:'status'},notice):null);
 }
     /* @ux-shell:workspace-nav:end */
+    /* @ux-shell:composer-drafts:start */
+/** Page-local unsent drafts. No serialization, disk storage, messages, or permissions. */
+function createRoomComposerDrafts() {
+ const entries=new Map();
+ const key=scope=>JSON.stringify([String(scope.nodeId??''),String(scope.sessionId??''),String(scope.roomId??'')]);
+ function remove(record){if(entries.get(record.key)!==record)return;entries.delete(record.key);record.listeners.clear();record.observers.clear();record.attachments?.dispose();record.attachments=null;}
+ return {
+  get(scope){const id=key(scope);if(!entries.has(id))entries.set(id,{key:id,values:Object.create(null),attempt:{current:null},attachments:null,listeners:new Set(),observers:new Set(),revision:0,taskPending:null});return entries.get(id);},
+  bindAttachments(record,create,listener,limits){
+   if(!record.attachments)record.attachments=create(rows=>{record.revision++;for(const fn of [...record.listeners])fn([...rows]);});
+   record.attachments.updateLimits?.(limits);
+   record.listeners.add(listener);listener([...record.attachments.rows]);
+   let subscribed=true;
+   return ()=>{if(!subscribed)return;subscribed=false;record.listeners.delete(listener);if(!record.listeners.size&&record.attachments?.rows.length===0){record.attachments.dispose();record.attachments=null;}};
+  },
+  watch(record,listener){record.observers.add(listener);return()=>record.observers.delete(listener);},
+  acknowledge(record,attempt,revision){
+   if(record.attempt.current!==attempt)return false;
+   record.attempt.current=null;
+   if(record.revision!==revision)return false;
+   for(const [field,value] of Object.entries({draft:'',draftMentions:[],draftSkills:[],caret:0,quickTask:false}))record.values[field]=value;
+   record.attachments?.clear?.();record.revision++;
+   for(const listener of [...record.observers])listener();
+   return true;
+  },
+  acknowledgeForm(record,fields){
+   if(!Object.entries(fields).every(([name,value])=>record.values[name]===value))return false;
+   record.values.taskTitle='';record.values.taskDetail='';record.revision++;
+   for(const listener of [...record.observers])listener();return true;
+  },
+  changed(record){for(const listener of [...record.observers])listener();},
+  drop(scope){const record=entries.get(key(scope));if(record)remove(record);},
+  dispose(){for(const record of [...entries.values()])remove(record);}
+ };
+}
+/** Persist before React commits so immediate navigation cannot discard an edit. */
+function useComposerField(React,record,name,initial,canWrite=()=>true) {
+ if(!Object.hasOwn(record.values,name))record.values[name]=typeof initial==='function'?initial():initial;
+ const [snapshot,setSnapshot]=React.useState(()=>({record,name,value:record.values[name]}));
+ const value=record.values[name];
+ const set=next=>{if(!canWrite())return;const updated=typeof next==='function'?next(record.values[name]):next;if(name!=='caret'&&record.values[name]!==updated)record.revision++;record.values[name]=updated;setSnapshot({record,name,value:updated});};
+ return [value,set];
+}
+    /* @ux-shell:composer-drafts:end */
+    const roomComposerDrafts=createRoomComposerDrafts();
     const STYLE_ID = 'dsh-lan-mesh-styles';
     /** The session id the backend reserves for "me, the human". */
     const HUMAN_SESSION_ID = 'human';
@@ -1749,6 +1794,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const remove=id=>{const row=rows.find(r=>r.id===id);if(!row)return;row.controller?.abort();if(row.preview)URL.revokeObjectURL(row.preview);rows=rows.filter(r=>r!==row);notify();};
       return {
         get rows(){return rows;},
+        updateLimits(value){limits=value;},
         add(files){
           const list=Array.from(files);if(!list.length)return;
           if(!limits)throw new Error(COPY.attachmentLimitsMissing);
@@ -2762,32 +2808,39 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const sessionId = props.sessionId;
       const call = props.call;
       const localAgents = Array.isArray(props.localAgents) ? props.localAgents : [];
+      const draftScope={nodeId:props.self?.nodeId??'',sessionId:sessionId??HUMAN_SESSION_ID,roomId};
+      const draftRecord=roomComposerDrafts.get(draftScope);
+      const draftLifetime=React.useRef({alive:true});
+      React.useEffect(()=>{draftLifetime.current.alive=true;return()=>{draftLifetime.current.alive=false;};},[draftRecord]);
+      const draftField=(name,initial)=>useComposerField(React,draftRecord,name,initial,()=>draftLifetime.current.alive);
 
-      const [contextDocuments, setContextDocuments] = React.useState([]);
+      const [contextDocuments, setContextDocuments] = draftField('contextDocuments',[]);
       const [documentCatalogue,setDocumentCatalogue]=React.useState({status:'idle',rows:[]});
       const [documentPicking,setDocumentPicking]=React.useState(false);
       const documentPicker=React.useRef({alive:true,pending:false,sequence:0});
       const composerSnapshot=React.useRef({});
-      React.useEffect(()=>{documentPicker.current.alive=true;setContextDocuments([]);return()=>{documentPicker.current.alive=false;documentPicker.current.pending=false;documentPicker.current.sequence++;};},[roomId]);
+      React.useEffect(()=>{documentPicker.current.alive=true;return()=>{documentPicker.current.alive=false;documentPicker.current.pending=false;documentPicker.current.sequence++;};},[roomId]);
       const [detail, setDetail] = React.useState({ status: 'loading', room: null, messages: [], viewer: null, error: '' });
       const [tasksOpen, setTasksOpen] = React.useState(false);
-      const [draft, setDraft] = React.useState('');
+      const [draft, setDraft] = draftField('draft','');
       const [busy, setBusy] = React.useState('');
       const [notice, setNotice] = React.useState('');
       const [noticeBad, setNoticeBad] = React.useState(false);
+      const [,setDraftPulse]=React.useState(0);
+      React.useEffect(()=>roomComposerDrafts.watch(draftRecord,()=>setDraftPulse(value=>value+1)),[draftRecord]);
       const [renaming, setRenaming] = React.useState(false);
       const [nameDraft, setNameDraft] = React.useState('');
-      const [assignee, setAssignee] = React.useState('');
-      const [taskTitle, setTaskTitle] = React.useState('');
-      const [taskDetail, setTaskDetail] = React.useState('');
+      const [assignee, setAssignee] = draftField('assignee','');
+      const [taskTitle, setTaskTitle] = draftField('taskTitle','');
+      const [taskDetail, setTaskDetail] = draftField('taskDetail','');
       /** Caret position, so `@` completion knows which token is being typed. */
-      const [caret, setCaret] = React.useState(0);
+      const [caret, setCaret] = draftField('caret',0);
       /** Set by Escape, so the list can be dismissed without changing the text. */
       const [mentionOff, setMentionOff] = React.useState(false);
       /** Highlighted row of the `@` completion list. */
       const [mentionPick, setMentionPick] = React.useState(0);
       /** Selected identities; readable labels are never routing authority. */
-      const [draftMentions, setDraftMentions] = React.useState([]);
+      const [draftMentions, setDraftMentions] = draftField('draftMentions',[]);
       /** Member being renamed locally, plus the draft for the nickname. */
       const [nickMember, setNickMember] = React.useState(null);
       const [nickDraft, setNickDraft] = React.useState('');
@@ -2798,19 +2851,18 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const [membersOpen, setMembersOpen] = React.useState(false);
       /** Quick-task: when checked, the next message also becomes a task
        *  assigned to the first @mentioned member (or everyone if @all). */
-      const [quickTask, setQuickTask] = React.useState(false);
+      const [quickTask, setQuickTask] = draftField('quickTask',false);
       /** Local originals and uploaded references stay in this room draft until acceptance. */
-      const [attachmentRows, setAttachmentRows] = React.useState([]);
+      const [attachmentRows, setAttachmentRows] = React.useState(()=>[...(draftRecord.attachments?.rows??[])]);
       const attachmentDraft = React.useRef(null);
-      const sendAttempt = React.useRef(null);
+      const sendAttempt = draftRecord.attempt;
       React.useEffect(()=>{
-        const draft=createAttachmentDraft({room:roomId,limits:props.attachmentLimits,onChange:setAttachmentRows});
-        attachmentDraft.current=draft;
-        setAttachmentRows([]);setBusy('');sendAttempt.current=null;
-        const cleanup=()=>draft.dispose();
-        window.addEventListener?.('beforeunload',cleanup);
-        return ()=>{if(attachmentDraft.current===draft)attachmentDraft.current=null;cleanup();window.removeEventListener?.('beforeunload',cleanup);};
-      },[roomId,props.attachmentLimits?.maxFileBytes,props.attachmentLimits?.maxMessageBytes,props.attachmentLimits?.maxAttachments,props.attachmentLimits?.maxTotalBytes]);
+        const unsubscribe=roomComposerDrafts.bindAttachments(draftRecord,notify=>createAttachmentDraft({room:roomId,limits:props.attachmentLimits,onChange:notify}),setAttachmentRows,props.attachmentLimits);
+        const draft=draftRecord.attachments;attachmentDraft.current=draft;setBusy('');
+        return ()=>{if(attachmentDraft.current===draft)attachmentDraft.current=null;unsubscribe();};
+      },[draftRecord]);
+      React.useEffect(()=>{draftRecord.attachments?.updateLimits?.(props.attachmentLimits);},[draftRecord,props.attachmentLimits?.maxFileBytes,props.attachmentLimits?.maxMessageBytes,props.attachmentLimits?.maxAttachments,props.attachmentLimits?.maxTotalBytes]);
+
       /**
        * This node's public skill catalogue, as the Host reported it.
        * `status` is 'idle' before the first read, then 'ready' or 'unavailable'
@@ -2818,7 +2870,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
        */
       const [skillCatalogue, setSkillCatalogue] = React.useState({ status: 'idle', skills: [], reason: '' });
       /** Confirmed skill references for the message being written. */
-      const [draftSkills, setDraftSkills] = React.useState([]);
+      const [draftSkills, setDraftSkills] = draftField('draftSkills',[]);
       /** Whether the shared skill menu is open, and its query/highlight. */
       const [skillMenuOpen, setSkillMenuOpen] = React.useState(false);
       const [skillQuery, setSkillQuery] = React.useState('');
@@ -2837,8 +2889,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       }, []);
 
       const load = React.useCallback(async () => {
+        if(!draftLifetime.current.alive)return;
         try {
           const value = await call('roomDetail', { room: roomId, sessionId });
+          if(!draftLifetime.current.alive)return;
           setDetail({
             status: 'ready',
             room: value?.room ?? null,
@@ -2848,7 +2902,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           });
         } catch (error) {
           // A transient failure keeps the last good transcript on screen.
-          setDetail((current) => ({ ...current, status: 'error', error: errorText(error) }));
+          if(draftLifetime.current.alive)setDetail((current) => ({ ...current, status: 'error', error: errorText(error) }));
         }
       }, [call, roomId, sessionId]);
 
@@ -3132,23 +3186,19 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           const fingerprint=JSON.stringify(sayArgs);
           if(sendAttempt.current?.fingerprint!==fingerprint)sendAttempt.current={fingerprint,messageId:window.crypto.randomUUID()};
           sayArgs.messageId=sendAttempt.current.messageId;
+          const submittedAttempt=sendAttempt.current,submittedRevision=draftRecord.revision;
           const value = await call('roomSay', sayArgs);
-          if(attachmentDraft.current!==sendingDraft)return;
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
           const failed = delivered.filter((row) => row.ok !== true);
-          if (failed.length > 0) flash(`${COPY.deliverFailed}: ${failed[0].name ?? ''} ${failed[0].error ?? ''}`, true);
-          else flash('', false);
-          setDraft('');
-          setDraftMentions([]);
-          setDraftSkills([]);
-          sendingDraft.clear();
-          sendAttempt.current=null;
+          if(draftLifetime.current.alive){if (failed.length > 0) flash(`${COPY.deliverFailed}: ${failed[0].name ?? ''} ${failed[0].error ?? ''}`, true);else flash('', false);}
+          roomComposerDrafts.acknowledge(draftRecord,submittedAttempt,submittedRevision);
           // Quick-task flow: if the user ticked the "as task" box, turn the
           // message into a task right after it was sent. The title is the
           // first line (or first 40 chars), and the assignee is the first
           // @mention in the text — falling back to the room leader (i.e. the
           // sender) if nobody was named.
-          if (quickTask === true && isLeader === true) {
+          if (quickTask === true && isLeader === true && !submittedAttempt.taskStarted) {
+            submittedAttempt.taskStarted=true;
             const firstLine = text.split('\n')[0].trim();
             const title = firstLine.length > 40 ? firstLine.slice(0, 40) + '…' : firstLine;
             const detail = firstLine.length <= 40 ? text.slice(firstLine.length).trim() : text;
@@ -3169,7 +3219,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
               assigneeHandle = members.find((m) => m.role === 'leader')?.key ?? '';
             }
             try {
-              await call('roomTaskAssign', {
+              await call('roomAssign', {
                 room: roomId,
                 sessionId,
                 assignee: assigneeHandle,
@@ -3177,12 +3227,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 detail,
               });
             } catch (taskError) {
-              flash(`${COPY.taskFailed}: ${errorText(taskError)}`, true);
+              if(draftLifetime.current.alive)flash(`${COPY.taskFailed}: ${errorText(taskError)}`, true);
             }
-            setQuickTask(false);
           }
-          await load();
-          props.onChanged?.();
+          if(draftLifetime.current.alive){await load();props.onChanged?.();}
         } catch (error) {
           if(attachmentDraft.current===sendingDraft)flash(`${COPY.error}: ${errorText(error)}`, true);
         } finally {
@@ -3215,6 +3263,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
         setBusy('leave');
         try {
           await call('roomLeave', { room: roomId, sessionId });
+          roomComposerDrafts.drop(draftScope);
           props.onChanged?.();
           props.onExited?.();
         } catch (error) {
@@ -3239,11 +3288,13 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       };
 
       const doAssign = async () => {
-        if(documentPicker.current.pending)return;
+        if(documentPicker.current.pending||draftRecord.taskPending)return;
         if (taskTitle.trim() === '') {
           flash(COPY.needTaskTitle, true);
           return;
         }
+        const submittedForm={taskTitle,taskDetail,assignee},pendingTask={};
+        draftRecord.taskPending=pendingTask;roomComposerDrafts.changed(draftRecord);
         setBusy('assign');
         try {
           const value = await call('roomAssign', {
@@ -3256,16 +3307,14 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           });
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
           const failed = delivered.filter((row) => row.ok !== true);
-          if (failed.length > 0) flash(`${COPY.deliverFailed}: ${failed[0].name ?? ''} ${failed[0].error ?? ''}`, true);
-          else flash(COPY.assigned, false);
-          setTaskTitle('');
-          setTaskDetail('');
-          await load();
-          props.onChanged?.();
+          if(draftLifetime.current.alive){if (failed.length > 0) flash(`${COPY.deliverFailed}: ${failed[0].name ?? ''} ${failed[0].error ?? ''}`, true);else flash(COPY.assigned, false);}
+          roomComposerDrafts.acknowledgeForm(draftRecord,submittedForm);
+          if(draftLifetime.current.alive){await load();props.onChanged?.();}
         } catch (error) {
-          flash(`${COPY.error}: ${errorText(error)}`, true);
+          if(draftLifetime.current.alive)flash(`${COPY.error}: ${errorText(error)}`, true);
         } finally {
-          setBusy('');
+          if(draftRecord.taskPending===pendingTask){draftRecord.taskPending=null;roomComposerDrafts.changed(draftRecord);}
+          if(draftLifetime.current.alive)setBusy('');
         }
       };
 
@@ -3644,10 +3693,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                           type: 'button',
                           className: 'lm-btn lm-btnSmall lm-btnPrimary lm-assignBtn',
                           style: { marginTop: '6px' },
-                          disabled: busy === 'assign',
+                          disabled: busy === 'assign'||!!draftRecord.taskPending,
                           onClick: doAssign,
                         },
-                        busy === 'assign' ? COPY.assigning : COPY.assignAction,
+                        busy === 'assign'||draftRecord.taskPending ? COPY.assigning : COPY.assignAction,
                       ),
                     )
                   : null,
@@ -5467,6 +5516,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
           // to install it. That left both the rail unstyled and the chrome
           // marker rules inert on a fresh page.
           installStyles();
+          ctx.effect(()=>{const cleanup=()=>roomComposerDrafts.dispose();window.addEventListener?.('beforeunload',cleanup);return()=>{window.removeEventListener?.('beforeunload',cleanup);cleanup();};},'lanmesh: composer drafts');
           // The navigation services are optional and are read at click time.
           const serviceOf = (name) => {
             try {

@@ -10,7 +10,7 @@
  * selected, a nav view opens), so this harness also renders, clicks a
  * class-tagged node, and renders again.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync,mkdirSync,writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
@@ -24,6 +24,7 @@ const h = (type, props, ...children) => ({ type, props: props ?? {}, children: c
 /** Hook state survives across renders, the way real hooks do. */
 const stateSlots = [];
 const effectSlots = [];
+const hookValues=()=>stateSlots.map(slot=>slot&&typeof slot==='object'&&Object.hasOwn(slot,'record')&&Object.hasOwn(slot,'value')?(slot.name?slot.record.values[slot.name]:slot.value):slot);
 const refSlots = [];
 let cursor = 0;
 let queued = [];
@@ -566,7 +567,7 @@ const context = vm.createContext({
   setInterval: (fn, ms) => { const id = ++intervalId; intervals.set(id, { fn, ms }); return id; },
   clearInterval: (id) => intervals.delete(id),
 });
-vm.runInContext(source.replace('    function DocumentsPane(props) {','    window.__documentsPane = DocumentsPane;\n    function DocumentsPane(props) {').replace('    function RoomPane(props) {','    window.__roomPane = RoomPane;\n    function RoomPane(props) {').replace('    function AttachmentCard(', '    window.__attachmentCard = AttachmentCard;\n    function AttachmentCard('), context);
+vm.runInContext(source.replace('    function DocumentsPane(props) {','    window.__documentsPane = DocumentsPane;\n    function DocumentsPane(props) {').replace('    function RoomPane(props) {','    window.__roomPane = RoomPane; window.__dropComposerDraft=scope=>roomComposerDrafts.drop(scope);\n    function RoomPane(props) {').replace('    function AttachmentCard(', '    window.__attachmentCard = AttachmentCard;\n    function AttachmentCard('), context);
 const loaded = window.__loaded;
 
 const opened = [];
@@ -632,6 +633,7 @@ const hasClass = (node, token) =>
   typeof node?.props?.className === 'string' && node.props.className.split(/\s+/).includes(token);
 
 let lastNodes = [];
+let lastTree;
 let lastText = '';
 
 /** Two components use separate hook position spaces, like two real components. */
@@ -654,23 +656,43 @@ const renderNode = (component) => {
     if (node === null || node === undefined || typeof node === 'boolean') return;
     if (typeof node === 'string' || typeof node === 'number') {
       text.push(String(node));
-      return;
+      return node;
     }
     if (Array.isArray(node)) {
-      for (const item of node) walk(item);
-      return;
+      return node.map(walk);
     }
     if (typeof node.type === 'function') {
-      walk(node.type(node.props ?? {}));
-      return;
+      return walk(node.type(node.props ?? {}));
     }
     nodes.push(node);
-    for (const child of node.children ?? []) walk(child);
+    return {...node,children:(node.children??[]).map(walk)};
   };
-  walk(component());
+  lastTree=walk(component());
   lastNodes = nodes;
   lastText = text.join(' ');
 };
+
+function captureDraftFixture(name){
+ if(process.env.MESH_DRAFT_CAPTURE!=='1')return;
+ const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const render=node=>{
+  if(node==null||typeof node==='boolean')return '';
+  if(Array.isArray(node))return node.map(render).join('');
+  if(typeof node!=='object')return escape(node);
+  const props=node.props??{},type=node.type;if(type==='Fragment')return (node.children??[]).map(render).join('');
+  const attributes=Object.entries(props).filter(([key,value])=>!key.startsWith('on')&&!['ref','key','children','style'].includes(key)&&(typeof value==='string'||typeof value==='number'||value===true)).map(([key,value])=>{
+   if(type==='textarea'&&key==='value')return '';
+   if(key==='src'&&String(value).startsWith('blob:'))value='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#edf0f5"/><text x="16" y="22" text-anchor="middle" font-size="18">图</text></svg>');
+   return ' '+(key==='className'?'class':key==='tabIndex'?'tabindex':key)+'="'+escape(value===true?'':value)+'"';
+  }).join('');
+  const style=props.style?Object.entries(props.style).filter(([,v])=>v!=null).map(([k,v])=>k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())+':'+(typeof v==='number'&&v!==0&&!['opacity','flex','flexGrow','flexShrink','zIndex','fontWeight','lineHeight'].includes(k)?v+'px':v)).join(';'):'';
+  return '<'+type+attributes+(style?' style="'+escape(style)+'"':'')+'>'+(type==='textarea'?escape(props.value??''):(node.children??[]).map(render).join(''))+(['input','img','br','hr'].includes(type)?'':'</'+type+'>');
+ };
+ const directory=join(here,'..','docs','ux','ux1e-drafts-preview');mkdirSync(directory,{recursive:true});
+ const css=source.match(/const CSS = `([\s\S]*?)`;/)[1];
+ const html='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>草稿恢复组件取证</title><style>:root{--dsw-alias-bg-base:#fff;--dsw-alias-bg-layer-1:#f6f7f9;--dsw-alias-bg-layer-2:#edf0f5;--dsw-alias-label-primary:#20242c;--dsw-alias-label-secondary:#616b79;--dsw-alias-label-tertiary:#6a7482;--dsw-alias-border-l1:#e3e7ed;--dsw-alias-border-l2:#bbc3cf;--dsw-alias-brand-primary:#315ecc;--dsw-alias-state-warn:#8a5b12}*{box-sizing:border-box}body{margin:0;height:100dvh;font:14px/1.5 Segoe UI,Microsoft YaHei,sans-serif;color:#20242c}.fixture-note{padding:8px 14px;height:36px;background:#edf0f5;font-size:12px}main{height:calc(100dvh - 36px)}'+css+'main.lm-panel{height:calc(100dvh - 36px);min-height:0}</style><div class="fixture-note">实际Room组件 / 模拟Host · '+escape(name)+' · 缩略图为静态导出占位</div><main class="lm-panel">'+render(lastTree)+'</main></html>';
+ writeFileSync(join(directory,name+'.html'),html);if(name==='restored')writeFileSync(join(directory,'index.html'),html);
+}
 
 /** Effects this render queued run right after it, like React. */
 const flushEffects = () => {
@@ -1023,7 +1045,7 @@ checks.push(['a prefix narrows the picker', count('lm-mentionItem') === 2 && las
 
 // Enter takes the highlighted row and rewrites the token to the title.
 const accepted = await press('lm-composerInput', 'Enter');
-const selectedMention = stateSlots.flatMap((slot) => Array.isArray(slot) ? slot : [])
+const selectedMention = hookValues().flatMap((slot) => Array.isArray(slot) ? slot : [])
   .find((item) => item?.memberKey === 'node-c/session-7');
 checks.push(
   ['selected mention retains member identity separately from text', selectedMention?.label === 'Beta rollout'],
@@ -1044,7 +1066,7 @@ await press('lm-composerInput', 'Enter');
 const selectedText = lastNodes.find(entry => hasClass(entry, 'lm-composerInput')).props.value;
 await typeInto('lm-composerInput', selectedText + '@all');
 await press('lm-composerInput', 'Enter');
-checks.push(['choosing all clears individual reference identities', !stateSlots.some(slot => Array.isArray(slot) && slot.some(item => item?.memberKey))]);
+checks.push(['choosing all clears individual reference identities', !hookValues().some(slot => Array.isArray(slot) && slot.some(item => item?.memberKey))]);
 await click('lm-sendBtn');
 const allRequest = requested.filter(row => row.endpoint === 'roomSay').at(-1);
 checks.push(['broadcast alongside selected individual sends readable all without exact filter', /@all(?:\s|$)/.test(allRequest?.payload.text ?? '') && allRequest?.payload.mentions === undefined]);
@@ -1056,7 +1078,7 @@ await typeInto('lm-composerInput', '@Beta rollout @bet', 18);
 await press('lm-composerInput', 'Enter');
 await typeInto('lm-composerInput', '@Beta rollout ');
 checks.push(['editing out the selected token drops its identity',
-  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+  !hookValues().some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
 
 // Same-machine duplicates need session IDs as a final discriminator.
 await typeInto('lm-composerInput', '');
@@ -1065,13 +1087,13 @@ await press('lm-composerInput', 'Enter');
 await typeInto('lm-composerInput', '@Beta rollout @Beta rollout ');
 await typeInto('lm-composerInput', '@Beta rollout ');
 checks.push(['deleting the selected first duplicate never transfers identity to typed text',
-  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+  !hookValues().some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
 await typeInto('lm-composerInput', '');
 await typeInto('lm-composerInput', '@bet');
 await press('lm-composerInput', 'Enter');
 await typeInto('lm-composerInput', '@Beta rolloutX ');
 checks.push(['appending to the mention label invalidates selected identity',
-  !stateSlots.some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
+  !hookValues().some((slot) => Array.isArray(slot) && slot.some((item) => item?.memberKey))]);
 
 remoteAgent.nodeName = offlinePeer.nodeName = 'Shared workstation';
 offlinePeer.nodeId = 'node-b';
@@ -1126,7 +1148,7 @@ checks.push(
 
 // Enter confirms a reference: the token leaves the text and a chip appears.
 await press('lm-composerInput', 'Enter');
-const pickedSkill = stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : []))
+const pickedSkill = hookValues().flatMap((slot) => (Array.isArray(slot) ? slot : []))
   .find((item) => item?.name === 'deploy');
 checks.push(
   ['confirming a skill creates a reference with its source node', pickedSkill?.sourceNodeId === 'node-a'],
@@ -1157,7 +1179,7 @@ checks.push(
     'a skill reference carries no execution instruction',
     Object.keys(skillRequest?.payload?.skillRefs?.[0] ?? {}).sort().join(',') === 'name,sourceNodeId,sourceNodeName',
   ],
-  ['sending clears the confirmed references', !stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
+  ['sending clears the confirmed references', !hookValues().flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
 );
 
 // A reference can be dropped again before sending, and dropping it removes the
@@ -1167,7 +1189,7 @@ await press('lm-composerInput', 'Enter');
 await click('lm-skillChipRemove');
 checks.push(
   ['a confirmed skill can be removed', count('lm-skillChip') === 0],
-  ['removing a skill clears its reference', !stateSlots.flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
+  ['removing a skill clears its reference', !hookValues().flatMap((slot) => (Array.isArray(slot) ? slot : [])).some((item) => item?.name === 'deploy')],
 );
 
 // Typed text that merely looks like a command stays text. The list may have
@@ -1640,7 +1662,7 @@ const docMentionCall=async(method,payload)=>{
  return {};
 };
 const MentionDocumentsComponent=()=>window.__roomPane({room:{id:'room-doc-mention',name:'Document mention'},sessionId:'human',self:{nodeId:'node-a'},call:docMentionCall});
-await switchTo(MentionDocumentsComponent);
+window.__dropComposerDraft({nodeId:'node-a',sessionId:'human',roomId:'room-doc-mention'});await switchTo(MentionDocumentsComponent);
 lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
 const documentCandidate=lastNodes.find(n=>hasClass(n,'lm-mentionDocument'));
 checks.push(['at menu offers document candidates with an explicit kind',!!documentCandidate&&lastText.includes('文档')&&lastText.includes('Design reference')]);
@@ -1654,7 +1676,7 @@ if(documentCandidate){
 }
 
 
-await switchTo(MentionDocumentsComponent);docMentionFailure=true;
+window.__dropComposerDraft({nodeId:'node-a',sessionId:'human',roomId:'room-doc-mention'});await switchTo(MentionDocumentsComponent);docMentionFailure=true;
 lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
 lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
 checks.push(['failed document pick preserves typed token and shows a retryable error',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='@Design'&&count('lm-contextDocument')===0&&lastText.includes('document offline')]);
@@ -1666,7 +1688,7 @@ checks.push(['pending document selection cannot send an incomplete context',docM
 lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'new input while reading',selectionStart:23}});await settleIn(MentionDocumentsComponent);
 const releaseDocument=docMentionRelease;docMentionRelease=undefined;releaseDocument();await settleIn(MentionDocumentsComponent);
 checks.push(['late document read cannot overwrite edited draft',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='new input while reading'&&count('lm-contextDocument')===0]);
-await switchTo(MentionDocumentsComponent);
+window.__dropComposerDraft({nodeId:'node-a',sessionId:'human',roomId:'room-doc-mention'});await switchTo(MentionDocumentsComponent);
 lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
 lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onKeyDown({key:'Tab',preventDefault(){}});await settleIn(MentionDocumentsComponent);
 checks.push(['keyboard selects a pinned document instead of sending',count('lm-contextDocument')===1]);
@@ -1674,7 +1696,7 @@ const removeReference=lastNodes.find(n=>n.props?.['aria-label']==='移除文档�
 checks.push(['one document reference can be removed without editing text',count('lm-contextDocument')===0]);
 
 
-await switchTo(MentionDocumentsComponent);docMentionRelease=()=>{};
+window.__dropComposerDraft({nodeId:'node-a',sessionId:'human',roomId:'room-doc-mention'});await switchTo(MentionDocumentsComponent);docMentionRelease=()=>{};
 lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Design',selectionStart:7}});await settleIn(MentionDocumentsComponent);
 lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
 const oldRoomRelease=docMentionRelease;docMentionRelease=undefined;
@@ -1685,8 +1707,8 @@ oldRoomRelease();await settleIn(OtherMentionRoom);
 checks.push(['old room document read cannot leak into a new room draft',count('lm-contextDocument')===0&&lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='other room draft']);
 
 
-await switchTo(MentionDocumentsComponent);
 docMentionRows=Array.from({length:9},(_,i)=>({documentId:'doc-c'+String(i).padStart(11,'0'),roomId:'room-doc-mention',title:'Limit'+i,headRevisionId:'rev-c'+String(i).padStart(11,'0')}));
+window.__dropComposerDraft({nodeId:'node-a',sessionId:'human',roomId:'room-doc-mention'});await switchTo(MentionDocumentsComponent);
 for(let i=0;i<8;i++){
  const value='@Limit'+i;lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value,selectionStart:value.length}});await settleIn(MentionDocumentsComponent);
  lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(MentionDocumentsComponent);
@@ -1736,6 +1758,60 @@ lastNodes.find(n=>hasClass(n,'lm-workspaceSwitch')).props.onChange({target:{valu
 checks.push(['compact navigation opens the exact listed room',count('lm-roomPane')===1&&lastText.includes('hello from beta')]);
 const detailsBeforeForeign=requested.filter(r=>r.endpoint==='roomDetail').length;lastNodes.find(n=>hasClass(n,'lm-workspaceSwitch')).props.onChange({target:{value:'room:foreign'}});await settle();
 checks.push(['compact selector rejects an unlisted room identity',requested.filter(r=>r.endpoint==='roomDetail').length===detailsBeforeForeign]);
+const retainedCalls=[],retainedTasks=[];let retainedFailure=true,retainedSendGate;
+const retainedDoc={documentId:'doc-eeeeeeeeeeee',roomId:'room-draft-a',title:'Draft design',headRevisionId:'rev-eeeeeeeeeeee'};
+const retainedCall=async(method,payload)=>{
+ if(method==='roomDetail')return {room:{id:payload.room,name:payload.room,members:[{...human,role:'leader'},remoteAgent],leader:{...human,role:'leader'},tasks:[]},viewer:{isMember:true,isLeader:true},messages:[]};
+ if(method==='roomSkills')return {status:'ready',skills:[{name:'deploy',description:'Deploy hint',sourceNodeId:'node-a',sourceNodeName:'Local node'}]};
+ if(method==='documents')return {status:'ready',documents:[retainedDoc]};
+ if(method==='documentRead')return {status:'ready',document:{...retainedDoc,contentHash:'e'.repeat(64)},revision:{revisionId:retainedDoc.headRevisionId}};
+ if(method==='roomAssign'){retainedTasks.push(payload);return {delivered:[],task:{id:'task-retained'}};}
+ if(method==='roomSay'){retainedCalls.push(payload);const gate=retainedSendGate;if(gate)await gate;if(retainedFailure)throw Error('retry after navigation');return {delivered:[],room:{id:payload.room}};}
+ return {};
+};
+const DraftRoomA=()=>h(window.__roomPane,{room:{id:'room-draft-a'},sessionId:'human',self:answers.snapshot.self,attachmentLimits:answers.snapshot.roomAttachmentLimits,call:retainedCall});
+const DraftRoomB=()=>h(window.__roomPane,{room:{id:'room-draft-b'},sessionId:'human',self:answers.snapshot.self,attachmentLimits:answers.snapshot.roomAttachmentLimits,call:retainedCall});
+await switchTo(DraftRoomA);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Draft',selectionStart:6}});await settleIn(DraftRoomA);
+lastNodes.find(n=>hasClass(n,'lm-mentionDocument')).props.onMouseDown({preventDefault(){}});await settleIn(DraftRoomA);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'/deploy',selectionStart:7}});await settleIn(DraftRoomA);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onKeyDown({key:'Enter',shiftKey:false,preventDefault(){}});await settleIn(DraftRoomA);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'@Beta',selectionStart:5}});await settleIn(DraftRoomA);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onKeyDown({key:'Enter',shiftKey:false,preventDefault(){}});await settleIn(DraftRoomA);
+const preservedText=lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value+'retained message';
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:preservedText,selectionStart:preservedText.length}});await settleIn(DraftRoomA);
+let releaseRetainedUpload;uploadGate=new Promise(resolve=>releaseRetainedUpload=resolve);const uploadsBeforeRetain=uploaded.length;
+const retainedImage=new File([new Uint8Array([1,4,8,16])],'retained.png',{type:'image/png'});
+lastNodes.find(n=>hasClass(n,'lm-fileInput')).props.onChange({target:{files:[retainedImage],value:'picked'}});await settleIn(DraftRoomA);
+captureDraftFixture('pending');
+checks.push(['retained draft starts with pinned document, skill and pending image',count('lm-contextDocument')===1&&count('lm-skillChip')===1&&count('lm-fileChip')===1]);
+await switchTo(DraftRoomB);lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'independent room B',selectionStart:18}});await settleIn(DraftRoomB);
+uploadGate=null;releaseRetainedUpload();await settleIn(DraftRoomB);
+checks.push(['detached upload does not leak draft or attachment into another room',count('lm-fileChip')===0&&lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='independent room B']);
+await switchTo(DraftRoomA);
+captureDraftFixture('restored');
+checks.push(['returning restores text, fixed references and completed image without reupload',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value===preservedText&&count('lm-contextDocument')===1&&count('lm-skillChip')===1&&count('lm-fileChip')===1&&lastText.includes('已上传')&&uploaded.length===uploadsBeforeRetain+1]);
+await lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);
+checks.push(['failed retained draft keeps its message and image',retainedCalls.length===1&&lastText.includes('retry after navigation')&&count('lm-fileChip')===1]);
+await switchTo(DraftRoomB);checks.push(['other room draft restores independently',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='independent room B']);
+await switchTo(DraftRoomA);retainedFailure=false;await lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);
+const firstRetained=retainedCalls[0],secondRetained=retainedCalls[1];
+checks.push(['retry after navigation preserves message ID, attachment and exact identities',firstRetained?.messageId===secondRetained?.messageId&&JSON.stringify(firstRetained?.attachments)===JSON.stringify(secondRetained?.attachments)&&secondRetained?.mentions?.[0]?.memberKey===remoteAgent.key&&secondRetained?.skillRefs?.[0]?.sourceNodeId==='node-a'&&secondRetained?.contextSelection?.selectedDocumentVersions?.[0]?.revisionId===retainedDoc.headRevisionId]);
+await switchTo(DraftRoomB);await switchTo(DraftRoomA);
+checks.push(['accepted send is not restored as an unsent message',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value===''&&count('lm-fileChip')===0&&count('lm-skillChip')===0&&uploaded.length===uploadsBeforeRetain+1]);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'background accepted',selectionStart:19}});await settleIn(DraftRoomA);
+let releaseBackground;retainedSendGate=new Promise(resolve=>releaseBackground=resolve);const backgroundSend=lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);await switchTo(DraftRoomB);
+retainedSendGate=null;releaseBackground();await backgroundSend;await settleIn(DraftRoomB);await switchTo(DraftRoomA);
+checks.push(['successful send while away is cleared from the retained draft',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='']);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'old submitted message',selectionStart:21}});await settleIn(DraftRoomA);
+let releaseOldSend;retainedSendGate=new Promise(resolve=>releaseOldSend=resolve);const oldSend=lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);await switchTo(DraftRoomB);await switchTo(DraftRoomA);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'new draft after returning',selectionStart:25}});await settleIn(DraftRoomA);
+retainedSendGate=null;releaseOldSend();await oldSend;await settleIn(DraftRoomA);
+checks.push(['late acceptance never clears a newer draft written after returning',lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.value==='new draft after returning']);
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'quick task while away',selectionStart:21}});lastNodes.find(n=>hasClass(n,'lm-taskPill')).props.onClick();await settleIn(DraftRoomA);
+let releaseQuick;retainedSendGate=new Promise(resolve=>releaseQuick=resolve);const quickOne=lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);await switchTo(DraftRoomB);await switchTo(DraftRoomA);
+const quickTwo=lastNodes.find(n=>hasClass(n,'lm-sendBtn')).props.onClick();await settleIn(DraftRoomA);retainedSendGate=null;releaseQuick();await Promise.all([quickOne,quickTwo]);await settleIn(DraftRoomA);
+checks.push(['background quick-task uses the existing endpoint exactly once despite concurrent retry',retainedTasks.length===1&&retainedTasks[0].room==='room-draft-a'&&retainedCalls.at(-1).messageId===retainedCalls.at(-2).messageId&&lastNodes.find(n=>hasClass(n,'lm-taskPill')).props['aria-pressed']===false]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;
