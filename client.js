@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.6';
+    const PLUGIN_VERSION = '0.4.7';
     const React = require('react');
     const h = React.createElement;
 
@@ -219,6 +219,9 @@ window.__ModuleLoader__.load({
           versionLabels: {versions:'身份与版本',ui:'界面',host:'服务端',unknown:'版本未知',node:'节点',mismatch:'版本不一致，请重新加载插件和界面'},
           projects: '项目',
           joinableShort: '可加入',
+          discoverProjects:'发现项目',
+          projectActions:'项目操作',
+          discoverLabels:{},
           noAgentsRail: '还没有 Agent',
           sessionUnavailable: '打不开这个会话',
           inboxHint: '你参与的对话与项目活动会汇总在这里',
@@ -455,6 +458,9 @@ window.__ModuleLoader__.load({
           versionLabels: {versions:'Identity and versions',ui:'UI',host:'Host',unknown:'Unknown version',node:'Node',mismatch:'Version mismatch; reload the plugin and UI'},
           projects: 'Projects',
           joinableShort: 'Joinable',
+          discoverProjects:'Discover projects',
+          projectActions:'Project actions',
+          discoverLabels:{title:'Discover projects',close:'Close',search:'Search project, device or Room ID',leader:'Leader',unknownLeader:'Unknown leader',unknownDevice:'Unknown device',empty:'No matching projects available to join',join:'Join',joining:'Joining…',hint:'Check the leader device and Room ID for namesake projects. Existing room authorization still applies.'},
           noAgentsRail: 'No agent yet',
           sessionUnavailable: 'Could not open that session',
           inboxHint: 'Activity from your conversations and projects lands here',
@@ -575,6 +581,29 @@ function WorkbenchHeader({h,model,title,subtitle,backLabel,backHint,onExit,label
 }
     /* @ux-shell:components:end */
 
+    /* @ux-shell:project-model:start */
+/** Project names are labels. Room IDs remain the identity for every action. */
+function discoverProjectsView(input, query='') {
+  const rows=Array.isArray(input)?input:[], seen=new Set(),needle=String(query??'').trim().toLocaleLowerCase();
+  const value=x=>typeof x==='string'?x:'';
+  return rows.filter(room=>room&&typeof room.id==='string'&&room.id&&!room.isMember&&room.deleted!==true&&room.lifecycle?.status!=='archived').filter(room=>{if(seen.has(room.id))return false;seen.add(room.id);return true;}).map(room=>({id:room.id,name:value(room.name)||room.id,topic:value(room.topic),leaderName:value(room.leader?.name)||value(room.leader?.title),deviceName:value(room.leader?.nodeName)||value(room.leader?.nodeId)})).filter(row=>!needle||[row.id,row.name,row.topic,row.leaderName,row.deviceName].some(x=>x.toLocaleLowerCase().includes(needle)));
+}
+    /* @ux-shell:project-model:end */
+    /* @ux-shell:discovery:start */
+/** Nonmodal read-only discovery surface; all joins use the existing Host handler. */
+function DiscoverProjectsPanel({h,rows,query,onQuery,onJoin,onClose,busy,labels={},panelRef,error=''}) {
+  const copy={title:'发现项目',close:'关闭',search:'搜索项目、设备或 Room ID',leader:'Leader',unknownLeader:'负责人未知',unknownDevice:'设备未知',empty:'没有符合条件的可加入项目',join:'加入',joining:'加入中…',hint:'同名项目请核对负责人设备与 Room ID。加入仍由现有房间权限校验。',...labels};
+  return h('aside',{className:'lm-discoverPanel',id:'lm-discover-projects',role:'region','aria-label':copy.title,tabIndex:-1,ref:panelRef,onKeyDown:event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}}},
+    h('div',{className:'lm-discoverHead'},h('h2',null,copy.title),h('button',{type:'button',className:'lm-btn lm-discoverClose',onClick:onClose,'aria-label':copy.close},copy.close)),
+    h('p',{className:'lm-discoverHint'},copy.hint),
+    h('input',{className:'lm-input lm-discoverSearch',type:'search',value:query,maxLength:200,'aria-label':copy.search,placeholder:copy.search,onChange:event=>onQuery(event.target.value)}),
+    error?h('p',{className:'lm-error lm-discoverError',role:'alert'},error):null,
+    h('div',{className:'lm-discoverResults','aria-live':'polite'},rows.length===0?h('p',{className:'lm-muted lm-discoverEmpty'},copy.empty):rows.map(row=>h('article',{key:row.id,className:'lm-discoverProject'},
+      h('div',{className:'lm-discoverProjectBody'},h('strong',{className:'lm-discoverProjectName'},row.name),row.topic?h('p',{className:'lm-discoverTopic'},row.topic):null,
+        h('p',{className:'lm-discoverLeader'},`${copy.leader}: ${row.leaderName||copy.unknownLeader} · ${row.deviceName||copy.unknownDevice}`),h('code',{className:'lm-discoverId'},row.id)),
+      h('button',{type:'button',className:'lm-btn lm-btnPrimary lm-joinBtn',disabled:!!busy,onClick:()=>onJoin(row.id),'aria-label':`${copy.join} ${row.name} · ${row.id}`},busy===row.id?copy.joining:copy.join)))));
+}
+    /* @ux-shell:discovery:end */
     const STYLE_ID = 'dsh-lan-mesh-styles';
     /** The session id the backend reserves for "me, the human". */
     const HUMAN_SESSION_ID = 'human';
@@ -596,6 +625,31 @@ function WorkbenchHeader({h,model,title,subtitle,backLabel,backHint,onExit,label
 @media(max-width:1100px){.lm-mainReturn{position:sticky;top:0;z-index:3;background:var(--dsw-alias-bg-base);margin:4px 8px;min-height:32px}.lm-mainReturn .lm-returnLabel{display:inline}}
 @media(prefers-reduced-motion:reduce){.lm-workbenchReturn{transition:none}}
     /* @ux-shell:styles:end */
+/* @ux-shell:project-styles:start */
+.lm-discoverTrigger{width:100%;justify-content:space-between;margin-top:10px}
+.lm-discoverPanel{position:fixed;right:24px;top:72px;bottom:24px;width:min(680px,calc(100vw - 340px));z-index:50;display:flex;flex-direction:column;gap:12px;padding:20px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l1);border-radius:10px;box-sizing:border-box;box-shadow:0 8px 32px #0002;min-width:0;overflow:hidden}
+.lm-discoverHead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none}
+.lm-discoverHead h2{margin:0;font-size:18px;font-weight:600}
+.lm-discoverHint,.lm-discoverLeader,.lm-discoverTopic{margin:0;font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.6;overflow-wrap:anywhere}
+.lm-discoverSearch{flex:none;width:100%;box-sizing:border-box}
+.lm-discoverResults{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:0}
+.lm-discoverProject{display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.lm-discoverProjectBody{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.lm-discoverProjectName{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.lm-discoverId{font-size:11px;overflow-wrap:anywhere;user-select:text;color:var(--dsw-alias-label-secondary)}
+.lm-discoverEmpty{padding:20px 0;font-size:13px}.lm-discoverError{margin:0;font-size:12px}
+.lm-projectEntry{display:flex;align-items:flex-start;position:relative;gap:4px;min-width:0}
+.lm-projectEntry>.lm-roomRow{flex:1;min-width:0}
+.lm-projectEntry>.lm-roomPreferences{flex:0 0 30px;position:relative}
+.lm-projectEntry .lm-roomPreferences>summary{cursor:pointer;list-style:none;padding:7px 4px;min-height:32px;text-align:center;border-radius:6px;color:var(--dsw-alias-label-secondary)}
+.lm-projectEntry .lm-roomPreferences>summary::-webkit-details-marker{display:none}
+.lm-projectEntry .lm-roomPreferences>summary:hover{background:var(--dsw-alias-bg-layer-2)}
+.lm-projectEntry .lm-roomPreferences>summary:focus-visible,.lm-discoverPanel:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.lm-projectMenu{position:absolute;right:0;top:100%;width:238px;max-width:calc(100vw - 32px);padding:10px;display:flex;flex-direction:column;gap:10px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;z-index:4;box-sizing:border-box;box-shadow:0 4px 16px #0002}
+.lm-projectMenu .lm-row{align-items:flex-start;font-size:12px;gap:7px}.lm-projectMenu input{flex:none}
+@media(max-width:1100px){.lm-discoverPanel{left:16px;right:16px;top:56px;bottom:16px;width:auto;max-width:720px;margin-left:auto}}
+@media(max-width:600px){.lm-discoverPanel{left:8px;right:8px;top:48px;bottom:8px;padding:14px}.lm-discoverProject{gap:10px}.lm-discoverHead h2{font-size:16px}}
+    /* @ux-shell:project-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
@@ -3871,6 +3925,11 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
       const agents = Array.isArray(props.agents) ? props.agents : [];
       const joinable = Array.isArray(props.joinable) ? props.joinable : [];
       const [showArchived,setShowArchived] = React.useState(false);
+      const [showDiscover,setShowDiscover]=React.useState(false);
+      const [discoverQuery,setDiscoverQuery]=React.useState('');
+      const discoverRef=React.useRef(null),discoverTriggerRef=React.useRef(null),discoverCycle=React.useRef(0);
+      const closeDiscover=()=>{discoverCycle.current++;setShowDiscover(false);discoverTriggerRef.current?.focus?.();};
+      React.useEffect(()=>{if(showDiscover)discoverRef.current?.focus?.();},[showDiscover]);
       // Nickname inline-editing: the input is hidden by default to keep the
       // rail clean — a click on the name opens it, and blur / Enter saves.
       const [editingNick, setEditingNick] = React.useState(false);
@@ -4050,7 +4109,7 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                 'div',
                 { className: 'lm-railList' },
                 ...rooms.map((room) =>
-                  h('div', {key:room.id}, h(
+                  h('div', {key:room.id,className:'lm-projectEntry'}, h(
                     'button',
                     {
                       key: room.id,
@@ -4064,48 +4123,19 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
                     room.localPreferences?.muted ? h('span',{className:'lm-badge'},'静音') : null,
                     room.isLeader === true ? h('span', { className: 'lm-badge lm-badgeLeader' }, COPY.roleLeader) : null,
                     unreadOf(room.id) > 0 ? h('span', { className: 'lm-roomUnread' }, String(unreadOf(room.id))) : null,
-                  ), h('details',{className:'lm-roomPreferences'},
-                    h('summary',{},'房间设置'),
+                  ), h('details',{className:'lm-roomPreferences',onToggle:event=>{if(event.currentTarget.open)event.currentTarget.querySelector?.('.lm-projectMenu')?.scrollIntoView?.({block:'nearest'});},onKeyDown:event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector?.('summary')?.focus?.();}}},
+                    h('summary',{'aria-label':COPY.projectActions+' · '+(room.name||room.id),title:COPY.projectActions},'…'),
+                    h('div',{className:'lm-projectMenu'},
                     room.isLeader ? h('button',{type:'button',className:'lm-archiveRoom',disabled:!!props.preferenceBusy,onClick:()=>props.onLifecycle?.(room,'archived')},'归档房间') : null,
                     ...[['pinned','置顶'],['muted','静音'],['muteAtException','静音时被 @ 仍提醒']].map(([field,label])=>h('label',{key:field,className:'lm-row'},
                       h('input',{type:'checkbox',className:`lm-pref-${field}`,checked:room.localPreferences?.[field] ?? (field==='muteAtException'),disabled:!!props.preferenceBusy,onChange:event=>props.onPreferences?.(room.id,{[field]:event.target.checked})}),label)),
                     props.preferenceBusy===room.id ? h('span',{role:'status'},'正在保存…') : null,
+                    ),
                   )),
                 ),
               ),
-          joinable.length === 0 ? null : h('div', { className: 'lm-railTitle' }, COPY.joinableShort),
-          joinable.length === 0
-            ? null
-            : h(
-                'div',
-                { className: 'lm-railList' },
-                ...joinable.map((room) =>
-                  h(
-                    'div',
-                    { key: room.id, className: 'lm-joinRow' },
-                    h(
-                      'div',
-                      { className: 'lm-joinInfo' },
-                      h('span', { className: 'lm-roomRowName' }, room.name || room.id),
-                      h(
-                        'span',
-                        { className: 'lm-joinMeta' },
-                        room.topic || `${COPY.roleLeader}: ${room.leader?.name || room.leader?.nodeId || COPY.noLeader}`,
-                      ),
-                    ),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'lm-btn lm-btnSmall lm-btnPrimary lm-joinBtn',
-                        disabled: props.joinBusy === room.id,
-                        onClick: () => props.onJoin(room.id),
-                      },
-                      props.joinBusy === room.id ? COPY.joining : COPY.join,
-                    ),
-                  ),
-                ),
-              ),
+          h('button',{type:'button',className:'lm-navBtn lm-discoverTrigger',ref:discoverTriggerRef,'aria-expanded':showDiscover,'aria-controls':'lm-discover-projects',onClick:()=>{discoverCycle.current++;setShowDiscover(value=>!value)}},h('span',null,COPY.discoverProjects),h('span',{className:'lm-navCount'},String(discoverProjectsView(joinable).length))),
+          showDiscover ? h(DiscoverProjectsPanel,{h,rows:discoverProjectsView(joinable,discoverQuery),query:discoverQuery,onQuery:setDiscoverQuery,panelRef:discoverRef,labels:COPY.discoverLabels,busy:props.joinBusy,error:props.railNoticeBad?props.railNotice:'',onClose:closeDiscover,onJoin:async id=>{const cycle=discoverCycle.current;if(await props.onJoin(id)===true&&cycle===discoverCycle.current)closeDiscover();}}):null,
         ),
 
         h(
@@ -4903,8 +4933,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
             noticeBad: false,
           });
           await refresh();
+          return true;
         } catch (error) {
           notice(`${COPY.error}: ${errorText(error)}`, true);
+          return false;
         } finally {
           setBusy('');
         }

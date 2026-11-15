@@ -1,0 +1,68 @@
+{
+  "screenshots": [
+    {
+      "name": "network-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1024-light-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 768
+    },
+    {
+      "name": "network-390-light-default",
+      "width": 390,
+      "height": 844,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 844
+    },
+    {
+      "name": "network-1440-dark-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-empty",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-failed",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    },
+    {
+      "name": "network-1440-light-busy",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "windowHeight": 900
+    }
+  ],
+  "runtimeErrors": []
+}

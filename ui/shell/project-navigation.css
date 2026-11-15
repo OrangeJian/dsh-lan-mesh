@@ -1,0 +1,23 @@
+.lm-discoverTrigger{width:100%;justify-content:space-between;margin-top:10px}
+.lm-discoverPanel{position:fixed;right:24px;top:72px;bottom:24px;width:min(680px,calc(100vw - 340px));z-index:50;display:flex;flex-direction:column;gap:12px;padding:20px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l1);border-radius:10px;box-sizing:border-box;box-shadow:0 8px 32px #0002;min-width:0;overflow:hidden}
+.lm-discoverHead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none}
+.lm-discoverHead h2{margin:0;font-size:18px;font-weight:600}
+.lm-discoverHint,.lm-discoverLeader,.lm-discoverTopic{margin:0;font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.6;overflow-wrap:anywhere}
+.lm-discoverSearch{flex:none;width:100%;box-sizing:border-box}
+.lm-discoverResults{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:0}
+.lm-discoverProject{display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.lm-discoverProjectBody{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.lm-discoverProjectName{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.lm-discoverId{font-size:11px;overflow-wrap:anywhere;user-select:text;color:var(--dsw-alias-label-secondary)}
+.lm-discoverEmpty{padding:20px 0;font-size:13px}.lm-discoverError{margin:0;font-size:12px}
+.lm-projectEntry{display:flex;align-items:flex-start;position:relative;gap:4px;min-width:0}
+.lm-projectEntry>.lm-roomRow{flex:1;min-width:0}
+.lm-projectEntry>.lm-roomPreferences{flex:0 0 30px;position:relative}
+.lm-projectEntry .lm-roomPreferences>summary{cursor:pointer;list-style:none;padding:7px 4px;min-height:32px;text-align:center;border-radius:6px;color:var(--dsw-alias-label-secondary)}
+.lm-projectEntry .lm-roomPreferences>summary::-webkit-details-marker{display:none}
+.lm-projectEntry .lm-roomPreferences>summary:hover{background:var(--dsw-alias-bg-layer-2)}
+.lm-projectEntry .lm-roomPreferences>summary:focus-visible,.lm-discoverPanel:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.lm-projectMenu{position:absolute;right:0;top:100%;width:238px;max-width:calc(100vw - 32px);padding:10px;display:flex;flex-direction:column;gap:10px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;z-index:4;box-sizing:border-box;box-shadow:0 4px 16px #0002}
+.lm-projectMenu .lm-row{align-items:flex-start;font-size:12px;gap:7px}.lm-projectMenu input{flex:none}
+@media(max-width:1100px){.lm-discoverPanel{left:16px;right:16px;top:56px;bottom:16px;width:auto;max-width:720px;margin-left:auto}}
+@media(max-width:600px){.lm-discoverPanel{left:8px;right:8px;top:48px;bottom:8px;padding:14px}.lm-discoverProject{gap:10px}.lm-discoverHead h2{font-size:16px}}

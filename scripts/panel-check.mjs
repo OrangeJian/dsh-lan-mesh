@@ -492,7 +492,7 @@ const answers = {
 const asked = [];
 const requested = [];
 let agentsGate;
-let uploadFailure=false,sendFailure=false,uploadGate;
+let uploadFailure=false,sendFailure=false,uploadGate,joinFailure=false;
 const uploaded=[];
 const fetch = async (route, init) => {
   if(route.startsWith('/api/lan-mesh/attachments?')){
@@ -517,6 +517,7 @@ const fetch = async (route, init) => {
   }
   if (endpoint === 'agents' && agentsGate) await agentsGate;
   if (endpoint === 'roomJoin') {
+    if(joinFailure)throw Error('Join rejected for verification');
     const joined = { ...strangerRoom, isMember: true, role: 'member' };
     answers.snapshot.rooms.mine.push(joined);
     answers.snapshot.rooms.all = answers.snapshot.rooms.all.map(room => room.id === joined.id ? joined : room);
@@ -780,6 +781,7 @@ const checks = [
   ['the rail offers a way back to the conversation', count('lm-conversation') === 1 && lastText.includes('对话')],
   ['return to native conversation has an explicit accessible name', lastNodes.some(n=>hasClass(n,'lm-conversation')&&n.props['aria-label']==='返回对话')],
   ['workbench brand separates versions into expandable identity details',count('lm-workbenchHeader')===1&&count('lm-versionDetails')===1],
+  ['project settings are accessible row-end actions',lastNodes.filter(n=>n.type==='summary'&&n.props['aria-label']?.startsWith('项目操作')).length===2&&!lastText.includes('房间设置')],
   ['the rail shows the configured identity', lastText.includes('建哥') && lastText.includes('node-a')],
   [
     'the rail shows inbox and the task board',
@@ -790,7 +792,7 @@ const checks = [
   ['the projects section shows both joined rooms', lastText.includes('Alpha room') && lastText.includes('Gamma side project')],
   ['the projects section badges unread room messages', count('lm-roomUnread') === 1 && lastText.includes('2')],
   ['the projects section offers a new project', count('lm-projectsAdd') === 1],
-  ['the projects section shows joinable rooms', lastText.includes('Beta project') && count('lm-joinBtn') === 1],
+  ['project discovery is a compact entry instead of persistent join cards', count('lm-discoverTrigger')===1 && count('lm-joinBtn')===0],
   // Resident sessions (imported here) and sessions pulled into a room belong on
   // the rail; a stored session that is neither must not.
   [
@@ -1391,6 +1393,18 @@ checks.push([
 // Joining from the actual native-sidebar host must forward the callback, use
 // the human identity and refresh the joined project list.
 await switchTo(RailHost);
+await clickRail('lm-discoverTrigger');
+checks.push(['discovery opens a named nonmodal project panel',count('lm-discoverPanel')===1&&count('lm-joinBtn')===1&&lastNodes.find(n=>hasClass(n,'lm-discoverPanel')).props.id==='lm-discover-projects']);
+lastNodes.find(n=>hasClass(n,'lm-discoverSearch')).props.onChange({target:{value:'no such project'}});await settleRail();
+checks.push(['discovery search has an explicit empty state',count('lm-joinBtn')===0&&lastText.includes('没有符合条件')]);
+lastNodes.find(n=>hasClass(n,'lm-discoverPanel')).props.onKeyDown({key:'Escape',preventDefault(){},stopPropagation(){}});await settleRail();
+checks.push(['Escape closes discovery without joining',count('lm-discoverPanel')===0]);
+await clickRail('lm-discoverTrigger');
+checks.push(['discovery preserves search across closing',lastNodes.find(n=>hasClass(n,'lm-discoverSearch')).props.value==='no such project']);
+lastNodes.find(n=>hasClass(n,'lm-discoverSearch')).props.onChange({target:{value:'Beta'}});await settleRail();
+joinFailure=true;await clickRail('lm-joinBtn');
+checks.push(['failed join preserves discovery, search and retryable error',count('lm-discoverPanel')===1&&count('lm-discoverError')===1&&lastNodes.find(n=>hasClass(n,'lm-discoverSearch')).props.value==='Beta']);
+joinFailure=false;
 await clickRail('lm-joinBtn');
 const joinRequest = requested.find(entry => entry.endpoint === 'roomJoin');
 checks.push(
@@ -1400,7 +1414,7 @@ checks.push(
       joinRequest?.payload.sessionId === 'human' &&
       joinRequest?.payload.sessionName === '建哥',
   ],
-  ['joined project moves out of the joinable list', count('lm-joinBtn') === 0 && count('lm-roomRow') === 3],
+  ['successful join closes discovery and updates joined projects', count('lm-discoverPanel')===0&&count('lm-joinBtn') === 0 && count('lm-roomRow') === 3],
   ['successful join opens the mesh panel', document.documentElement.dataset.lanMeshMode === 'lanmesh'],
 );
 

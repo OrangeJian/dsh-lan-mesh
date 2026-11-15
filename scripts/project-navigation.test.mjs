@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { discoverProjectsView } from '../ui/models/project-navigation.mjs';
+import { DiscoverProjectsPanel } from '../ui/shell/discover-projects.mjs';
+const h=(type,props,...children)=>({type,props:props??{},children:children.flat()});
+const walk=n=>!n||typeof n!=='object'?[]:[n,...(n.children??[]).flatMap(walk)];
+const rooms=[{id:'r1',name:'相同项目',leader:{name:'Lead',nodeName:'机器甲',nodeId:'a'}},{id:'r2',name:'相同项目',leader:{name:'Lead',nodeName:'机器乙',nodeId:'b'}},{id:'r3',name:'已加入',isMember:true},{id:'r4',name:'已归档',lifecycle:{status:'archived'}}];
+test('discovery preserves same-name room identities and searches machine and exact ID',()=>{const rows=discoverProjectsView(rooms);assert.deepEqual(rows.map(r=>r.id),['r1','r2']);assert.equal(discoverProjectsView(rooms,'机器乙')[0].id,'r2');assert.equal(discoverProjectsView(rooms,'r1')[0].id,'r1');assert.equal(rooms.length,4);});
+test('discovery handles old fields, duplicate IDs and missing data without inventing a leader',()=>{assert.deepEqual(discoverProjectsView(null),[]);const rows=discoverProjectsView([{id:'x',name:''},{id:'x',name:'duplicate'},null,{}]);assert.equal(rows.length,1);assert.equal(rows[0].name,'x');assert.equal(rows[0].leaderName,'');assert.equal(rows[0].deviceName,'');});
+test('discovery actions use room identity, busy prevents competing joins, Escape closes',()=>{let selected='',closed=0;const tree=DiscoverProjectsPanel({h,rows:discoverProjectsView(rooms),query:'',onQuery:()=>{},onJoin:id=>selected=id,onClose:()=>closed++,busy:'',labels:{}});const nodes=walk(tree);const buttons=nodes.filter(n=>n.props.className==='lm-btn lm-btnPrimary lm-joinBtn');buttons[1].props.onClick();assert.equal(selected,'r2');tree.props.onKeyDown({key:'Escape',preventDefault(){},stopPropagation(){}});assert.equal(closed,1);assert.equal(tree.props.role,'region');const busy=walk(DiscoverProjectsPanel({h,rows:discoverProjectsView(rooms),query:'',onQuery:()=>{},onJoin:()=>{},onClose:()=>{},busy:'r1',labels:{}}));assert.ok(busy.filter(n=>n.props.className==='lm-btn lm-btnPrimary lm-joinBtn').every(n=>n.props.disabled));});
