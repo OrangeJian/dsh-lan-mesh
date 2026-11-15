@@ -1851,6 +1851,8 @@ captureDraftFixture('body-expanded');
 checks.push(['long text expands without replacing the original message or its id',count('lm-messageTextCollapsed')===0&&lastNodes.find(n=>hasClass(n,'lm-messageExpand')).props['aria-expanded']===true&&lastNodes.some(n=>n.props['data-message-id']==='long-reading')]);
 await lastNodes.find(n=>hasClass(n,'lm-messageCopy')).props.onClick();await settleIn(GroupedRoom);
 checks.push(['production message copy shows honest unavailable feedback when Clipboard API is absent',lastText.includes('当前环境不支持复制，请手动选择正文')]);
+while(groupedTranscript.length<41){const index=groupedTranscript.length;groupedTranscript.push({...groupedTranscript[0],id:'retained-history-'+index,text:'retained history '+index,sentAt:new Date(Date.UTC(2026,10,15,11,index)).toISOString()});}roomPoll.fn();await settleIn(GroupedRoom);
+checks.push(['Room renders more than twenty retained messages including the earliest stable id',count('lm-bubbleRow')===41&&lastNodes.some(n=>n.props['data-message-id']==='group-0')&&lastNodes.some(n=>n.props['data-message-id']==='retained-history-40')]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

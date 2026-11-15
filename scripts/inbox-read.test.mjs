@@ -109,3 +109,17 @@ test('concurrent delivery and repeated read rewrites retain all records and dura
   await Promise.all([rewriteInbox([record], { port: 1 }), appendInbox(later, { port: 1 }), rewriteInbox([record, { ...later, read: true }], { port: 1 })]);
   assert.deepEqual((await readInbox({ port: 1 })).map(item => [item.envelope.id, item.read]), [['store-first', true], ['store-later', true]]);
 });
+
+test('room history exposes every retained message beyond twenty and survives restart', async t => {
+  const { open }=await fixture(t);let node=await open();const {room}=await node.createRoom({name:'Long Room history',sessionId:'human'});
+  for(let index=0;index<41;index++)await node.receive(message('history-'+index,'remote-node','human',{kind:'room-message',room:room.id,text:'history line '+index}));
+  let detail=node.roomDetail({room:room.id,sessionId:'human'});
+  assert.equal(detail.messages.length,41);assert.equal(detail.messages[0].id,'history-0');assert.equal(detail.messages.at(-1).id,'history-40');
+  await node.close();node=await open();detail=node.roomDetail({room:room.id,sessionId:'human'});
+  assert.equal(detail.messages.length,41);assert.equal(detail.messages[0].id,'history-0');assert.ok(detail.messages.every(row=>row.read===true));
+});
+test('long room history filters by exact room before displaying retained records', async t => {
+  const {open}=await fixture(t);const node=await open();const first=await node.createRoom({name:'First history',sessionId:'human'}),second=await node.createRoom({name:'Second history',sessionId:'human'});
+  for(let index=0;index<60;index++)await node.receive(message('mixed-'+index,'remote-node','human',{kind:'room-message',room:index%2?first.room.id:second.room.id}));
+  const detail=node.roomDetail({room:first.room.id,sessionId:'human'});assert.equal(detail.messages.length,30);assert.ok(detail.messages.every(row=>row.room===first.room.id));assert.equal(detail.messages[0].id,'mixed-1');
+});
