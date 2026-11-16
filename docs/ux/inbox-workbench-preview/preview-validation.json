@@ -2,63 +2,240 @@
   "screenshots": [
     {
       "name": "list-1440-light-default",
+      "page": "list.html",
       "width": 1440,
       "height": 900,
+      "theme": "light",
       "ready": "complete",
+      "rootWidth": 1440,
+      "mainWidth": 1440,
+      "columnsDisplay": "grid",
+      "listDisplay": "block",
+      "detailDisplay": "block",
       "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "buttons": [
+        {
+          "label": "全部标为已读",
+          "width": 106,
+          "overflow": false
+        }
+      ],
+      "rows": 26,
+      "visibleRows": 8,
+      "windowHeight": 900
+    },
+    {
+      "name": "detail-1024-dark-default",
+      "page": "detail.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "dark",
+      "ready": "complete",
+      "rootWidth": 1024,
+      "mainWidth": 1024,
+      "columnsDisplay": "grid",
+      "listDisplay": "block",
+      "detailDisplay": "block",
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "buttons": [
+        {
+          "label": "全部标为已读",
+          "width": 106,
+          "overflow": false
+        },
+        {
+          "label": "返回列表",
+          "width": 78,
+          "overflow": false
+        },
+        {
+          "label": "标为已读",
+          "width": 78,
+          "overflow": false
+        },
+        {
+          "label": "前往房间（不定位具体消息）",
+          "width": 204,
+          "overflow": false
+        }
+      ],
+      "rows": 26,
+      "visibleRows": 6,
+      "windowHeight": 768
+    },
+    {
+      "name": "detail-640-light-default",
+      "page": "detail.html",
+      "width": 640,
+      "height": 768,
+      "theme": "light",
+      "ready": "complete",
+      "rootWidth": 640,
+      "mainWidth": 640,
+      "columnsDisplay": "flex",
+      "listDisplay": "none",
+      "detailDisplay": "block",
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "buttons": [
+        {
+          "label": "全部标为已读",
+          "width": 106,
+          "overflow": false
+        },
+        {
+          "label": "返回列表",
+          "width": 78,
+          "overflow": false
+        },
+        {
+          "label": "标为已读",
+          "width": 78,
+          "overflow": false
+        },
+        {
+          "label": "前往房间（不定位具体消息）",
+          "width": 204,
+          "overflow": false
+        }
+      ],
+      "rows": 26,
+      "visibleRows": 0,
+      "windowHeight": 768
+    },
+    {
+      "name": "confirm-1440-light-default",
+      "page": "confirm.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "ready": "complete",
+      "rootWidth": 1440,
+      "mainWidth": 1440,
+      "columnsDisplay": "grid",
+      "listDisplay": "block",
+      "detailDisplay": "block",
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "buttons": [
+        {
+          "label": "全部标为已读",
+          "width": 106,
+          "overflow": false
+        },
+        {
+          "label": "确认全部标为已读",
+          "width": 118,
+          "overflow": false
+        },
+        {
+          "label": "取消",
+          "width": 46,
+          "overflow": false
+        }
+      ],
       "rows": 26,
       "visibleRows": 7,
       "windowHeight": 900
     },
     {
-      "name": "detail-1024-dark-default",
-      "width": 1024,
-      "height": 768,
-      "ready": "complete",
-      "overflow": false,
-      "rows": 26,
-      "visibleRows": 5,
-      "windowHeight": 768
-    },
-    {
-      "name": "detail-640-light-default",
-      "width": 640,
-      "height": 768,
-      "ready": "complete",
-      "overflow": false,
-      "rows": 26,
-      "visibleRows": 26,
-      "windowHeight": 768
-    },
-    {
-      "name": "confirm-1440-light-default",
-      "width": 1440,
-      "height": 900,
-      "ready": "complete",
-      "overflow": false,
-      "rows": 26,
-      "visibleRows": 6,
-      "windowHeight": 900
-    },
-    {
       "name": "empty-1024-light-default",
+      "page": "empty.html",
       "width": 1024,
       "height": 768,
+      "theme": "light",
       "ready": "complete",
+      "rootWidth": 1024,
+      "mainWidth": 1024,
+      "columnsDisplay": "grid",
+      "listDisplay": "block",
+      "detailDisplay": "block",
       "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "buttons": [
+        {
+          "label": "全部标为已读",
+          "width": 106,
+          "overflow": false
+        }
+      ],
       "rows": 0,
       "visibleRows": 0,
       "windowHeight": 768
     },
     {
       "name": "failed-1024-dark-default",
+      "page": "failed.html",
       "width": 1024,
       "height": 768,
+      "theme": "dark",
       "ready": "complete",
+      "rootWidth": 1024,
+      "mainWidth": 1024,
+      "columnsDisplay": "grid",
+      "listDisplay": "block",
+      "detailDisplay": "block",
       "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "buttons": [
+        {
+          "label": "全部标为已读",
+          "width": 106,
+          "overflow": false
+        }
+      ],
       "rows": 26,
-      "visibleRows": 5,
+      "visibleRows": 6,
       "windowHeight": 768
+    },
+    {
+      "name": "detail-1440-main540-light",
+      "page": "detail.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "ready": "complete",
+      "rootWidth": 540,
+      "mainWidth": 540,
+      "columnsDisplay": "flex",
+      "listDisplay": "none",
+      "detailDisplay": "block",
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "buttons": [
+        {
+          "label": "全部标为已读",
+          "width": 106,
+          "overflow": false
+        },
+        {
+          "label": "返回列表",
+          "width": 78,
+          "overflow": false
+        },
+        {
+          "label": "标为已读",
+          "width": 78,
+          "overflow": false
+        },
+        {
+          "label": "前往房间（不定位具体消息）",
+          "width": 204,
+          "overflow": false
+        }
+      ],
+      "rows": 26,
+      "visibleRows": 0,
+      "windowHeight": 900
     }
   ],
   "runtimeErrors": []

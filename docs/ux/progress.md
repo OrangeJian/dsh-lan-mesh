@@ -52,3 +52,7 @@
 ## 并行整合收尾（0.4.19）
 
 Inbox、网络拓扑/列表与Room任务看板完成软件整合。显式标读持久化成功后才更新内存，失败可重试；身份与容器边界已补。最终完整488、panel283、schema82、构建与原保护通过。当前SDK门禁因rc.1/矩阵rc.3不符未通过，不能沿用历史PASS。后续交给DSH：docs/handoffs/dsh-ux-v0.4.19-handoff.md。UX-6真实宿主/双机与Team/M6门槛仍未完成；不推送。
+
+## 读取一致性与取证（0.4.20）
+
+Room自动已读与Inbox分页标读保持同步返回，改为串行队列+写盘失败精确回滚，关闭前先等队列落地；三个新回归覆盖回滚、不抛异常重试、burst后立即关闭。schema-check改为发现宿主路径（原先写死用户目录，本机须外部注入环境变量才能跑）。Inbox静态取证加生成器 scripts/inbox-workbench-preview.mjs，按组件CSS重写fixture并实测7例，补1440宽窗口内540px主区：columns由grid变flex、列表隐藏、无横向溢出。完整491/491、panel283、schema82、构建一致，实际宿主DSH 0.2.2-rc.3兼容PASS。详见ux-workbench-v0.4.20-report.md；真机与双机仍未验收，不推送。

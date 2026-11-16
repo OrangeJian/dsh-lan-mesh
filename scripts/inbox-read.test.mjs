@@ -149,3 +149,52 @@ test('failed durable read acknowledgement keeps unread state until a successful 
  try{await assert.rejects(node.markAllRead('retry-read','remote'));assert.equal(node.messages.find(row=>row.id==='retry-read').read,false);assert.equal(node.humanInbox().unread,1);assert.equal((await readInbox({port:0})).find(row=>row.envelope.id==='retry-read').read,false);}finally{await rm(blocked,{recursive:true,force:true});}
  assert.equal(await node.markAllRead('retry-read','remote'),1);assert.equal(node.humanInbox().unread,0);
 });
+
+test('failed room auto-read rolls the badge back instead of claiming a read a restart would lose',async t=>{
+ const {open}=await fixture(t);const node=await open();const {room}=await node.createRoom({name:'Read failure',sessionId:'human'});
+ await node.receive(message('room-unread','remote-node','agent',{kind:'room-message',room:room.id,text:'needs a look'}));
+ const blocked=join(meshRootDir(0),'inbox.jsonl.tmp');await mkdir(blocked);
+ try{
+  // The call stays synchronous: the panel and roomDetail both read the count in
+  // the same expression, so the flip is optimistic and the rewrite is queued.
+  assert.equal(node.markRoomRead(room.id,'human'),1);
+  assert.equal(node.messages.find(row=>row.id==='room-unread').read,true);
+  await node.inboxReadsSettled();
+  assert.equal(node.messages.find(row=>row.id==='room-unread').read,false);
+  assert.equal(node.humanInbox().unread,1);
+  assert.equal((await readInbox({port:0})).find(row=>row.envelope.id==='room-unread').read,false);
+ }finally{await rm(blocked,{recursive:true,force:true});}
+ assert.equal(node.markRoomRead(room.id,'human'),1);
+ await node.inboxReadsSettled();
+ assert.equal(node.humanInbox().unread,0);
+ assert.equal((await readInbox({port:0})).find(row=>row.envelope.id==='room-unread').read,true);
+});
+
+test('failed inbox markRead keeps the unread count and is retryable without throwing',async t=>{
+ const {open}=await fixture(t);const node=await open();await node.receive(message('agent-unread','remote-node','agent'));
+ const blocked=join(meshRootDir(0),'inbox.jsonl.tmp');await mkdir(blocked);
+ try{
+  const page=node.inbox({limit:20,markRead:true});
+  assert.equal(page.unread,0);
+  await node.inboxReadsSettled();
+  assert.equal(node.inbox({limit:20}).unread,1);
+  assert.equal((await readInbox({port:0})).find(row=>row.envelope.id==='agent-unread').read,false);
+ }finally{await rm(blocked,{recursive:true,force:true});}
+ node.inbox({limit:20,markRead:true});
+ await node.inboxReadsSettled();
+ assert.equal(node.inbox({limit:20}).unread,0);
+ assert.equal((await readInbox({port:0})).find(row=>row.envelope.id==='agent-unread').read,true);
+});
+
+test('queued room reads survive shutdown and never publish a stale unread record',async t=>{
+ const {open}=await fixture(t);let node=await open();const {room}=await node.createRoom({name:'Burst reads',sessionId:'human'});
+ for(let index=0;index<8;index++)await node.receive(message('burst-'+index,'remote-node','agent',{kind:'room-message',room:room.id,text:'line '+index}));
+ assert.equal(node.markRoomRead(room.id,'human'),8);
+ // Close immediately: the queued rewrite must be awaited before the final
+ // checkpoint, otherwise the restart below reloads all eight as unread.
+ await node.close();
+ node=await open();
+ assert.ok(node.messages.filter(row=>row.room===room.id).every(row=>row.read===true));
+ assert.equal(node.humanInbox().unread,0);
+ assert.ok((await readInbox({port:0})).filter(row=>row.envelope.room===room.id).every(row=>row.read));
+});

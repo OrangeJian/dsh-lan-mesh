@@ -17,8 +17,10 @@
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { apply } from '../index.js';
 import { MeshNode } from '../lib/service.mjs';
 import { teamToolDefinitions } from '../lib/team-tools.mjs';
@@ -29,14 +31,48 @@ import { teamToolDefinitions } from '../lib/team-tools.mjs';
  * the plugin package deliberately has no dependency on `@deepseek-ai/dsh-tools`
  * (the profile cannot resolve it from a linked package), and a verification
  * script must not change that.
- * @returns {Promise<{ assertSupportedJsonSchema: Function, validateJsonSchemaValue: Function }>}
+ *
+ * Where the validator lives is discovered, never hard-coded: `DSH_TOOLS_MODULE`
+ * wins, then the installed Host (resolved from this package, then from the
+ * global npm root). Baking in a user path made this check fail on any machine
+ * that installed the Host elsewhere.
+ * @returns {string[]} candidate module specifiers, in priority order
  */
+function candidateModules() {
+  const candidates = [process.env.DSH_TOOLS_MODULE];
+  // Resolve the Host installation the way `composer-compat-check.mjs` does:
+  // from the local dependency tree first, then from the global npm root. A
+  // machine path must never be baked in — it silently rots when the Host moves.
+  const hostFrom = (anchor) => {
+    try {
+      const hostPackage = createRequire(anchor).resolve('@deepseek-ai/dsh/package.json');
+      const fromHost = createRequire(hostPackage);
+      try {
+        return fromHost.resolve('@deepseek-ai/dsh-tools/lib/index.js');
+      } catch {
+        // The package does not export ./lib/*; locate the entry next to its
+        // package.json instead. Same module, still resolved from the Host.
+        const toolsPackage = fromHost.resolve('@deepseek-ai/dsh-tools/package.json');
+        return join(dirname(toolsPackage), 'lib', 'index.js');
+      }
+    } catch {
+      return '';
+    }
+  };
+  candidates.push(hostFrom(join(dirname(dirname(fileURLToPath(import.meta.url))), 'package.json')));
+  try {
+    const command = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : 'npm';
+    const args = process.platform === 'win32' ? ['/d', '/s', '/c', 'npm root -g'] : ['root', '-g'];
+    const root = execFileSync(command, args, { encoding: 'utf8' }).trim();
+    if (root !== '') candidates.push(hostFrom(join(root, '__schema_probe__.cjs')));
+  } catch {
+    // The failure summary below reports the hard miss when nothing resolves.
+  }
+  return candidates.filter((entry) => typeof entry === 'string' && entry !== '');
+}
+
 async function loadFrameworkValidator() {
-  const candidates = [
-    process.env.DSH_TOOLS_MODULE,
-    'file:///C:/Users/jian/AppData/Roaming/npm/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tools/lib/index.js',
-  ].filter((entry) => typeof entry === 'string' && entry !== '');
-  for (const candidate of candidates) {
+  for (const candidate of candidateModules()) {
     try {
       const url = candidate.startsWith('file:') ? candidate : pathToFileURL(candidate).href;
       const module = await import(url);
