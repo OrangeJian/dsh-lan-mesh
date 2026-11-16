@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.18';
+    const PLUGIN_VERSION = '0.4.19';
     const React = require('react');
     const h = React.createElement;
 
@@ -620,7 +620,7 @@ function shellReadState(state={}) {
 function networkWorkspaceView({self,peers,agents,agentsStatus,stale=false}={}) {
  const nodes=[],seen=new Set(),catalogueReady=agentsStatus==='ready';
  const list=Array.isArray(peers)?peers:[];
- if(typeof self?.nodeId==='string'&&self.nodeId){seen.add(self.nodeId);const local=Array.isArray(agents?.local)?agents.local:[];nodes.push({id:self.nodeId,name:self.selfName||self.name||self.nodeId,local:true,ageSeconds:null,sessions:catalogueReady?local.length:null,running:catalogueReady?local.filter(a=>a.status==='running').length:null});}
+ if(typeof self?.nodeId==='string'&&self.nodeId){seen.add(self.nodeId);const local=Array.isArray(agents?.local)?agents.local:[];nodes.push({id:self.nodeId,name:self.selfName||self.name||self.nodeId,local:true,ageSeconds:null,sessions:catalogueReady?local.length:null,running:catalogueReady&&local.every(a=>a?.status==='running'||a?.status==='idle')?local.filter(a=>a.status==='running').length:null});}
  for(const peer of list){if(!peer||typeof peer.nodeId!=='string'||!peer.nodeId||seen.has(peer.nodeId))continue;seen.add(peer.nodeId);nodes.push({id:peer.nodeId,name:typeof peer.name==='string'&&peer.name?peer.name:peer.nodeId,local:false,ageSeconds:Number.isFinite(peer.ageSeconds)&&peer.ageSeconds>=0?peer.ageSeconds:null,sessions:null,running:null});}
  // The remote catalogue can be partial. A positive match is evidence, absence isn't zero.
  if(catalogueReady)for(const n of nodes.filter(n=>!n.local)){const matches=(Array.isArray(agents?.remote)?agents.remote:[]).filter(a=>a.nodeId===n.id);if(matches.length)n.sessions=matches.length;}
@@ -827,6 +827,92 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-roomTabSurface .lm-inviteRow>.lm-muted{flex:0 1 220px}
 @media(max-width:650px){.lm-roomTabSurface .lm-inviteRow{flex-wrap:wrap}.lm-roomTabSurface .lm-inviteRow>.lm-muted{flex-basis:100%}}
     /* @ux-shell:message-styles:end */
+/* @ux-shell:inbox-styles:start */
+.lm-inboxWorkbench{display:flex;flex-direction:column;min-height:0;flex:1;padding:20px;overflow:hidden;color:var(--dsw-alias-label-primary)}
+.lm-inboxWorkbench .lm-inboxToolbar,.lm-inboxWorkbench .lm-inboxFilters,.lm-inboxWorkbench .lm-inboxActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex:none}
+.lm-inboxWorkbench h1{font-size:20px;margin:0;flex:1}.lm-inboxWorkbench h2{font-size:16px;overflow-wrap:anywhere}
+.lm-inboxWorkbench .lm-inboxScope{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.lm-inboxWorkbench .lm-inboxFilters input{flex:1;min-width:100px}.lm-inboxWorkbench input,.lm-inboxWorkbench select{font:inherit;padding:8px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:inherit}
+.lm-inboxWorkbench .lm-inboxColumns{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1fr);min-height:0;flex:1;margin-top:16px;gap:16px}
+.lm-inboxWorkbench .lm-inboxList,.lm-inboxWorkbench .lm-inboxDetail{min-width:0;overflow:auto}.lm-inboxWorkbench .lm-inboxRow{display:block;width:100%;margin:0;border:0;border-bottom:1px solid var(--dsw-alias-border-l1);border-radius:0;text-align:left;background:transparent;color:inherit;padding:12px;cursor:pointer;font:inherit;min-height:96px}
+.lm-inboxWorkbench .lm-inboxRowSelected{background:var(--dsw-alias-bg-layer-2);box-shadow:inset 3px 0 var(--dsw-alias-brand-primary)}
+.lm-inboxWorkbench .lm-inboxRowMeta{display:flex;gap:8px;flex-wrap:wrap;font-size:12px}.lm-inboxWorkbench time,.lm-inboxWorkbench small{font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-inboxWorkbench .lm-inboxPreview{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0;line-height:1.5}
+.lm-inboxWorkbench .lm-inboxDetail{border-left:1px solid var(--dsw-alias-border-l1);padding:12px 16px}.lm-inboxWorkbench .lm-inboxFullText{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin:16px 0}
+.lm-inboxWorkbench .lm-inboxConfirm{padding:12px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);font-size:12px;flex:none}.lm-inboxWorkbench .lm-inboxConfirm button{margin-right:10px}
+.lm-inboxWorkbench button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}
+@media(max-width:850px){.lm-inboxWorkbench{padding:12px}.lm-inboxWorkbench .lm-inboxColumns{display:flex;flex-direction:column}.lm-inboxWorkbench .lm-inboxDetail{display:none}.lm-inboxWorkbench.lm-inboxHasDetail .lm-inboxList{display:none}.lm-inboxWorkbench.lm-inboxHasDetail .lm-inboxDetail{display:block;border:0;padding:4px;flex:1}}
+.lm-inboxWorkbench .lm-inboxRow{padding:10px 12px;min-height:92px;font-size:13px;line-height:1.35}
+.lm-inboxWorkbench .lm-inboxPreview{margin:4px 0;line-height:1.35}
+.lm-inboxWorkbench .lm-inboxRow small{display:block;line-height:1.3}
+.lm-inboxWorkbench{container-type:inline-size;container-name:lm-inbox}
+@container lm-inbox (max-width:850px){.lm-inboxWorkbench .lm-inboxColumns{display:flex;flex-direction:column}.lm-inboxWorkbench .lm-inboxDetail{display:none}.lm-inboxWorkbench.lm-inboxHasDetail .lm-inboxList{display:none}.lm-inboxWorkbench.lm-inboxHasDetail .lm-inboxDetail{display:block;border:0;padding:4px;flex:1}}
+    /* @ux-shell:inbox-styles:end */
+/* @ux-shell:network-styles:start */
+.lm-networkWorkbench{flex:1;min-width:0;min-height:0;overflow:auto;padding:24px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base)}
+.lm-networkWorkbench .lm-networkHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.lm-networkWorkbench h1{margin:0;font-size:21px;font-weight:600}.lm-networkWorkbench h2{margin:0;font-size:16px;overflow-wrap:anywhere}
+.lm-networkWorkbench .lm-networkHeader p,.lm-networkWorkbench .lm-networkHint{font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary);margin:8px 0 0;overflow-wrap:anywhere}
+.lm-networkWorkbench .lm-networkRefresh{flex:none;min-height:34px}
+.lm-networkWorkbench .lm-networkStale{padding:12px 14px;border:1px solid var(--dsw-alias-state-warn,var(--dsw-alias-border-l1));border-radius:8px;font-size:12px;margin-bottom:16px}
+.lm-networkWorkbench .lm-networkSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 20px}
+.lm-networkWorkbench .lm-networkSummary>span{padding:14px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;font-size:13px;overflow-wrap:anywhere}
+.lm-networkWorkbench .lm-networkToolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.lm-networkWorkbench .lm-networkSearch{font:inherit;font-size:13px;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:7px;padding:8px 10px;min-width:0;flex:1;max-width:480px;min-height:36px}
+.lm-networkWorkbench .lm-networkToolbar [role=group]{display:flex;gap:4px}
+.lm-networkWorkbench .lm-networkModeTopology,.lm-networkWorkbench .lm-networkModeList{font:inherit;font-size:12px;min-height:36px;padding:7px 14px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-base);color:inherit;cursor:pointer}
+.lm-networkWorkbench [aria-pressed=true]{border-color:var(--dsw-alias-brand-primary)}
+.lm-networkWorkbench .lm-networkLayout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+.lm-networkWorkbench .lm-networkPrimary{min-width:0}
+.lm-networkWorkbench .lm-networkTopology{height:560px;position:relative;min-width:0;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}
+.lm-networkWorkbench .lm-networkEdges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.lm-networkWorkbench .lm-networkSpoke{stroke:var(--dsw-alias-border-l2);stroke-width:.3;stroke-dasharray:1 1}
+.lm-networkWorkbench .lm-networkNode{font:inherit;font-size:12px;display:flex;flex-direction:column;gap:4px;text-align:left;min-width:0;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:12px;background:var(--dsw-alias-bg-base);color:inherit;cursor:pointer}
+.lm-networkWorkbench .lm-networkNode:hover{background:var(--dsw-alias-bg-layer-2)}
+.lm-networkWorkbench .lm-networkNodeSelected{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}
+.lm-networkWorkbench .lm-networkNode>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;width:100%}
+.lm-networkWorkbench .lm-networkNodeId{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;color:var(--dsw-alias-label-secondary);font-size:11px}
+.lm-networkWorkbench .lm-networkNodeFact{font-size:11px;color:var(--dsw-alias-label-secondary)}
+.lm-networkWorkbench .lm-networkTopology .lm-networkNode{position:absolute;transform:translate(-50%,-50%);width:min(150px,27%);padding:9px;gap:3px}
+.lm-networkWorkbench .lm-networkList{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:12px}
+.lm-networkWorkbench .lm-networkDetail{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:18px;min-width:0;background:var(--dsw-alias-bg-layer-1)}
+.lm-networkWorkbench .lm-networkDetailId{font-size:12px;overflow-wrap:anywhere;user-select:text;color:var(--dsw-alias-label-secondary);line-height:1.6}
+.lm-networkWorkbench .lm-networkDetail dl{display:grid;grid-template-columns:75px minmax(0,1fr);gap:12px;font-size:12px;line-height:1.6;margin:20px 0}
+.lm-networkWorkbench .lm-networkDetail dt{color:var(--dsw-alias-label-secondary)}.lm-networkWorkbench .lm-networkDetail dd{margin:0;overflow-wrap:anywhere}
+.lm-networkWorkbench button:focus-visible,.lm-networkWorkbench input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px}
+@media(max-width:1100px){.lm-networkWorkbench .lm-networkLayout{grid-template-columns:minmax(0,1fr)}.lm-networkWorkbench .lm-networkDetail{width:100%;box-sizing:border-box}.lm-networkWorkbench .lm-networkTopology{height:520px}}
+@media(max-width:650px){.lm-networkWorkbench{padding:16px}.lm-networkWorkbench .lm-networkSummary{grid-template-columns:minmax(0,1fr);gap:6px}.lm-networkWorkbench .lm-networkSummary>span{padding:10px 12px}.lm-networkWorkbench .lm-networkTopology{height:440px}.lm-networkWorkbench .lm-networkTopology .lm-networkNode{font-size:11px;width:26%;padding:7px}.lm-networkWorkbench .lm-networkNodeFact{font-size:10px}.lm-networkWorkbench .lm-networkHeader{gap:8px}.lm-networkWorkbench .lm-networkDetail dl{grid-template-columns:70px minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.lm-networkWorkbench *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+/* Measure this workbench rather than the host window when its sidebar is open. */
+.lm-networkWorkbench{container-type:inline-size;container-name:lm-network}
+.lm-networkWorkbench .lm-networkCompactNotice{display:none;font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary);margin:10px 0 0}
+@container lm-network (max-width:650px){
+ .lm-networkWorkbench .lm-networkTopology{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:10px;height:auto;overflow:visible;padding:12px}
+ .lm-networkWorkbench .lm-networkTopology .lm-networkEdges{display:none}
+ .lm-networkWorkbench .lm-networkTopology .lm-networkNode{position:static;transform:none;width:100%;box-sizing:border-box;padding:12px;font-size:12px}
+ .lm-networkWorkbench .lm-networkCompactNotice{display:block}
+ .lm-networkWorkbench .lm-networkLayout{grid-template-columns:minmax(0,1fr)}
+}
+/* Fallback for hosts whose engine does not support container queries. */
+@media(max-width:650px){
+ .lm-networkWorkbench .lm-networkTopology{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:10px;height:auto;overflow:visible;padding:12px}
+ .lm-networkWorkbench .lm-networkTopology .lm-networkEdges{display:none}
+ .lm-networkWorkbench .lm-networkTopology .lm-networkNode{position:static;transform:none;width:100%;box-sizing:border-box;padding:12px;font-size:12px}
+ .lm-networkWorkbench .lm-networkCompactNotice{display:block}
+}
+    /* @ux-shell:network-styles:end */
+/* @ux-shell:task-board-styles:start */
+.lm-roomTaskBoard{display:flex;flex-direction:column;gap:16px;min-height:0;overflow:auto;padding:24px;color:var(--dsw-alias-label-primary)}
+.lm-roomTaskBoard header,.lm-roomTaskBoard .lm-taskBoardRowHead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.lm-roomTaskBoard h1{margin:0;font-size:20px}.lm-roomTaskBoard h2{margin:0 0 10px;font-size:14px}
+.lm-roomTaskBoard .lm-taskBoardScope{margin:0;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.lm-roomTaskBoard .lm-taskBoardFilters{display:flex;flex-wrap:wrap;gap:8px}.lm-roomTaskBoard .lm-taskBoardFilters input{flex:1;min-width:180px}
+.lm-roomTaskBoard input,.lm-roomTaskBoard select{font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:8px;max-width:100%}
+.lm-roomTaskBoard .lm-taskBoardRow{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%;padding:12px 16px;margin-bottom:8px;text-align:left;white-space:normal;overflow-wrap:anywhere;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;color:inherit}
+.lm-roomTaskBoard small{color:var(--dsw-alias-label-secondary)}.lm-roomTaskBoard .lm-taskBoardPreview{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px}
+.lm-roomTaskBoard button:focus-visible,.lm-roomTaskBoard input:focus-visible,.lm-roomTaskBoard select:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+@media(max-width:650px){.lm-roomTaskBoard{padding:16px}.lm-roomTaskBoard .lm-taskBoardFilters>*{width:100%}.lm-roomTaskBoard .lm-taskBoardRowHead{align-items:flex-start;flex-wrap:wrap}}
+    /* @ux-shell:task-board-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
@@ -1600,10 +1686,9 @@ function mergeRoomTranscript(earlier,current) {
      */
     function TaskItem(props) {
       const task = props.task;
-      const status = STATUS_ORDER.includes(task.status) ? task.status : 'open';
+      const status = STATUS_ORDER.includes(task.status) ? task.status : 'unknown';
       // The service lets the leader move any task and an assignee move their own.
-      const mine = task.assignee?.sessionId === props.sessionId;
-      const canMove = mine || props.isLeader === true;
+      const canMove = STATUS_ORDER.includes(task.status)&&canMoveRoomTask({task,nodeId:props.nodeId,sessionId:props.sessionId,isLeader:props.isLeader});
       const busy = props.busy === task.id;
       return h(
         'div',
@@ -1611,12 +1696,12 @@ function mergeRoomTranscript(earlier,current) {
         h(
           'div',
           { className: 'lm-taskHead' },
-          h('span', { className: STATUS_CLASS[status] ?? 'lm-status' }, STATUS_LABELS[status] ?? status),
+          h('span', { className: STATUS_CLASS[status] ?? 'lm-status' }, STATUS_LABELS[status] ?? '未知状态'),
           h('span', { className: 'lm-taskTitle' }, task.title),
           h(
             'span',
             { className: 'lm-taskAssignee' },
-            `${COPY.assignee}: ${labelOf(task.assignee) || '?'}`,
+            `${COPY.assignee}: ${labelOf(task.assignee) || '?'} · ${task.assignee?.nodeId || '来源未知'}`,
           ),
         ),
         task.detail ? h('div', { className: 'lm-taskDetail' }, task.detail) : null,
@@ -3707,6 +3792,7 @@ function RoomTabs(props) {
                         key: task.id,
                         task,
                         sessionId,
+                        nodeId:self.nodeId,
                         isLeader,
                         busy,
                         onStatus: doStatus,
@@ -4580,10 +4666,10 @@ function RoomTabs(props) {
       const view = props.view ?? 'inbox';
       const agents = props.agents ?? { local: [], remote: [] };
       const workspaces = Array.isArray(props.workspaces) ? props.workspaces : [];
-      if(view==='network')return h(NetworkWorkspace,{h,model:networkWorkspaceView({self:props.self,peers:props.peerSource,agents:props.agents,agentsStatus:props.agentsStatus,stale:props.snapshotStale}),onRefresh:props.onRefresh,labels:COPY.networkLabels});
+      if(view==='network')return h(NetworkWorkbench,{h,React,model:networkWorkspaceView({self:props.self,peers:props.peerSource,agents:props.agents,agentsStatus:props.agentsStatus,stale:props.snapshotStale}),onRefresh:props.onRefresh,labels:COPY.networkLabels});
       if(view==='manage')return h(ManagementWorkspace,{h,self:props.self,uiVersion:PLUGIN_VERSION,hostVersion:props.pluginVersion,onOpenAgents:props.onOpenAgents,labels:COPY.managementLabels});
       if (view === 'rooms') return RoomListPane(props);
-      if (view === 'inbox') return InboxPane(props);
+      if (view === 'inbox') return h(InboxPane,props);
       if (view === 'board') return BoardPane(props);
       if (view === 'agents')
         return h(
@@ -4886,28 +4972,90 @@ function RoomTabs(props) {
      * @param {object} props - messages, unread count, mark-read handler.
      * @returns {object} pane element.
      */
+    /* @ux-shell:inbox-model:start */
+/** Pure projection over the returned unread subset; no routing or read-state mutation. */
+function inboxWorkbenchView({messages,self,rooms=[],peers=[],query='',filter='all'}={}) {
+ const string=value=>typeof value==='string'?value:'';
+ const roomList=Array.isArray(rooms)?rooms:[],peerList=Array.isArray(peers)?peers:[];
+ const allRows=(Array.isArray(messages)?messages:[]).filter(message=>message&&typeof message==='object'&&message.read!==true&&!(self?.nodeId&&message.from?.nodeId===self.nodeId&&(!message.from.sessionId||message.from.sessionId==='human'))).slice().reverse().map(message=>{
+  const nodeId=string(message.from?.nodeId),id=string(message.id),roomId=string(message.room);
+  const sender=string(message.from?.title)||string(message.from?.name)||nodeId||'未知作者';
+  const deviceName=nodeId&&nodeId===self?.nodeId?string(self?.name):string(peerList.find(peer=>peer?.nodeId===nodeId)?.name);
+  const device=nodeId?(deviceName?deviceName+' · '+nodeId:nodeId):'来源设备未知';
+  const roomLabel=string(roomList.find(room=>room?.id===roomId)?.name)||string(message.topic)||roomId;
+  const body=string(message.text),preview=body.replace(/\s+/g,' ').slice(0,240);
+  const category=message.kind==='room-task'?'tasks':['system','system-event'].includes(message.kind)?'system':'ordinary';
+  const mentioned=!!self?.nodeId&&Array.isArray(message.structuredMentions)&&message.structuredMentions.some(ref=>ref?.memberKey===self.nodeId+'/human');
+  return {key:JSON.stringify([nodeId,id]),message,id,nodeId,sender,device,roomId,roomLabel,body,preview,timestamp:string(message.at??message.receivedAt??message.sentAt),category,mentioned};
+ });
+ const counts={all:allRows.length,mentions:allRows.filter(row=>row.mentioned).length,tasks:allRows.filter(row=>row.category==='tasks').length,system:allRows.filter(row=>row.category==='system').length};
+ const availableFilters=['all',...['mentions','tasks','system'].filter(key=>counts[key]>0)];
+ const activeFilter=availableFilters.includes(filter)?filter:'all';
+ const needle=string(query).trim().toLocaleLowerCase();
+ const rows=allRows.filter(row=>(activeFilter==='all'||activeFilter==='mentions'&&row.mentioned||row.category===activeFilter)&&(!needle||[row.sender,row.device,row.roomLabel,row.roomId,row.body].join(' ').toLocaleLowerCase().includes(needle)));
+ return {rows,allRows,counts,availableFilters,activeFilter};
+}
+    /* @ux-shell:inbox-model:end */
+    /* @ux-shell:inbox-component:start */
+function InboxWorkbench(props){
+ const {h,React}=props;const [query,setQuery]=React.useState(''),[filter,setFilter]=React.useState('all'),[selected,setSelected]=React.useState(''),[confirm,setConfirm]=React.useState(false),[busy,setBusy]=React.useState(false),[error,setError]=React.useState('');
+ const life=React.useRef({alive:true,pending:false}),focus=React.useRef(null),detailFocus=React.useRef(null);
+ React.useEffect(()=>{life.current.alive=true;return()=>{life.current.alive=false;};},[]);
+ const model=props.modelOf({messages:props.messages,self:props.self,rooms:props.rooms,peers:props.peers,query,filter});
+ const row=model.allRows.find(r=>r.key===selected);
+ React.useEffect(()=>{if(selected)detailFocus.current?.focus?.();},[selected]);
+ const readableIdentity=!!row&&typeof row.id==='string'&&row.id.trim()!==''&&typeof row.nodeId==='string'&&row.nodeId.trim()!=='';
+ const close=()=>{setSelected('');focus.current?.focus?.();};
+ const act=async(all)=>{if(life.current.pending)return;if(!all&&!readableIdentity){setError('消息身份不完整，无法单独标为已读');return;}const submitted=selected;life.current.pending=true;setBusy(true);setError('');try{const result=all?await props.onMarkRead():await props.onMarkMessageRead(row.id,row.nodeId);if(!life.current.alive)return;if(result===false){setError('保存已读状态失败，请重试');return;}setSelected(current=>current===submitted?'':current);setConfirm(false);}catch{if(life.current.alive)setError('保存已读状态失败，请重试');}finally{life.current.pending=false;if(life.current.alive)setBusy(false);}};
+ const names={all:'全部未读',mentions:'@我',tasks:'任务',system:'系统'};
+ return h('section',{className:'lm-inboxWorkbench'+(row?' lm-inboxHasDetail':''),onKeyDown:e=>{if(e.key==='Escape'){e.preventDefault();if(confirm)setConfirm(false);else close();}}},
+ h('header',{className:'lm-inboxToolbar'},h('h1',null,'收件箱'),h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>setConfirm(true)},'全部标为已读')),
+ h('p',{className:'lm-inboxScope'},'当前返回 '+model.allRows.length+' 条未读；搜索范围为本次返回的记录。'),
+ h('div',{className:'lm-inboxFilters'},h('input',{type:'search',value:query,'aria-label':'搜索提醒',placeholder:'搜索正文、项目或来源',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeFilter??filter,'aria-label':'提醒类型',onChange:e=>setFilter(e.target.value)},...(model.availableFilters??['all']).map(id=>h('option',{key:id,value:id},names[id]||id)))),
+ confirm?h('div',{className:'lm-inboxConfirm',role:'group','aria-label':'确认全部已读'},h('p',null,'将确认时本节点的当前未读记录标为已读，不删除来源记录；范围不限于当前搜索结果。'),h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>act(true)},'确认全部标为已读'),h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>setConfirm(false)},'取消')):null,
+ error?h('p',{role:'alert',className:'lm-error'},error):null,
+ h('div',{className:'lm-inboxColumns'},h('div',{className:'lm-inboxList','aria-label':'未读提醒'},model.rows.length?model.rows.map(item=>h('button',{type:'button',key:item.key,className:'lm-msg lm-inboxRow'+(selected===item.key?' lm-inboxRowSelected':''),'aria-pressed':selected===item.key,onClick:e=>{focus.current=e.currentTarget;setSelected(item.key);setError('');}},h('div',{className:'lm-inboxRowMeta'},h('strong',null,item.sender),h('span',null,item.roomLabel||'直接消息'),h('time',null,item.timestamp)),h('div',{className:'lm-inboxPreview'},item.preview||item.body),h('small',null,item.device))):h('p',{className:'lm-muted'},'当前没有匹配的未读提醒')),
+ row?h('aside',{className:'lm-inboxDetail','aria-label':'提醒详情'},h('button',{type:'button',className:'lm-btn',ref:detailFocus,onClick:close},'返回列表'),h('h2',null,row.sender),h('p',null,row.device+' · '+(row.roomLabel||'直接消息')),h('time',null,row.timestamp),h('div',{className:'lm-inboxFullText'},props.MarkdownText?h(props.MarkdownText,{text:row.body}):row.body),h('div',{className:'lm-inboxActions'},h('button',{type:'button',className:'lm-btn',disabled:busy||!readableIdentity,onClick:()=>act(false)},busy?'正在保存…':'标为已读'),!readableIdentity?h('span',{role:'status'},'消息身份不完整，无法单独标为已读'):null,row.roomId?h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>props.onOpenRoom?.(row.roomId)},'前往房间（不定位具体消息）'):null)):h('aside',{className:'lm-inboxDetail lm-muted'},'选择提醒查看全文；查看不会自动标为已读。')));
+}
+    /* @ux-shell:inbox-component:end */
+    /* @ux-shell:network-component:start */
+/** Read-only projections of observed node records; never conveys dispatch authority. */
+function NetworkWorkbench(props) {
+ const {h,React}=props,model=props.model??{},stale=model.stale===true;
+ const source=Array.isArray(model.nodes)?model.nodes:[],seen=new Set();
+ const nodes=source.filter(n=>n&&typeof n.id==='string'&&n.id&&!seen.has(n.id)&&(seen.add(n.id),true));
+ const [modeChoice,setMode]=React.useState(null);
+ const mode=modeChoice??(nodes.length>10?'list':'topology');
+ const [query,setQuery]=React.useState('');
+ const [selectedId,setSelectedId]=React.useState(()=>nodes.find(n=>n.local)?.id||nodes[0]?.id||'');
+ const clean=value=>typeof value==='string'?value:'';
+ const numeric=value=>Number.isFinite(value)&&value>=0?String(Math.trunc(value)):null;
+ const matching=nodes.filter(n=>(clean(n.name)+' '+n.id).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+ const selected=nodes.find(n=>n.id===selectedId)||nodes.find(n=>n.local)||nodes[0];
+ const local=nodes.find(n=>n.local),chart=matching.slice(0,10),remoteChart=chart.filter(n=>!n.local);
+ const position=n=>n.local?{x:50,y:50}:(()=>{const i=remoteChart.indexOf(n),angle=-Math.PI/2+2*Math.PI*i/Math.max(1,remoteChart.length);return {x:50+36*Math.cos(angle),y:50+36*Math.sin(angle)};})();
+ const sessions=n=>stale?'数量未核对':numeric(n.sessions)===null?'目录会话未核对':'目录会话 '+numeric(n.sessions);
+ const age=n=>stale?'当前可见性未核对':n.local?'本机记录':Number.isFinite(n.ageSeconds)&&n.ageSeconds>=0?'约 '+Math.floor(n.ageSeconds)+' 秒前观测':'最近观测时间未知';
+ const nodeButton=(n,topology)=>{const p=position(n);return h('button',{type:'button',key:n.id,className:'lm-networkNode'+(selected?.id===n.id?' lm-networkNodeSelected':''),'aria-pressed':selected?.id===n.id,onClick:()=>setSelectedId(n.id),style:topology?{left:p.x+'%',top:p.y+'%'}:undefined},h('strong',null,clean(n.name)||n.id),h('span',{className:'lm-networkNodeId'},n.id),h('span',{className:'lm-networkNodeFact'},n.local?'本机':age(n)),h('span',{className:'lm-networkNodeFact'},sessions(n)));};
+ const label=(key,fallback)=>clean(props.labels?.[key])||fallback;
+ return h('section',{className:'lm-networkWorkbench','aria-label':'网络总览'},
+  h('header',{className:'lm-networkHeader'},h('div',null,h('h1',null,label('title','网络总览')),h('p',null,'节点发现、会话目录和执行状态分别核对。')),h('button',{type:'button',className:'lm-btn lm-networkRefresh',onClick:props.onRefresh},label('refresh','刷新'))),
+  stale?h('div',{className:'lm-networkStale',role:'status'},'快照已过期：数量未核对，以下为上次读取的记录。'):null,
+  h('div',{className:'lm-networkSummary'},h('span',null,stale?'节点数量未核对':'本机记录 '+(local?'1':'未核对')),h('span',null,stale?'发现数量未核对':'发现节点 '+(numeric(model.peerCount)??'未核对')),h('span',null,'派发权限未核对')),
+  h('div',{className:'lm-networkToolbar'},h('input',{type:'search',className:'lm-networkSearch','aria-label':'搜索设备名称或节点ID',placeholder:'搜索设备名称或节点 ID',value:query,onChange:event=>setQuery(event.target.value)}),h('div',{role:'group','aria-label':'网络显示方式'},h('button',{type:'button',className:'lm-networkModeTopology','aria-pressed':mode==='topology',onClick:()=>setMode('topology')},'拓扑'),h('button',{type:'button',className:'lm-networkModeList','aria-pressed':mode==='list',onClick:()=>setMode('list')},'列表'))),
+  h('div',{className:'lm-networkLayout'},h('div',{className:'lm-networkPrimary'},
+   mode==='list'?h('div',{className:'lm-networkList'},...matching.map(n=>nodeButton(n,false))):h('div',{className:'lm-networkTopology'},
+    h('svg',{className:'lm-networkEdges',viewBox:'0 0 100 100',preserveAspectRatio:'none','aria-hidden':'true'},...(local&&chart.some(n=>n.id===local.id)?remoteChart:[]).map(n=>{const p=position(n);return h('line',{key:n.id,className:'lm-networkSpoke',x1:50,y1:50,x2:p.x,y2:p.y});})),...chart.map(n=>nodeButton(n,true))),
+   mode==='topology'?h('p',{className:'lm-networkCompactNotice'},'小窗以节点排列显示；节点详情和列表入口保持可用。'):null,
+   matching.length===0?h('p',{className:'lm-networkHint'},nodes.length?'没有匹配的设备记录。':'暂无设备记录，请刷新后核对。'):null,
+   mode==='topology'&&matching.length>10?h('p',{className:'lm-networkHint'},'拓扑仅展示当前匹配的前10个节点；请切换列表查看全部 '+matching.length+' 个。'):null,
+   !local?h('p',{className:'lm-networkHint'},'本机身份尚未读取；不绘制中心连接。'):null,
+   h('p',{className:'lm-networkHint'},'连线仅表示本机发现节点的观测关系，不代表传输健康、Peer之间互联或可向Agent派发任务。')),
+   selected?h('aside',{className:'lm-networkDetail','aria-label':'所选节点详情'},h('h2',null,clean(selected.name)||selected.id),h('p',{className:'lm-networkDetailId'},selected.id),h('dl',null,h('dt',null,'来源'),h('dd',null,selected.local?'本机':'发现记录'),h('dt',null,'最近观测'),h('dd',null,age(selected)),h('dt',null,'目录会话'),h('dd',null,sessions(selected)),h('dt',null,'执行状态'),h('dd',null,stale?'执行状态未核对':selected.local&&numeric(selected.running)!==null?'正在运行 '+numeric(selected.running):selected.local?'本机执行状态未知':'远端执行状态未知'),h('dt',null,'授权'),h('dd',null,'派发权限未核对')),h('p',{className:'lm-networkHint'},'目录可能不完整；未找到会话不能直接视为零。')):null));
+}
+    /* @ux-shell:network-component:end */
     function InboxPane(props) {
-      const inbox = unreadMessages(props.messages, props.self);
-      return h(
-        'div',
-        { className: 'lm-emptyPane lm-inboxPane' },
-        h(
-          'div',
-          { className: 'lm-head' },
-          h('span', { className: 'lm-title' }, COPY.navInbox),
-          h('button', { type: 'button', className: 'lm-btn', style: { marginLeft: 'auto' }, onClick: props.onMarkRead }, COPY.markRead),
-        ),
-        inbox.length === 0
-          ? h('div', { className: 'lm-muted' }, COPY.emptyInboxTitle)
-          : h('div', { className: 'lm-msgs lm-msgsPane' }, h(InboxRows, {
-              messages: inbox,
-              self: props.self,
-              expandedMessages: props.expandedMessages,
-              onToggleMessage: props.onToggleMessage,
-              onOpenRoom: props.onOpenRoom,
-              onMarkMessageRead: props.onMarkMessageRead,
-            })),
-      );
+      return h(InboxWorkbench,{...props,h,React,modelOf:inboxWorkbenchView,MarkdownText});
     }
 
     /**
@@ -4916,49 +5064,32 @@ function RoomTabs(props) {
      * @param {object} props - rooms with tasks, handlers.
      * @returns {object} pane element.
      */
-    function BoardPane(props) {
-      const rooms = (Array.isArray(props.rooms) ? props.rooms : []).filter((room) => Array.isArray(room.tasks) && room.tasks.length > 0);
-      const board = rooms
-        .flatMap((room) =>
-          (room.tasks ?? []).map((task) => ({
-            roomId: room.id,
-            roomName: room.name || room.id,
-            task,
-          })),
-        )
-        .sort((a, b) => String(a.task.status).localeCompare(String(b.task.status)));
-      return h(
-        'div',
-        { className: 'lm-emptyPane' },
-        h(
-          'div',
-          { className: 'lm-head' },
-          h('span', { className: 'lm-title' }, COPY.navBoard),
-          h('button', { type: 'button', className: 'lm-btn', style: { marginLeft: 'auto' }, onClick: props.onRefresh }, COPY.refresh),
-        ),
-        h('div', { className: 'lm-card' }, h('div', { className: 'lm-cardHead' }, h('span', { className: 'lm-cardTitle' }, COPY.boardAcross))),
-        rooms.length === 0 || board.length === 0
-          ? h('div', { className: 'lm-muted' }, COPY.boardNoRooms)
-          : h(
-              'div',
-              { className: 'lm-railList' },
-              ...board.map((row) =>
-                h(
-                  'button',
-                  {
-                    key: `${row.roomId}/${row.task.id}`,
-                    type: 'button',
-                    className: 'lm-roomRow lm-boardRow',
-                    onClick: () => props.onOpenRoom(row.roomId),
-                  },
-                  h('span', { className: STATUS_CLASS[row.task.status] ?? 'lm-status' }, STATUS_LABELS[row.task.status] ?? row.task.status),
-                  h('span', { className: 'lm-taskTitle' }, row.task.title),
-                  h('span', { className: 'lm-roomRowMeta' }, row.roomName),
-                ),
-              ),
-            ),
-      );
-    }
+    /* @ux-shell:task-board-model:start */
+/** Room task projection only: no Team execution or acceptance inference. */
+function canMoveRoomTask({task,nodeId,sessionId,isLeader}={}) {
+ return isLeader===true||!!(typeof nodeId==='string'&&nodeId&&typeof sessionId==='string'&&sessionId&&task?.assignee?.nodeId===nodeId&&task.assignee.sessionId===sessionId);
+}
+function roomTaskBoardView({rooms,self,query='',status='all',assignee='all'}={}) {
+ const text=v=>typeof v==='string'?v:'';const states=['open','doing','blocked','done','unknown'];
+ const labels={open:'待开始',doing:'进行中',blocked:'受阻',done:'已完成',unknown:'未知状态'};
+ const allRows=[];
+ for(const room of Array.isArray(rooms)?rooms:[]){if(!room||room.deleted===true||!text(room.id))continue;for(const task of Array.isArray(room.tasks)?room.tasks:[]){if(!task||task.deleted===true||!text(task.id))continue;const owner=task.assignee??{},nodeId=text(owner.nodeId),sessionId=text(owner.sessionId),ownerKey=nodeId&&sessionId?JSON.stringify([nodeId,sessionId]):null;const ownerName=text(owner.title)||text(owner.name)||sessionId||'负责人未知';const deviceName=text(owner.nodeName)||(nodeId===self?.nodeId?text(self?.name):'');const device=nodeId?(deviceName?deviceName+' · '+nodeId:nodeId):'来源设备未知';const state=states.slice(0,4).includes(task.status)?task.status:'unknown';allRows.push({key:JSON.stringify([room.id,task.id]),task,roomId:room.id,roomName:text(room.name)||room.id,title:text(task.title)||task.id,detail:text(task.detail),status:state,statusLabel:state==='unknown'?labels.unknown+(text(task.status)?' · '+task.status:''):labels[state],assigneeKey:ownerKey,assigneeName:ownerName,device,updatedAt:Number.isFinite(Date.parse(task.updatedAt))?task.updatedAt:'时间未知',source:'Room任务',archived:room.lifecycle?.status==='archived'});}}
+ const counts=Object.fromEntries([['all',allRows.length],...states.map(id=>[id,allRows.filter(r=>r.status===id).length])]);
+ const assignees=[...new Map(allRows.filter(r=>r.assigneeKey).map(r=>[r.assigneeKey,{key:r.assigneeKey,label:r.assigneeName+' · '+r.device}])).values()];
+ const activeStatus=status==='all'||states.includes(status)&&counts[status]>0?status:'all';const activeAssignee=assignee==='all'||assignees.some(a=>a.key===assignee)?assignee:'all';const needle=text(query).trim().toLocaleLowerCase();
+ const rows=allRows.filter(r=>(activeStatus==='all'||r.status===activeStatus)&&(activeAssignee==='all'||r.assigneeKey===activeAssignee)&&(!needle||[r.title,r.detail,r.roomName,r.roomId,r.assigneeName,r.device].join(' ').toLocaleLowerCase().includes(needle)));
+ return {rows,groups:states.map(id=>({id,label:labels[id],rows:rows.filter(r=>r.status===id)})).filter(g=>g.rows.length),counts,assignees,activeStatus,activeAssignee};
+}
+    /* @ux-shell:task-board-model:end */
+    /* @ux-shell:task-board-component:start */
+/** Read-only cross-Room board; existing Room owns every task mutation. */
+function RoomTaskBoard(props){
+ const {h,React}=props;const [query,setQuery]=React.useState(''),[status,setStatus]=React.useState('all'),[assignee,setAssignee]=React.useState('all');
+ const model=props.modelOf({rooms:props.rooms,self:props.self,query,status,assignee});const labels={all:'全部状态',open:'待开始',doing:'进行中',blocked:'受阻',done:'已完成',unknown:'未知状态'};
+ return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',onClick:props.onRefresh},'刷新'):null),h('p',{className:'lm-taskBoardScope'},'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),model.groups.length?model.groups.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),...group.rows.map(row=>h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null)))):h('p',{className:'lm-muted'},model.counts.all?'没有匹配的房间任务':'当前没有房间任务'));
+}
+    /* @ux-shell:task-board-component:end */
+    function BoardPane(props) {return h(RoomTaskBoard,{...props,h,React,modelOf:roomTaskBoardView});}
 
     /** Exact Host route the panel posts to; the Host mounts it under `/api`. */
     const ROUTE_PATH = 'api/lan-mesh';
@@ -5556,14 +5687,17 @@ function RoomTabs(props) {
         try {
           await call('markRead');
           await refresh();
+          return true;
         } catch (error) {
           setSendNotice(`${COPY.error}: ${errorText(error)}`);
+          return false;
         }
       };
 
-      const markMessageRead = async (messageId) => {
+      const markMessageRead = async (messageId,fromNodeId) => {
+        if(typeof messageId!=='string'||!messageId.trim()||typeof fromNodeId!=='string'||!fromNodeId.trim())return false;
         try {
-          await call('markRead', { messageId });
+          await call('markRead', { messageId,...(fromNodeId?{fromNodeId}:{}) });
           await refresh();
           return true;
         } catch (error) {

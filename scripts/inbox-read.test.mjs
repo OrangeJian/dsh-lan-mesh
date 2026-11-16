@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MeshNode } from '../lib/service.mjs';
-import { appendInbox, rewriteInbox, readInbox } from '../lib/store.mjs';
+import { appendInbox, rewriteInbox, readInbox, meshRootDir } from '../lib/store.mjs';
 
 async function fixture(t) {
   const previous = process.env.DSH_HOME;
@@ -136,4 +136,16 @@ test('preserving checkpoint keeps concurrent appends and distinguishes same ids 
  await appendInbox(a,{port:1});await appendInbox(b,{port:1});
  await Promise.all([rewriteInbox([{...a,read:true}],{port:1,preserveUnlisted:true}),appendInbox({envelope:message('new','c'),read:false},{port:1})]);
  const rows=await readInbox({port:1,limit:1000});assert.equal(rows.length,3);assert.equal(rows[0].read,true);assert.equal(rows[1].envelope.from.nodeId,'b');assert.equal(rows[2].envelope.id,'new');
+});
+
+test('explicit read can target one origin without acknowledging another origin with the same message id',async t=>{
+ const {open}=await fixture(t);for(const origin of ['first','second'])await appendInbox({envelope:message('shared-id',origin,'agent'),receivedAt:new Date().toISOString(),read:false},{port:0});const node=await open();
+ assert.equal(await node.markAllRead('shared-id','first'),1);assert.equal(node.messages.find(row=>row.from.nodeId==='first').read,true);assert.equal(node.messages.find(row=>row.from.nodeId==='second').read,false);
+});
+
+test('failed durable read acknowledgement keeps unread state until a successful retry',async t=>{
+ const {open}=await fixture(t),node=await open();await node.receive(message('retry-read','remote','agent'));await readInbox({port:0});
+ const blocked=join(meshRootDir(0),'inbox.jsonl.tmp');await mkdir(blocked);
+ try{await assert.rejects(node.markAllRead('retry-read','remote'));assert.equal(node.messages.find(row=>row.id==='retry-read').read,false);assert.equal(node.humanInbox().unread,1);assert.equal((await readInbox({port:0})).find(row=>row.envelope.id==='retry-read').read,false);}finally{await rm(blocked,{recursive:true,force:true});}
+ assert.equal(await node.markAllRead('retry-read','remote'),1);assert.equal(node.humanInbox().unread,0);
 });

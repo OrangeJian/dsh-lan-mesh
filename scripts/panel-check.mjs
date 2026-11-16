@@ -495,7 +495,7 @@ const answers = {
 const asked = [];
 const requested = [];
 let agentsGate,snapshotGate,snapshotFailure=false,snapshotOverride;
-let uploadFailure=false,sendFailure=false,uploadGate,joinFailure=false;
+let uploadFailure=false,sendFailure=false,uploadGate,joinFailure=false,emulateRoomRead=false;
 const uploaded=[];
 const fetch = async (route, init) => {
   if(route.startsWith('/api/lan-mesh/attachments?')){
@@ -514,7 +514,7 @@ const fetch = async (route, init) => {
   if(endpoint==='roomSay'&&sendFailure)throw Error('Leader unavailable');
   if (endpoint === 'markRead') {
     for (const message of answers.snapshot.inbox.messages) {
-      if (!payload.messageId || payload.messageId === message.id) message.read = true;
+      if ((!payload.messageId || payload.messageId === message.id)&&(!payload.fromNodeId||payload.fromNodeId===message.from?.nodeId)) message.read = true;
     }
     answers.snapshot.inbox.unread = answers.snapshot.inbox.messages.filter(message => !message.read && !(message.from?.nodeId === 'node-a' && (!message.from.sessionId || message.from.sessionId === 'human'))).length;
     return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: answers.snapshot.inbox } }) };
@@ -542,6 +542,7 @@ const fetch = async (route, init) => {
     return {ok:true,json:async()=>({type:'server-response',rpcId:body.rpcId,result:{ok:true,value:room.localPreferences}})};
   }
   if (answers[endpoint] === undefined) throw new Error(`unexpected endpoint ${endpoint}`);
+  if(endpoint==='roomDetail'&&emulateRoomRead){for(const message of answers.snapshot.inbox.messages)if(message.room===payload.room)message.read=true;answers.snapshot.inbox.unread=answers.snapshot.inbox.messages.filter(message=>!message.read&&!(message.from?.nodeId==='node-a'&&(!message.from.sessionId||message.from.sessionId==='human'))).length;}
   const value = endpoint === 'roomDetail' ? answers.roomDetail[payload.room] : answers[endpoint];
   return {
     ok: true,
@@ -777,7 +778,7 @@ const clickOn = async (component, token, at = 0) => {
   const node = nodes[at];
   if (node === undefined) throw new Error(`nothing to click for .${token}`);
   if (typeof node.props.onClick !== 'function') throw new Error(`.${token} has no onClick`);
-  node.props.onClick({ preventDefault() {}, stopPropagation() {} });
+  node.props.onClick({ preventDefault() {}, stopPropagation() {},currentTarget:{focus(){}} });
   await settleIn(component);
 };
 const click = (token, at = 0) => clickOn(Component, token, at);
@@ -1342,80 +1343,33 @@ checks.push(
 
 // The inbox is what reached this node, so the useful header is who spoke and
 // in which room — the recipient is always this node and stays out of the text.
-const senderLabels = () =>
-  lastNodes
-    .filter((entry) => hasClass(entry, 'lm-msgFrom'))
-    .map((entry) => (entry.children ?? []).map((child) => (child?.children ?? []).join('')).join(''));
-await switchTo(RailHost);
-await clickRail('lm-nav-inbox');
-await switchTo(Component);
+const senderLabels=()=>lastNodes.filter(entry=>hasClass(entry,'lm-inboxRow')).map(entry=>(entry.children?.[0]?.children?.find(child=>child?.type==='strong')?.children??[]).join(''));
+await switchTo(RailHost);await clickRail('lm-nav-inbox');await switchTo(Component);
 checks.push(
-  [
-    'inbox lists only the unread messages',
-    count('lm-msg') === 4 &&
-      lastText.includes('a long note') &&
-      !lastText.includes('my own note') &&
-      lastText.includes('a remote human note') &&
-      lastText.includes('the local agent answered me') &&
-      lastText.includes('beta needs a decision on the header'),
-  ],
-  // Read rows must drop out of the surface entirely.
-  [
-    'inbox hides read messages',
-    !lastText.includes('a direct note') && !lastText.includes('I said this into the room'),
-  ],
-  [
-    'inbox names the sender instead of the recipient',
-    senderLabels().includes('Beta rollout') && senderLabels().includes('echo-worker') && !lastText.includes('发给'),
-  ],
-  ['inbox excludes local human and names remote human correctly', count('lm-msgOut') === 0 && senderLabels().includes('Remote human')],
-  [
-    'inbox tags room messages with their room',
-    count('lm-msgRoomTag') === 2 && lastText.includes('#Alpha room'),
-  ],
-  // A point-to-point note has no room to jump to, so only the room rows act.
-  ['inbox only makes room messages clickable', count('lm-msgJump') === 2],
-  // The long body is clamped and offers its own toggle, so one verbose message
-  // cannot push the rest out of the pane.
-  [
-    'long messages start clamped with an expand toggle',
-    count('lm-msgTextClamp') === 1 && count('lm-msgToggle') === 1 && lastText.includes('展开'),
-  ],
+ ['inbox lists only unread replies including local agents and remote humans',count('lm-msg')===4&&lastText.includes('a long note')&&!lastText.includes('my own note')&&lastText.includes('a remote human note')&&lastText.includes('the local agent answered me')&&lastText.includes('beta needs a decision on the header')],
+ ['inbox hides read messages',!lastText.includes('a direct note')&&!lastText.includes('I said this into the room')],
+ ['inbox names the sender instead of recipient',senderLabels().includes('Beta rollout')&&senderLabels().includes('echo-worker')&&!lastText.includes('发给')],
+ ['inbox excludes own human and names remote human',count('lm-msgOut')===0&&senderLabels().includes('Remote human')],
+ ['inbox names source rooms without requiring full-body cards',lastNodes.filter(n=>n.type==='span'&&n.children?.includes('Alpha room')).length===2],
+ ['all unread rows can select details without auto-read actions',count('lm-inboxRow')===4&&lastNodes.filter(n=>hasClass(n,'lm-inboxRow')).every(n=>typeof n.props.onClick==='function')],
+ ['long reminders remain two-line previews in compact list',count('lm-inboxPreview')===4&&!lastText.includes('and finally stops')],
 );
-
-await click('lm-msgToggle');
-checks.push([
-  'the expand toggle opens the body without leaving the inbox',
-  count('lm-msgTextClamp') === 0 &&
-    count('lm-msgToggle') === 1 &&
-    lastText.includes('收起') &&
-    count('lm-chat') === 0,
-]);
-
-// Clicking a room row must open that room, not just mark it read.
-await click('lm-msg', 0);
-checks.push([
-  'clicking a private inbox message marks only that message and keeps the inbox open',
-  count('lm-msg') === 3 && !lastText.includes('a remote human note') && count('lm-chat') === 0
-    && requested.some(request => request.endpoint === 'markRead' && request.payload.messageId === 'i7'),
-]);
-await click('lm-msgJump');
-if (!asked.includes('roomDetail')) throw new Error('the inbox jump never asked for roomDetail');
-if (!requested.some(request => request.endpoint === 'markRead' && request.payload.messageId === 'i4')) throw new Error('room inbox click did not mark the clicked non-mention message read');
-if (!answers.snapshot.inbox.messages.find(message => message.id === 'i4').read) throw new Error('room message remained unread after clicking');
-checks.push([
-  'clicking an inbox room message opens that room',
-  count('lm-chat') === 1 && lastText.includes('hello from beta'),
-]);
-await switchTo(RailHost);
-await clickRail('lm-nav-inbox');
-await switchTo(Component);
-checks.push(['returning to inbox keeps the clicked room message read', !lastText.includes('the local agent answered me') && count('lm-msg') === 2]);
-const markAllButton = lastNodes.find(entry => entry.type === 'button' && (entry.children ?? []).includes('全部标为已读'));
-if (!markAllButton) throw new Error('missing mark all read button');
-await markAllButton.props.onClick();
-await settle();
-checks.push(['mark all read clears the remaining inbox and count', count('lm-msg') === 0 && answers.snapshot.inbox.unread === 0]);
+const readsBeforeInspect=requested.filter(r=>r.endpoint==='markRead').length;
+await click('lm-msg',1);
+checks.push(['selecting long reminder shows full body but never marks it read',count('lm-inboxFullText')===1&&lastText.includes('and finally stops')&&count('lm-msg')===4&&requested.filter(r=>r.endpoint==='markRead').length===readsBeforeInspect&&count('lm-chat')===0]);
+await click('lm-msg',0);
+checks.push(['selecting private reminder alone preserves unread count',count('lm-msg')===4&&answers.snapshot.inbox.messages.find(m=>m.id==='i7').read===false]);
+const explicitRead=lastNodes.find(n=>n.type==='button'&&n.children?.includes('标为已读'));await explicitRead.props.onClick();await settle();
+checks.push(['explicit read removes only private reminder and sends its source identity',count('lm-msg')===3&&!lastText.includes('a remote human note')&&requested.some(r=>r.endpoint==='markRead'&&r.payload.messageId==='i7'&&r.payload.fromNodeId==='node-b')]);
+await click('lm-msg',1);emulateRoomRead=true;
+const sourceRoom=lastNodes.find(n=>n.type==='button'&&n.children?.some(c=>typeof c==='string'&&c.startsWith('前往房间')));await sourceRoom.props.onClick();await settle();
+checks.push(['source navigation enters Room and uses its normal read semantics',count('lm-chat')===1&&lastText.includes('hello from beta')&&answers.snapshot.inbox.messages.find(m=>m.id==='i4').read===true&&answers.snapshot.inbox.messages.find(m=>m.id==='i1').read===true]);
+await switchTo(RailHost);await clickRail('lm-nav-inbox');await switchTo(Component);
+checks.push(['returning to Inbox retains authoritative Room read state',!lastText.includes('the local agent answered me')&&count('lm-msg')===1]);
+const markAllButton=lastNodes.find(n=>n.type==='button'&&n.children?.includes('全部标为已读'));await markAllButton.props.onClick();await settle();
+checks.push(['batch read first explains scope and waits for confirmation',count('lm-msg')===1&&count('lm-inboxConfirm')===1]);
+const confirmAll=lastNodes.find(n=>n.type==='button'&&n.children?.includes('确认全部标为已读'));await confirmAll.props.onClick();await settle();
+checks.push(['confirmed batch read clears remaining unread snapshot',count('lm-msg')===0&&answers.snapshot.inbox.unread===0]);
 
 // A rail Agent row opens the native conversation in the main area. The rail
 // itself lives in the sidebar, so it stays exactly where it is.
@@ -1748,27 +1702,27 @@ const beforeMainReturn=selectPanelCalls.length;
 await click('lm-mainReturn');
 checks.push(['main return releases plugin main slot and restores native chrome',selectPanelCalls.length>beforeMainReturn&&selectPanelCalls.slice(beforeMainReturn).every(id=>id===null)&&document.documentElement.dataset.lanMeshMode===undefined]);
 await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Component);
-checks.push(['network workspace uses current snapshot identity and discovered devices',count('lm-networkWorkspace')===1&&count('lm-deviceRow')>=1&&lastText.includes('node-a')&&!lastText.includes('允许派发：是')]);
+checks.push(['network workspace uses current snapshot identity and discovered devices',count('lm-networkWorkbench')===1&&count('lm-networkNode')>=1&&lastText.includes('node-a')&&!lastText.includes('允许派发：是')]);
 await switchTo(RailHost);await clickRail('lm-nav-manage');await switchTo(Component);
 checks.push(['management exposes actual UI version and existing session-management route',count('lm-managementWorkspace')===1&&lastText.includes(JSON.parse(readFileSync(join(here,'..','package.json'),'utf8')).version)&&count('lm-managementAgents')===1]);
 await click('lm-managementAgents');checks.push(['management opens the existing agent catalogue',count('lm-agentImport')>0||lastText.includes('stored-one')]);
 await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Component);
 const mainPoll=[...intervals.values()].filter(timer=>timer.ms===4000).at(-1);
 snapshotFailure=true;mainPoll.fn();await settle();
-checks.push(['failed refresh retains network data and explains stale snapshot at the top',count('lm-shellStale')===1&&count('lm-networkWorkspace')===1&&lastText.includes('上次成功读取')]);
-snapshotFailure=false;await click('lm-shellRetry');checks.push(['retry recovers the retained snapshot without a stale banner',count('lm-shellStale')===0&&count('lm-networkWorkspace')===1]);
+checks.push(['failed refresh retains network data and explains stale snapshot at the top',count('lm-shellStale')===1&&count('lm-networkWorkbench')===1&&lastText.includes('上次成功读取')]);
+snapshotFailure=false;await click('lm-shellRetry');checks.push(['retry recovers the retained snapshot without a stale banner',count('lm-shellStale')===0&&count('lm-networkWorkbench')===1]);
 snapshotFailure=true;await switchTo(Component);
-checks.push(['first snapshot failure is not presented as an empty workspace',count('lm-shellReadState')===1&&count('lm-networkWorkspace')===0&&count('lm-mainReturn')===1&&lastText.includes('无法读取')]);
-snapshotFailure=false;await click('lm-shellRetry');checks.push(['first-load retry restores selected workspace',count('lm-networkWorkspace')===1&&count('lm-shellReadState')===0]);
+checks.push(['first snapshot failure is not presented as an empty workspace',count('lm-shellReadState')===1&&count('lm-networkWorkbench')===0&&count('lm-mainReturn')===1&&lastText.includes('无法读取')]);
+snapshotFailure=false;await click('lm-shellRetry');checks.push(['first-load retry restores selected workspace',count('lm-networkWorkbench')===1&&count('lm-shellReadState')===0]);
 let releaseSnapshot;snapshotGate=new Promise(resolve=>releaseSnapshot=resolve);await switchTo(Component);
 checks.push(['initial pending read shows loading while native exit stays available',count('lm-shellSkeleton')===2&&count('lm-mainReturn')===1&&lastText.includes('正在读取')]);
 const snapshotsBeforePoll=asked.filter(method=>method==='snapshot').length;const pendingPoll=[...intervals.values()].filter(timer=>timer.ms===4000).at(-1);pendingPoll.fn();pendingPoll.fn();await settle();
 checks.push(['overlapping snapshot polls share one pending request',asked.filter(method=>method==='snapshot').length===snapshotsBeforePoll]);
 snapshotGate=null;releaseSnapshot();await settle();
-checks.push(['pending initial read resolves into the selected workspace',count('lm-networkWorkspace')===1&&count('lm-shellSkeleton')===0]);
+checks.push(['pending initial read resolves into the selected workspace',count('lm-networkWorkbench')===1&&count('lm-shellSkeleton')===0]);
 let releaseOldSnapshot;snapshotGate=new Promise(resolve=>releaseOldSnapshot=resolve);snapshotOverride=structuredClone(answers.snapshot);snapshotOverride.self.name='OLD SNAPSHOT';snapshotOverride.self.selfName='OLD SNAPSHOT';await switchTo(Component);
 snapshotGate=null;snapshotOverride=undefined;await switchTo(Component);releaseOldSnapshot();await settle();
-checks.push(['snapshot from an unmounted workspace cannot overwrite the new view',count('lm-networkWorkspace')===1&&!lastText.includes('OLD SNAPSHOT')]);
+checks.push(['snapshot from an unmounted workspace cannot overwrite the new view',count('lm-networkWorkbench')===1&&!lastText.includes('OLD SNAPSHOT')]);
 const togglesBefore=sidebarToggleCount;await click('lm-sidebarToggle');
 checks.push(['workbench sidebar control invokes the public host toggle',sidebarToggleCount===togglesBefore+1]);
 const sidebarAction=navigation.layout.toggleSidebar;delete navigation.layout.toggleSidebar;await click('lm-sidebarToggle');
@@ -1889,6 +1843,12 @@ await switchTo(ArchivedTabsRoom);await clickOn(ArchivedTabsRoom,'lm-roomTab-task
 checks.push(['archived tasks remain viewable while new task assignment is absent',lastText.includes('Existing archived task')&&count('lm-assignBtn')===0]);
 await clickOn(ArchivedTabsRoom,'lm-roomTab-members');
 checks.push(['archived members remain viewable without invite or kick controls',count('lm-memberDevice')===2&&count('lm-inviteRow')===0&&count('lm-kickBtn')===0]);
+let ownerNode='node-b';const ownerCall=async(method,args)=>method==='roomDetail'?{room:{id:args.room,members:[human],tasks:[{id:'same-human-owner',title:'Exact owner task',status:'open',assignee:{nodeId:ownerNode,sessionId:'human',name:'Same human'}}]},viewer:{isMember:true,isLeader:false},messages:[]}:method==='roomSkills'?{status:'ready',skills:[]}:{status:'ready',documents:[]};
+const TaskOwnerRoom=()=>h(window.__roomPane,{room:{id:'room-task-owner'},sessionId:'human',self:answers.snapshot.self,call:ownerCall});
+await switchTo(TaskOwnerRoom);await clickOn(TaskOwnerRoom,'lm-roomTab-tasks');
+checks.push(['same human session on a different node never grants task controls',count('lm-statusBtns')===0&&lastText.includes('Exact owner task')]);
+ownerNode='node-a';[...intervals.values()].find(timer=>timer.ms===2000).fn();await settleIn(TaskOwnerRoom);
+checks.push(['exact local human owner retains existing task controls',count('lm-statusBtns')===1]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;

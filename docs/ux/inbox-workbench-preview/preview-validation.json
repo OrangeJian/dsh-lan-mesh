@@ -1,0 +1,65 @@
+{
+  "screenshots": [
+    {
+      "name": "list-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 26,
+      "visibleRows": 7,
+      "windowHeight": 900
+    },
+    {
+      "name": "detail-1024-dark-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 26,
+      "visibleRows": 5,
+      "windowHeight": 768
+    },
+    {
+      "name": "detail-640-light-default",
+      "width": 640,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 26,
+      "visibleRows": 26,
+      "windowHeight": 768
+    },
+    {
+      "name": "confirm-1440-light-default",
+      "width": 1440,
+      "height": 900,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 26,
+      "visibleRows": 6,
+      "windowHeight": 900
+    },
+    {
+      "name": "empty-1024-light-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 0,
+      "visibleRows": 0,
+      "windowHeight": 768
+    },
+    {
+      "name": "failed-1024-dark-default",
+      "width": 1024,
+      "height": 768,
+      "ready": "complete",
+      "overflow": false,
+      "rows": 26,
+      "visibleRows": 5,
+      "windowHeight": 768
+    }
+  ],
+  "runtimeErrors": []
+}

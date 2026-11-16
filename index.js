@@ -1447,7 +1447,7 @@ export function apply(ctx, rawConfig) {
             value: await node.send({ target: str('target'), text: str('text'), topic: opt('topic') }),
           };
         case 'markRead':
-          await node.markAllRead(opt('messageId'));
+          await node.markAllRead(opt('messageId'),opt('fromNodeId'));
           return { ok: true, value: node.humanInbox() };
         case 'roomRead':
           return { ok: true, value: { flipped: node.markRoomRead(str('room'), 'human') } };
