@@ -5,7 +5,7 @@
 ## 工作区和禁止覆盖的成果
 
 - 工作目录：C:/Users/jian/.codex/worktrees/ux-workbench/dsh-lan-mesh；分支codex/ux-workbench。
-- 前一个已提交基线：3b80fac / v0.4.19。v0.4.20最终提交请读取git log；不要以旧文档SHA替代当前HEAD。
+- 前一个已提交基线：3b80fac / v0.4.19。v0.4.20提交 `7eff5a7`；不要以旧文档SHA替代当前HEAD。
 - 原工作区C:/Users/jian/.codex/worktrees/room-collaboration/dsh-lan-mesh中的未完成0.4.5任务成果引用和暂停M6草稿禁止覆盖、清理、合入或重置。
 - 用户要求每批版本号明确、本地Git留档；GitHub推送继续暂停。不要自动merge/push或自动发布。日常可逆实施无需逐步询问。
 
