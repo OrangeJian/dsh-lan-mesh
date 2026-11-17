@@ -1,6 +1,6 @@
 # v0.4.21 跨批已读一致性、历史索引与取证补齐
 
-上一基线 7eff5a7 / v0.4.20（其前 3b80fac / v0.4.19）；本批为 0.4.21。GitHub 仍暂停，只本地提交。
+上一基线 7eff5a7 / v0.4.20（其前 3b80fac / v0.4.19）；本批为 0.4.21，代码与文档提交 `a2802df`（如需核对以 `git log --oneline` 为准）。GitHub 仍暂停，只本地提交。
 
 本批第一次按交接文档 line 48-53 的分工用四个子代理并行：Agent A 做 Network 与任务看板的取证生成器，Agent B 做历史分页索引，Agent C 做 Team 只读 Owner 契约与 UX-6 矩阵，主 Agent 负责 P0 修复、共享入口（client.js / build / package / index）与全量回归。共享入口没有让任何子代理碰。
 
