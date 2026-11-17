@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.20';
+    const PLUGIN_VERSION = '0.4.21';
     const React = require('react');
     const h = React.createElement;
 
@@ -911,7 +911,10 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-roomTaskBoard .lm-taskBoardRow{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%;padding:12px 16px;margin-bottom:8px;text-align:left;white-space:normal;overflow-wrap:anywhere;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;color:inherit}
 .lm-roomTaskBoard small{color:var(--dsw-alias-label-secondary)}.lm-roomTaskBoard .lm-taskBoardPreview{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px}
 .lm-roomTaskBoard button:focus-visible,.lm-roomTaskBoard input:focus-visible,.lm-roomTaskBoard select:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-@media(max-width:650px){.lm-roomTaskBoard{padding:16px}.lm-roomTaskBoard .lm-taskBoardFilters>*{width:100%}.lm-roomTaskBoard .lm-taskBoardRowHead{align-items:flex-start;flex-wrap:wrap}}
+.lm-roomTaskBoard{container-type:inline-size;container-name:lm-task-board}
+/* An element is never its own container, so the padding step stays a window query; the layout switch below is the pane-driven one that matters when the host main column is narrower than its window. */
+@media(max-width:650px){.lm-roomTaskBoard{padding:16px}}
+@container lm-task-board (max-width:650px){.lm-roomTaskBoard .lm-taskBoardFilters>*{width:100%}.lm-roomTaskBoard .lm-taskBoardRowHead{align-items:flex-start;flex-wrap:wrap}}
     /* @ux-shell:task-board-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off

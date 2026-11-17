@@ -1,23 +1,1734 @@
 {
-  "screenshots": [
+  "generator": "scripts/task-board-preview.mjs",
+  "browser": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  "component": {
+    "path": "ui/tasks/room-task-board.css",
+    "lines": 13,
+    "bytes": 2059,
+    "sha256": "3f972cc29078841e"
+  },
+  "fixtures": [
     {
-      "name": "board-1440-light-default",
-      "width": 1440,
-      "height": 900,
-      "ready": "complete",
-      "overflow": false,
-      "rows": 0,
-      "windowHeight": 900
+      "page": "board.html",
+      "rows": 6,
+      "groups": 5,
+      "bytes": 7294,
+      "sha256": "51938c6fe6e031b8"
     },
     {
-      "name": "board-1024-dark-default",
-      "width": 1024,
-      "height": 768,
-      "ready": "complete",
-      "overflow": false,
+      "page": "board-empty.html",
       "rows": 0,
-      "windowHeight": 768
+      "groups": 0,
+      "bytes": 4149,
+      "sha256": "3dc1c968af015f61"
+    },
+    {
+      "page": "board-few.html",
+      "rows": 2,
+      "groups": 2,
+      "bytes": 5269,
+      "sha256": "4b73b93d8e595cfa"
+    },
+    {
+      "page": "board-many.html",
+      "rows": 12,
+      "groups": 5,
+      "bytes": 9492,
+      "sha256": "126acfa8a05c5936"
+    },
+    {
+      "page": "board-long.html",
+      "rows": 3,
+      "groups": 3,
+      "bytes": 6678,
+      "sha256": "151b62928a300e84"
+    },
+    {
+      "page": "index.html",
+      "copyOf": "board.html",
+      "bytes": 7294,
+      "sha256": "51938c6fe6e031b8"
     }
   ],
-  "runtimeErrors": []
+  "screenshots": [
+    {
+      "screenshot": {
+        "path": "screenshots/board-1440-light-default.png",
+        "bytes": 78018,
+        "sha256": "256f2a91a8e9c61a"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-1440-light-default",
+      "page": "board.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1440,
+        "padding": 24,
+        "containerContentWidth": 1392
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1440,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 1392,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          1081,
+          106,
+          189
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 5,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-1024-dark-default.png",
+        "bytes": 65226,
+        "sha256": "10946fa87f777d8a"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-1024-dark-default",
+      "page": "board.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "dark",
+      "expectation": {
+        "rows": 6,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1024,
+        "padding": 24,
+        "containerContentWidth": 976
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyBackground": "rgb(21, 25, 31)",
+      "mainWidth": 1024,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 976,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          665,
+          106,
+          189
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-1024-light-default.png",
+        "bytes": 65851,
+        "sha256": "f78af0d546c2edf2"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-1024-light-default",
+      "page": "board.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1024,
+        "padding": 24,
+        "containerContentWidth": 976
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1024,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 976,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          665,
+          106,
+          189
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-640-light-narrow.png",
+        "bytes": 58526,
+        "sha256": "eb9db6d150ecadee"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-640-light-narrow",
+      "page": "board.html",
+      "width": 640,
+      "height": 768,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": true,
+        "narrowBasis": "window",
+        "paneWidth": 640,
+        "padding": 16,
+        "containerContentWidth": 608
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 640,
+        "height": 768
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 640,
+      "rootWidth": 640,
+      "rootHeight": 732,
+      "rootPadding": 16,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": true,
+      "narrowApplied": true,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 608,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          608,
+          608,
+          608
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-390-light-narrow.png",
+        "bytes": 55236,
+        "sha256": "5470765fc08f0473"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-390-light-narrow",
+      "page": "board.html",
+      "width": 390,
+      "height": 780,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": true,
+        "narrowBasis": "window",
+        "paneWidth": 390,
+        "padding": 16,
+        "containerContentWidth": 358
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 390,
+        "height": 780
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 390,
+      "rootWidth": 390,
+      "rootHeight": 744,
+      "rootPadding": 16,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": true,
+      "narrowApplied": true,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 358,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          358,
+          358,
+          358
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 44,
+        "clipped": true
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-1440-light-main640.png",
+        "bytes": 70843,
+        "sha256": "7a28bb97e09ff7ea"
+      },
+      "notes": [
+        "pane 640px triggered the narrow branch",
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-1440-light-main640",
+      "page": "board.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": true,
+        "narrowBasis": "pane",
+        "paneWidth": 640,
+        "padding": 16,
+        "containerContentWidth": 608
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 640,
+      "rootWidth": 640,
+      "rootHeight": 864,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": true,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 592,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          592,
+          592,
+          592
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 4,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-699-light-boundary-wide.png",
+        "bytes": 64127,
+        "sha256": "32002f5f9d9c4dba"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-699-light-boundary-wide",
+      "page": "board.html",
+      "width": 699,
+      "height": 768,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 699,
+        "padding": 24,
+        "containerContentWidth": 651
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 699,
+        "height": 768
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 699,
+      "rootWidth": 699,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 651,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          340,
+          106,
+          189
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-698-light-boundary-narrow.png",
+        "bytes": 57437,
+        "sha256": "97b9b5e159366cbf"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-698-light-boundary-narrow",
+      "page": "board.html",
+      "width": 698,
+      "height": 768,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": true,
+        "narrowBasis": "window",
+        "paneWidth": 698,
+        "padding": 24,
+        "containerContentWidth": 650
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 698,
+        "height": 768
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 698,
+      "rootWidth": 698,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": true,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 650,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          650,
+          650,
+          650
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-1440-light-focus.png",
+        "bytes": 78018,
+        "sha256": "256f2a91a8e9c61a"
+      },
+      "notes": [
+        "programmatic focus landed on <input>, computed outline none 3px; the :focus-visible rule (ui/tasks/room-task-board.css:9) only matches keyboard-originated focus, so a real Tab walk is NOT VERIFIED by this case",
+        "groups: 待开始 1 | 进行中 1 | 受阻 1 | 已完成 2 | 未知状态 1"
+      ],
+      "name": "board-1440-light-focus",
+      "page": "board.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "expectation": {
+        "rows": 6,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1440,
+        "padding": 24,
+        "containerContentWidth": 1392
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1440,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1",
+        "受阻 1",
+        "已完成 2",
+        "未知状态 1"
+      ],
+      "rows": 6,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 1392,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          1081,
+          106,
+          189
+        ]
+      },
+      "rowHeads": {
+        "measured": 6,
+        "sameLine": 6
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 5,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 10,
+      "focused": {
+        "tag": "input",
+        "outlineWidth": 3,
+        "outlineStyle": "none"
+      },
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-empty-1440-light-default.png",
+        "bytes": 24246,
+        "sha256": "50baa7c8902103b2"
+      },
+      "notes": [],
+      "name": "board-empty-1440-light-default",
+      "page": "board-empty.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "expectation": {
+        "rows": 0,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1440,
+        "padding": 24,
+        "containerContentWidth": 1392
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1440,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": false,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 0,
+      "groupTitles": [],
+      "rows": 0,
+      "cardsWithDetail": 0,
+      "rowLayout": "",
+      "rowWidth": 0,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          1162,
+          106,
+          108
+        ]
+      },
+      "rowHeads": {
+        "measured": 0,
+        "sameLine": 0
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "当前没有房间任务",
+      "visibleRows": 0,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 4,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-empty-640-dark-narrow.png",
+        "bytes": 21611,
+        "sha256": "54c0d2ffeca96dbe"
+      },
+      "notes": [],
+      "name": "board-empty-640-dark-narrow",
+      "page": "board-empty.html",
+      "width": 640,
+      "height": 768,
+      "theme": "dark",
+      "expectation": {
+        "rows": 0,
+        "narrow": true,
+        "narrowBasis": "window",
+        "paneWidth": 640,
+        "padding": 16,
+        "containerContentWidth": 608
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 640,
+        "height": 768
+      },
+      "bodyBackground": "rgb(21, 25, 31)",
+      "mainWidth": 640,
+      "rootWidth": 640,
+      "rootHeight": 732,
+      "rootPadding": 16,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": false,
+      "narrowPadding": true,
+      "narrowApplied": true,
+      "groups": 0,
+      "groupTitles": [],
+      "rows": 0,
+      "cardsWithDetail": 0,
+      "rowLayout": "",
+      "rowWidth": 0,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          608,
+          608,
+          608
+        ]
+      },
+      "rowHeads": {
+        "measured": 0,
+        "sameLine": 0
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "当前没有房间任务",
+      "visibleRows": 0,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 4,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-few-1440-light-default.png",
+        "bytes": 44397,
+        "sha256": "57251ce72a959f8c"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1"
+      ],
+      "name": "board-few-1440-light-default",
+      "page": "board-few.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "expectation": {
+        "rows": 2,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1440,
+        "padding": 24,
+        "containerContentWidth": 1392
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1440,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": false,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 2,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1"
+      ],
+      "rows": 2,
+      "cardsWithDetail": 1,
+      "rowLayout": "flex/column",
+      "rowWidth": 1392,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          1081,
+          106,
+          189
+        ]
+      },
+      "rowHeads": {
+        "measured": 2,
+        "sameLine": 2
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 2,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 6,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-few-1024-dark-default.png",
+        "bytes": 41877,
+        "sha256": "ceae193d7a964442"
+      },
+      "notes": [
+        "groups: 待开始 1 | 进行中 1"
+      ],
+      "name": "board-few-1024-dark-default",
+      "page": "board-few.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "dark",
+      "expectation": {
+        "rows": 2,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1024,
+        "padding": 24,
+        "containerContentWidth": 976
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyBackground": "rgb(21, 25, 31)",
+      "mainWidth": 1024,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": false,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 2,
+      "groupTitles": [
+        "待开始 1",
+        "进行中 1"
+      ],
+      "rows": 2,
+      "cardsWithDetail": 1,
+      "rowLayout": "flex/column",
+      "rowWidth": 976,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          665,
+          106,
+          189
+        ]
+      },
+      "rowHeads": {
+        "measured": 2,
+        "sameLine": 2
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 2,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 6,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-many-1440-light-default.png",
+        "bytes": 80610,
+        "sha256": "a2ccbc23d86de0f3"
+      },
+      "notes": [
+        "groups: 待开始 3 | 进行中 2 | 受阻 2 | 已完成 3 | 未知状态 2"
+      ],
+      "name": "board-many-1440-light-default",
+      "page": "board-many.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "expectation": {
+        "rows": 12,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1440,
+        "padding": 24,
+        "containerContentWidth": 1392
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1440,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 3",
+        "进行中 2",
+        "受阻 2",
+        "已完成 3",
+        "未知状态 2"
+      ],
+      "rows": 12,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 1392,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          1046,
+          113,
+          217
+        ]
+      },
+      "rowHeads": {
+        "measured": 12,
+        "sameLine": 12
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 5,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 16,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-many-1024-dark-default.png",
+        "bytes": 67288,
+        "sha256": "796661e5481e9a69"
+      },
+      "notes": [
+        "groups: 待开始 3 | 进行中 2 | 受阻 2 | 已完成 3 | 未知状态 2"
+      ],
+      "name": "board-many-1024-dark-default",
+      "page": "board-many.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "dark",
+      "expectation": {
+        "rows": 12,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1024,
+        "padding": 24,
+        "containerContentWidth": 976
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyBackground": "rgb(21, 25, 31)",
+      "mainWidth": 1024,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 3",
+        "进行中 2",
+        "受阻 2",
+        "已完成 3",
+        "未知状态 2"
+      ],
+      "rows": 12,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 976,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          630,
+          113,
+          217
+        ]
+      },
+      "rowHeads": {
+        "measured": 12,
+        "sameLine": 12
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 5,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 16,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-many-640-light-narrow.png",
+        "bytes": 58771,
+        "sha256": "e731de0150c507d3"
+      },
+      "notes": [
+        "groups: 待开始 3 | 进行中 2 | 受阻 2 | 已完成 3 | 未知状态 2"
+      ],
+      "name": "board-many-640-light-narrow",
+      "page": "board-many.html",
+      "width": 640,
+      "height": 768,
+      "theme": "light",
+      "expectation": {
+        "rows": 12,
+        "narrow": true,
+        "narrowBasis": "window",
+        "paneWidth": 640,
+        "padding": 16,
+        "containerContentWidth": 608
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 640,
+        "height": 768
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 640,
+      "rootWidth": 640,
+      "rootHeight": 732,
+      "rootPadding": 16,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": true,
+      "narrowApplied": true,
+      "groups": 5,
+      "groupTitles": [
+        "待开始 3",
+        "进行中 2",
+        "受阻 2",
+        "已完成 3",
+        "未知状态 2"
+      ],
+      "rows": 12,
+      "cardsWithDetail": 3,
+      "rowLayout": "flex/column",
+      "rowWidth": 608,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          608,
+          608,
+          608
+        ]
+      },
+      "rowHeads": {
+        "measured": 12,
+        "sameLine": 12
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 4,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 16,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-long-1024-light-default.png",
+        "bytes": 86815,
+        "sha256": "3330ae7783c8c422"
+      },
+      "notes": [
+        "groups: 待开始 1 | 受阻 1 | 已完成 1"
+      ],
+      "name": "board-long-1024-light-default",
+      "page": "board-long.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "light",
+      "expectation": {
+        "rows": 3,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1024,
+        "padding": 24,
+        "containerContentWidth": 976
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1024,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": false,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 3,
+      "groupTitles": [
+        "待开始 1",
+        "受阻 1",
+        "已完成 1"
+      ],
+      "rows": 3,
+      "cardsWithDetail": 2,
+      "rowLayout": "flex/column",
+      "rowWidth": 976,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          385,
+          106,
+          469
+        ]
+      },
+      "rowHeads": {
+        "measured": 3,
+        "sameLine": 3
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 7,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-long-640-dark-narrow.png",
+        "bytes": 84344,
+        "sha256": "fd181a9bc86a9337"
+      },
+      "notes": [
+        "groups: 待开始 1 | 受阻 1 | 已完成 1"
+      ],
+      "name": "board-long-640-dark-narrow",
+      "page": "board-long.html",
+      "width": 640,
+      "height": 768,
+      "theme": "dark",
+      "expectation": {
+        "rows": 3,
+        "narrow": true,
+        "narrowBasis": "window",
+        "paneWidth": 640,
+        "padding": 16,
+        "containerContentWidth": 608
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 640,
+        "height": 768
+      },
+      "bodyBackground": "rgb(21, 25, 31)",
+      "mainWidth": 640,
+      "rootWidth": 640,
+      "rootHeight": 732,
+      "rootPadding": 16,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": true,
+      "narrowApplied": true,
+      "groups": 3,
+      "groupTitles": [
+        "待开始 1",
+        "受阻 1",
+        "已完成 1"
+      ],
+      "rows": 3,
+      "cardsWithDetail": 2,
+      "rowLayout": "flex/column",
+      "rowWidth": 608,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          608,
+          608,
+          608
+        ]
+      },
+      "rowHeads": {
+        "measured": 3,
+        "sameLine": 3
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 3,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 7,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-long-390-light-narrow.png",
+        "bytes": 67554,
+        "sha256": "08680a4c4abecb82"
+      },
+      "notes": [
+        "1 detail preview(s) clamped to two lines by -webkit-line-clamp (designed)",
+        "2/3 row heads let the status badge wrap under the title (@media flex-wrap:wrap at <=650px, designed)",
+        "groups: 待开始 1 | 受阻 1 | 已完成 1"
+      ],
+      "name": "board-long-390-light-narrow",
+      "page": "board-long.html",
+      "width": 390,
+      "height": 780,
+      "theme": "light",
+      "expectation": {
+        "rows": 3,
+        "narrow": true,
+        "narrowBasis": "window",
+        "paneWidth": 390,
+        "padding": 16,
+        "containerContentWidth": 358
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 390,
+        "height": 780
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 390,
+      "rootWidth": 390,
+      "rootHeight": 744,
+      "rootPadding": 16,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": true,
+      "narrowApplied": true,
+      "groups": 3,
+      "groupTitles": [
+        "待开始 1",
+        "受阻 1",
+        "已完成 1"
+      ],
+      "rows": 3,
+      "cardsWithDetail": 2,
+      "rowLayout": "flex/column",
+      "rowWidth": 358,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 3,
+        "widths": [
+          358,
+          358,
+          358
+        ]
+      },
+      "rowHeads": {
+        "measured": 3,
+        "sameLine": 1
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 1,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 2,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 44,
+        "clipped": true
+      },
+      "focusTargets": 7,
+      "focused": null,
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    }
+  ],
+  "runtimeErrors": [],
+  "notRun": [
+    "真实 Team/M6 审批流程下的任务派发、状态流转与成果验收：需要真实 Team 审批与多机授权，本目录只做静态取证，NOT RUN。",
+    "真实 DSH 宿主壳（侧栏/抽屉/分栏）里的主区宽度：需要运行中的 DSH GUI 与真实 Room，本脚本仅用 1440 宽窗口内 640px 主区近似，原样实机 NOT RUN。",
+    "服务端对已删除房间/未知状态的裁剪：fixture 由 roomTaskBoardView 本地生成，服务端路径 NOT RUN。",
+    "筛选与点击交互：由 scripts/room-task-board.test.mjs 覆盖，截图不证明交互，交互 NOT RUN。",
+    "键盘 focus-visible 真实 Tab 走查：程序化 focus() 不触发 :focus-visible，计算 outline 仍为 none，NOT RUN。"
+  ]
 }

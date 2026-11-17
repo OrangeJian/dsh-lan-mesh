@@ -1,6 +1,6 @@
 {
   "name": "dsh-lan-mesh",
-  "version": "0.4.20",
+  "version": "0.4.21",
   "type": "module",
   "scripts": {
     "check:composer-compat": "node scripts/composer-compat-check.mjs",
@@ -10,7 +10,9 @@
     "test:team:smoke": "node scripts/team-smoke.mjs",
     "build:client": "node scripts/build-client.mjs",
     "check:client-build": "node scripts/build-client.mjs --check",
-    "preview:inbox": "node scripts/inbox-workbench-preview.mjs"
+    "preview:inbox": "node scripts/inbox-workbench-preview.mjs",
+    "preview:network": "node scripts/network-workbench-preview.mjs",
+    "preview:board": "node scripts/task-board-preview.mjs"
   },
   "description": "LAN peer-to-peer collaboration mesh for DeepSeek Harness agents.",
   "keywords": [

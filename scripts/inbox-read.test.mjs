@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { rmSync } from 'node:fs';
 import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,8 +13,8 @@ async function fixture(t) {
   process.env.DSH_HOME = home;
   const config = { port: 0, discoveryPort: 0, autoWake: false, clusterSecret: '', trustedPeers: [] };
   const nodes = [];
-  const open = async () => {
-    const node = new MeshNode({ config });
+  const open = async (extra = {}) => {
+    const node = new MeshNode({ config, ...extra });
     nodes.push(node);
     await node.start();
     return node;
@@ -197,4 +198,31 @@ test('queued room reads survive shutdown and never publish a stale unread record
  assert.ok(node.messages.filter(row=>row.room===room.id).every(row=>row.read===true));
  assert.equal(node.humanInbox().unread,0);
  assert.ok((await readInbox({port:0})).filter(row=>row.envelope.room===room.id).every(row=>row.read));
+});
+test('a failed read batch never reverts a later batch that already made the same record durable',async t=>{
+ let unblock=()=>{};
+ const {open}=await fixture(t);
+ // The first queued rewrite fails while the second is already enqueued. Batch
+ // two publishes records batch one optimistically flipped, so their read flag
+ // must stay true in memory once batch two has written them to disk.
+ const node=await open({log:(...args)=>{if(String(args[0]).includes('cannot rewrite the inbox log'))unblock();}});
+ const first=await node.createRoom({name:'First batch',sessionId:'human'});
+ const second=await node.createRoom({name:'Second batch',sessionId:'human'});
+ await node.receive(message('batch-one','remote-node','agent',{kind:'room-message',room:first.room.id,text:'flipped by batch one'}));
+ await node.receive(message('batch-two','remote-node','agent',{kind:'room-message',room:second.room.id,text:'flipped by batch two'}));
+ const blocked=join(meshRootDir(0),'inbox.jsonl.tmp');
+ await mkdir(blocked);
+ unblock=()=>{rmSync(blocked,{recursive:true,force:true});};
+ try{
+  assert.equal(node.markRoomRead(first.room.id,'human'),1,'batch one flips synchronously');
+  assert.equal(node.markRoomRead(second.room.id,'human'),1,'batch two joins the queue before batch one settles');
+  await node.inboxReadsSettled();
+ }finally{rmSync(blocked,{recursive:true,force:true});}
+ const stored=await readInbox({port:0,limit:50});
+ assert.equal(stored.find(row=>row.envelope.id==='batch-one').read,true,'batch two wrote batch one as durable read');
+ assert.equal(stored.find(row=>row.envelope.id==='batch-two').read,true);
+ assert.equal(node.messages.find(row=>row.id==='batch-one').read,true,'memory must agree with the durable flag');
+ assert.equal(node.messages.find(row=>row.id==='batch-two').read,true);
+ assert.equal(node.humanInbox().unread,0);
+ await node.close();
 });

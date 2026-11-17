@@ -2,481 +2,2663 @@
   "screenshots": [
     {
       "name": "one-1440-light",
+      "page": "one.html",
       "width": 1440,
       "height": 900,
-      "nodes": 1,
-      "collisions": [],
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 1440,
+      "windowHeight": 900,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootScrollWidth": 1440,
+      "rootClientWidth": 1440,
+      "layoutDisplay": "grid",
+      "layoutColumns": 2,
+      "layoutTemplate": "1092px 280px",
+      "primaryWidth": 1092,
+      "detailWidth": 280,
+      "detailDisplay": "block",
+      "topologyDisplay": "block",
+      "topologyHeight": 560,
+      "topologyNodePosition": "absolute",
+      "edgesDisplay": "block",
+      "spokes": 0,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": false,
       "overflow": false,
       "rootOverflow": false,
-      "rootWidth": 1440,
-      "compactNotice": "none",
+      "nodes": 1,
+      "visibleNodes": 1,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [],
+      "collisions": [],
       "rects": [
         {
-          "id": "建哥的工作站node-0-f3a0b2本机目录会话 3",
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
           "x": 495,
-          "y": 493.890625,
+          "y": 494,
           "w": 150,
-          "h": 98
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
         }
-      ]
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "absolute/edges-visible",
+          "actual": "block/absolute/edges-block"
+        }
+      ],
+      "status": "PASS"
     },
     {
       "name": "three-1440-light",
+      "page": "three.html",
       "width": 1440,
       "height": 900,
-      "nodes": 3,
-      "collisions": [],
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 1440,
+      "windowHeight": 900,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootScrollWidth": 1440,
+      "rootClientWidth": 1440,
+      "layoutDisplay": "grid",
+      "layoutColumns": 2,
+      "layoutTemplate": "1092px 280px",
+      "primaryWidth": 1092,
+      "detailWidth": 280,
+      "detailDisplay": "block",
+      "topologyDisplay": "block",
+      "topologyHeight": 560,
+      "topologyNodePosition": "absolute",
+      "edgesDisplay": "block",
+      "spokes": 2,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": false,
       "overflow": false,
       "rootOverflow": false,
-      "rootWidth": 1440,
-      "compactNotice": "none",
+      "nodes": 3,
+      "visibleNodes": 3,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
       "rects": [
         {
-          "id": "建哥的工作站node-0-f3a0b2本机目录会话 3",
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
           "x": 495,
-          "y": 493.890625,
+          "y": 494,
           "w": 150,
-          "h": 98
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
         },
         {
-          "id": "Reviewer 所在设备node-1-f3a0b2约 3 秒前观测目录会话 1",
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
           "x": 495,
           "y": 293,
           "w": 150,
-          "h": 98
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
         },
         {
-          "id": "Reviewer 所在设备node-2-f3a0b2约 4 秒前观测目录会话 1",
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
           "x": 495,
-          "y": 694.765625,
+          "y": 695,
           "w": 150,
-          "h": 98
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
         }
-      ]
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "absolute/edges-visible",
+          "actual": "block/absolute/edges-block"
+        }
+      ],
+      "status": "PASS"
     },
     {
-      "name": "ten-1024-dark",
-      "width": 1024,
+      "name": "three-640-light",
+      "page": "three.html",
+      "width": 640,
       "height": 768,
-      "nodes": 10,
-      "collisions": [],
-      "overflow": false,
-      "rootOverflow": false,
-      "rootWidth": 1024,
-      "compactNotice": "none",
-      "rects": [
-        {
-          "id": "建哥的工作站node-0-f3a0b2本机目录会话 3",
-          "x": 429.5,
-          "y": 473.890625,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "Reviewer 所在设备node-1-f3a0b2约 3 秒前观测目录会话 1",
-          "x": 429.5,
-          "y": 287.40625,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "Reviewer 所在设备node-2-f3a0b2约 4 秒前观测目录会话 1",
-          "x": 651.40625,
-          "y": 331.03125,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "协作节点 3node-3-f3a0b2约 5 秒前观测目录会话未核对",
-          "x": 769.484375,
-          "y": 441.5,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "协作节点 4node-4-f3a0b2约 6 秒前观测目录会话未核对",
-          "x": 728.484375,
-          "y": 567.125,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "协作节点 5node-5-f3a0b2约 7 秒前观测目录会话未核对",
-          "x": 547.578125,
-          "y": 649.109375,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "协作节点 6node-6-f3a0b2约 8 秒前观测目录会话未核对",
-          "x": 311.40625,
-          "y": 649.109375,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "协作节点 7node-7-f3a0b2约 9 秒前观测目录会话未核对",
-          "x": 130.5,
-          "y": 567.125,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "协作节点 8node-8-f3a0b2约 10 秒前观测目录会话未核对",
-          "x": 89.5,
-          "y": 441.5,
-          "w": 150,
-          "h": 98
-        },
-        {
-          "id": "协作节点 9node-9-f3a0b2约 11 秒前观测目录会话未核对",
-          "x": 207.578125,
-          "y": 331.03125,
-          "w": 150,
-          "h": 98
-        }
-      ]
-    },
-    {
-      "name": "thirty-1440-light",
-      "width": 1440,
-      "height": 900,
-      "nodes": 30,
-      "collisions": [],
-      "overflow": false,
-      "rootOverflow": false,
-      "rootWidth": 1440,
-      "compactNotice": "",
-      "rects": [
-        {
-          "id": "建哥的工作站node-0-f3a0b2本机目录会话 3",
-          "x": 24,
-          "y": 262.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "Reviewer 所在设备node-1-f3a0b2约 3 秒前观测目录会话 1",
-          "x": 296.25,
-          "y": 262.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "Reviewer 所在设备node-2-f3a0b2约 4 秒前观测目录会话 1",
-          "x": 568.5,
-          "y": 262.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 3node-3-f3a0b2约 5 秒前观测目录会话未核对",
-          "x": 840.75,
-          "y": 262.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 4node-4-f3a0b2约 6 秒前观测目录会话未核对",
-          "x": 24,
-          "y": 381.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 5node-5-f3a0b2约 7 秒前观测目录会话未核对",
-          "x": 296.25,
-          "y": 381.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 6node-6-f3a0b2约 8 秒前观测目录会话未核对",
-          "x": 568.5,
-          "y": 381.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 7node-7-f3a0b2约 9 秒前观测目录会话未核对",
-          "x": 840.75,
-          "y": 381.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 8node-8-f3a0b2约 10 秒前观测目录会话未核对",
-          "x": 24,
-          "y": 500.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 9node-9-f3a0b2约 11 秒前观测目录会话未核对",
-          "x": 296.25,
-          "y": 500.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 10node-10-f3a0b2约 12 秒前观测目录会话未核对",
-          "x": 568.5,
-          "y": 500.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 11node-11-f3a0b2约 13 秒前观测目录会话未核对",
-          "x": 840.75,
-          "y": 500.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 12node-12-f3a0b2约 14 秒前观测目录会话未核对",
-          "x": 24,
-          "y": 619.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 13node-13-f3a0b2约 15 秒前观测目录会话未核对",
-          "x": 296.25,
-          "y": 619.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 14node-14-f3a0b2约 16 秒前观测目录会话未核对",
-          "x": 568.5,
-          "y": 619.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 15node-15-f3a0b2约 17 秒前观测目录会话未核对",
-          "x": 840.75,
-          "y": 619.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 16node-16-f3a0b2约 18 秒前观测目录会话未核对",
-          "x": 24,
-          "y": 738.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 17node-17-f3a0b2约 19 秒前观测目录会话未核对",
-          "x": 296.25,
-          "y": 738.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 18node-18-f3a0b2约 20 秒前观测目录会话未核对",
-          "x": 568.5,
-          "y": 738.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 19node-19-f3a0b2约 21 秒前观测目录会话未核对",
-          "x": 840.75,
-          "y": 738.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 20node-20-f3a0b2约 22 秒前观测目录会话未核对",
-          "x": 24,
-          "y": 857.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 21node-21-f3a0b2约 23 秒前观测目录会话未核对",
-          "x": 296.25,
-          "y": 857.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 22node-22-f3a0b2约 24 秒前观测目录会话未核对",
-          "x": 568.5,
-          "y": 857.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 23node-23-f3a0b2约 25 秒前观测目录会话未核对",
-          "x": 840.75,
-          "y": 857.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 24node-24-f3a0b2约 26 秒前观测目录会话未核对",
-          "x": 24,
-          "y": 976.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 25node-25-f3a0b2约 27 秒前观测目录会话未核对",
-          "x": 296.25,
-          "y": 976.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 26node-26-f3a0b2约 28 秒前观测目录会话未核对",
-          "x": 568.5,
-          "y": 976.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 27node-27-f3a0b2约 29 秒前观测目录会话未核对",
-          "x": 840.75,
-          "y": 976.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 28node-28-f3a0b2约 30 秒前观测目录会话未核对",
-          "x": 24,
-          "y": 1095.890625,
-          "w": 260.25,
-          "h": 107
-        },
-        {
-          "id": "协作节点 29node-29-f3a0b2约 31 秒前观测目录会话未核对",
-          "x": 296.25,
-          "y": 1095.890625,
-          "w": 260.25,
-          "h": 107
-        }
-      ]
-    },
-    {
-      "name": "ten-narrow-1440-dark",
-      "width": 1440,
-      "height": 900,
-      "nodes": 10,
-      "collisions": [],
-      "overflow": false,
-      "rootOverflow": false,
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 640,
+      "windowHeight": 768,
       "rootWidth": 640,
+      "rootHeight": 732,
+      "rootScrollWidth": 640,
+      "rootClientWidth": 640,
+      "layoutDisplay": "grid",
+      "layoutColumns": 1,
+      "layoutTemplate": "608px",
+      "primaryWidth": 608,
+      "detailWidth": 608,
+      "detailDisplay": "block",
+      "topologyDisplay": "grid",
+      "topologyHeight": 127,
+      "topologyNodePosition": "static",
+      "edgesDisplay": "none",
+      "spokes": 2,
+      "listDisplay": "none",
+      "listColumns": 0,
       "compactNotice": "block",
+      "summaryColumns": 1,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 3,
+      "visibleNodes": 3,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
       "rects": [
         {
-          "id": "建哥的工作站node-0-f3a0b2本机目录会话 3",
-          "x": 437,
-          "y": 275.890625,
-          "w": 270.5,
-          "h": 104
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 29,
+          "y": 355,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
         },
         {
-          "id": "Reviewer 所在设备node-1-f3a0b2约 3 秒前观测目录会话 1",
-          "x": 717.5,
-          "y": 275.890625,
-          "w": 270.5,
-          "h": 104
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 226,
+          "y": 355,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
         },
         {
-          "id": "Reviewer 所在设备node-2-f3a0b2约 4 秒前观测目录会话 1",
-          "x": 437,
-          "y": 389.890625,
-          "w": 270.5,
-          "h": 104
-        },
-        {
-          "id": "协作节点 3node-3-f3a0b2约 5 秒前观测目录会话未核对",
-          "x": 717.5,
-          "y": 389.890625,
-          "w": 270.5,
-          "h": 104
-        },
-        {
-          "id": "协作节点 4node-4-f3a0b2约 6 秒前观测目录会话未核对",
-          "x": 437,
-          "y": 503.890625,
-          "w": 270.5,
-          "h": 104
-        },
-        {
-          "id": "协作节点 5node-5-f3a0b2约 7 秒前观测目录会话未核对",
-          "x": 717.5,
-          "y": 503.890625,
-          "w": 270.5,
-          "h": 104
-        },
-        {
-          "id": "协作节点 6node-6-f3a0b2约 8 秒前观测目录会话未核对",
-          "x": 437,
-          "y": 617.890625,
-          "w": 270.5,
-          "h": 104
-        },
-        {
-          "id": "协作节点 7node-7-f3a0b2约 9 秒前观测目录会话未核对",
-          "x": 717.5,
-          "y": 617.890625,
-          "w": 270.5,
-          "h": 104
-        },
-        {
-          "id": "协作节点 8node-8-f3a0b2约 10 秒前观测目录会话未核对",
-          "x": 437,
-          "y": 731.890625,
-          "w": 270.5,
-          "h": 104
-        },
-        {
-          "id": "协作节点 9node-9-f3a0b2约 11 秒前观测目录会话未核对",
-          "x": 717.5,
-          "y": 731.890625,
-          "w": 270.5,
-          "h": 104
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 424,
+          "y": 355,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
         }
-      ]
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "block",
+          "actual": "block"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "grid/static/edges-hidden",
+          "actual": "grid/static/edges-none"
+        }
+      ],
+      "status": "PASS"
     },
     {
       "name": "three-stale-1024-dark",
+      "page": "three-stale.html",
       "width": 1024,
       "height": 768,
-      "nodes": 3,
-      "collisions": [],
+      "theme": "dark",
+      "ready": "complete",
+      "windowWidth": 1024,
+      "windowHeight": 768,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootScrollWidth": 1024,
+      "rootClientWidth": 1024,
+      "layoutDisplay": "grid",
+      "layoutColumns": 1,
+      "layoutTemplate": "976px",
+      "primaryWidth": 976,
+      "detailWidth": 976,
+      "detailDisplay": "block",
+      "topologyDisplay": "block",
+      "topologyHeight": 520,
+      "topologyNodePosition": "absolute",
+      "edgesDisplay": "block",
+      "spokes": 2,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": true,
       "overflow": false,
       "rootOverflow": false,
-      "rootWidth": 1024,
-      "compactNotice": "none",
+      "nodes": 3,
+      "visibleNodes": 2,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
       "rects": [
         {
-          "id": "建哥的工作站node-0-f3a0b2本机数量未核对",
-          "x": 429.5,
-          "y": 533.890625,
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 437,
+          "y": 534,
           "w": 150,
-          "h": 98
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
         },
         {
-          "id": "Reviewer 所在设备node-1-f3a0b2当前可见性未核对数量未核对",
-          "x": 429.5,
-          "y": 347.40625,
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 437,
+          "y": 347,
           "w": 150,
-          "h": 98
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
         },
         {
-          "id": "Reviewer 所在设备node-2-f3a0b2当前可见性未核对数量未核对",
-          "x": 429.5,
-          "y": 720.359375,
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 437,
+          "y": 720,
           "w": 150,
-          "h": 98
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": false
         }
-      ]
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "absolute/edges-visible",
+          "actual": "block/absolute/edges-block"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "ten-1440-light",
+      "page": "ten.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 1440,
+      "windowHeight": 900,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootScrollWidth": 1440,
+      "rootClientWidth": 1440,
+      "layoutDisplay": "grid",
+      "layoutColumns": 2,
+      "layoutTemplate": "1092px 280px",
+      "primaryWidth": 1092,
+      "detailWidth": 280,
+      "detailDisplay": "block",
+      "topologyDisplay": "block",
+      "topologyHeight": 560,
+      "topologyNodePosition": "absolute",
+      "edgesDisplay": "block",
+      "spokes": 9,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 10,
+      "visibleNodes": 10,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 495,
+          "y": 494,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 495,
+          "y": 293,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 747,
+          "y": 340,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 3,
+          "name": "协作节点 3",
+          "id": "node-3-f3a0b2",
+          "x": 881,
+          "y": 459,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 4,
+          "name": "协作节点 4",
+          "id": "node-4-f3a0b2",
+          "x": 835,
+          "y": 594,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 5,
+          "name": "协作节点 5",
+          "id": "node-5-f3a0b2",
+          "x": 629,
+          "y": 683,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 6,
+          "name": "协作节点 6",
+          "id": "node-6-f3a0b2",
+          "x": 361,
+          "y": 683,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 7,
+          "name": "协作节点 7",
+          "id": "node-7-f3a0b2",
+          "x": 155,
+          "y": 594,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 8,
+          "name": "协作节点 8",
+          "id": "node-8-f3a0b2",
+          "x": 109,
+          "y": 459,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 9,
+          "name": "协作节点 9",
+          "id": "node-9-f3a0b2",
+          "x": 243,
+          "y": 340,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "absolute/edges-visible",
+          "actual": "block/absolute/edges-block"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "ten-1024-dark",
+      "page": "ten.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "dark",
+      "ready": "complete",
+      "windowWidth": 1024,
+      "windowHeight": 768,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootScrollWidth": 1024,
+      "rootClientWidth": 1024,
+      "layoutDisplay": "grid",
+      "layoutColumns": 1,
+      "layoutTemplate": "976px",
+      "primaryWidth": 976,
+      "detailWidth": 976,
+      "detailDisplay": "block",
+      "topologyDisplay": "block",
+      "topologyHeight": 520,
+      "topologyNodePosition": "absolute",
+      "edgesDisplay": "block",
+      "spokes": 9,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 10,
+      "visibleNodes": 10,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 437,
+          "y": 474,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 437,
+          "y": 287,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 662,
+          "y": 331,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 3,
+          "name": "协作节点 3",
+          "id": "node-3-f3a0b2",
+          "x": 782,
+          "y": 442,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 4,
+          "name": "协作节点 4",
+          "id": "node-4-f3a0b2",
+          "x": 741,
+          "y": 567,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 5,
+          "name": "协作节点 5",
+          "id": "node-5-f3a0b2",
+          "x": 557,
+          "y": 649,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 6,
+          "name": "协作节点 6",
+          "id": "node-6-f3a0b2",
+          "x": 317,
+          "y": 649,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 7,
+          "name": "协作节点 7",
+          "id": "node-7-f3a0b2",
+          "x": 133,
+          "y": 567,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 8,
+          "name": "协作节点 8",
+          "id": "node-8-f3a0b2",
+          "x": 92,
+          "y": 442,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 9,
+          "name": "协作节点 9",
+          "id": "node-9-f3a0b2",
+          "x": 212,
+          "y": 331,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "absolute/edges-visible",
+          "actual": "block/absolute/edges-block"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "ten-640-light",
+      "page": "ten.html",
+      "width": 640,
+      "height": 768,
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 640,
+      "windowHeight": 768,
+      "rootWidth": 640,
+      "rootHeight": 732,
+      "rootScrollWidth": 640,
+      "rootClientWidth": 640,
+      "layoutDisplay": "grid",
+      "layoutColumns": 1,
+      "layoutTemplate": "608px",
+      "primaryWidth": 608,
+      "detailWidth": 608,
+      "detailDisplay": "block",
+      "topologyDisplay": "grid",
+      "topologyHeight": 460,
+      "topologyNodePosition": "static",
+      "edgesDisplay": "none",
+      "spokes": 9,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "block",
+      "summaryColumns": 1,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 10,
+      "visibleNodes": 9,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 29,
+          "y": 355,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 226,
+          "y": 355,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 424,
+          "y": 355,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 3,
+          "name": "协作节点 3",
+          "id": "node-3-f3a0b2",
+          "x": 29,
+          "y": 466,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 4,
+          "name": "协作节点 4",
+          "id": "node-4-f3a0b2",
+          "x": 226,
+          "y": 466,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 5,
+          "name": "协作节点 5",
+          "id": "node-5-f3a0b2",
+          "x": 424,
+          "y": 466,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 6,
+          "name": "协作节点 6",
+          "id": "node-6-f3a0b2",
+          "x": 29,
+          "y": 577,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 7,
+          "name": "协作节点 7",
+          "id": "node-7-f3a0b2",
+          "x": 226,
+          "y": 577,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 8,
+          "name": "协作节点 8",
+          "id": "node-8-f3a0b2",
+          "x": 424,
+          "y": 577,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 9,
+          "name": "协作节点 9",
+          "id": "node-9-f3a0b2",
+          "x": 29,
+          "y": 688,
+          "w": 187,
+          "h": 101,
+          "nameClipped": false,
+          "insideRoot": false
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "block",
+          "actual": "block"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "grid/static/edges-hidden",
+          "actual": "grid/static/edges-none"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "ten-narrow-1440-dark",
+      "page": "ten-narrow.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "ready": "complete",
+      "windowWidth": 1440,
+      "windowHeight": 900,
+      "rootWidth": 640,
+      "rootHeight": 864,
+      "rootScrollWidth": 640,
+      "rootClientWidth": 640,
+      "layoutDisplay": "grid",
+      "layoutColumns": 1,
+      "layoutTemplate": "592px",
+      "primaryWidth": 592,
+      "detailWidth": 592,
+      "detailDisplay": "block",
+      "topologyDisplay": "grid",
+      "topologyHeight": 472,
+      "topologyNodePosition": "static",
+      "edgesDisplay": "none",
+      "spokes": 9,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "block",
+      "summaryColumns": 3,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 10,
+      "visibleNodes": 10,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 437,
+          "y": 276,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 629,
+          "y": 276,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 821,
+          "y": 276,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 3,
+          "name": "协作节点 3",
+          "id": "node-3-f3a0b2",
+          "x": 437,
+          "y": 390,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 4,
+          "name": "协作节点 4",
+          "id": "node-4-f3a0b2",
+          "x": 629,
+          "y": 390,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 5,
+          "name": "协作节点 5",
+          "id": "node-5-f3a0b2",
+          "x": 821,
+          "y": 390,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 6,
+          "name": "协作节点 6",
+          "id": "node-6-f3a0b2",
+          "x": 437,
+          "y": 504,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 7,
+          "name": "协作节点 7",
+          "id": "node-7-f3a0b2",
+          "x": 629,
+          "y": 504,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 8,
+          "name": "协作节点 8",
+          "id": "node-8-f3a0b2",
+          "x": 821,
+          "y": 504,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 9,
+          "name": "协作节点 9",
+          "id": "node-9-f3a0b2",
+          "x": 437,
+          "y": 618,
+          "w": 182,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "10",
+          "actual": "10"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "block",
+          "actual": "block"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "grid/static/edges-hidden",
+          "actual": "grid/static/edges-none"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "thirty-1440-light",
+      "page": "thirty.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 1440,
+      "windowHeight": 900,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootScrollWidth": 1440,
+      "rootClientWidth": 1440,
+      "layoutDisplay": "grid",
+      "layoutColumns": 2,
+      "layoutTemplate": "1092px 280px",
+      "primaryWidth": 1092,
+      "detailWidth": 280,
+      "detailDisplay": "block",
+      "topologyDisplay": "none",
+      "topologyHeight": 0,
+      "topologyNodePosition": "",
+      "edgesDisplay": "none",
+      "spokes": 0,
+      "listDisplay": "grid",
+      "listColumns": 4,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 30,
+      "visibleNodes": 20,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 24,
+          "y": 263,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 300,
+          "y": 263,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 576,
+          "y": 263,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 3,
+          "name": "协作节点 3",
+          "id": "node-3-f3a0b2",
+          "x": 852,
+          "y": 263,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 4,
+          "name": "协作节点 4",
+          "id": "node-4-f3a0b2",
+          "x": 24,
+          "y": 382,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 5,
+          "name": "协作节点 5",
+          "id": "node-5-f3a0b2",
+          "x": 300,
+          "y": 382,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 6,
+          "name": "协作节点 6",
+          "id": "node-6-f3a0b2",
+          "x": 576,
+          "y": 382,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 7,
+          "name": "协作节点 7",
+          "id": "node-7-f3a0b2",
+          "x": 852,
+          "y": 382,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 8,
+          "name": "协作节点 8",
+          "id": "node-8-f3a0b2",
+          "x": 24,
+          "y": 501,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 9,
+          "name": "协作节点 9",
+          "id": "node-9-f3a0b2",
+          "x": 300,
+          "y": 501,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 10,
+          "name": "协作节点 10",
+          "id": "node-10-f3a0b2",
+          "x": 576,
+          "y": 501,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 11,
+          "name": "协作节点 11",
+          "id": "node-11-f3a0b2",
+          "x": 852,
+          "y": 501,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 12,
+          "name": "协作节点 12",
+          "id": "node-12-f3a0b2",
+          "x": 24,
+          "y": 620,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 13,
+          "name": "协作节点 13",
+          "id": "node-13-f3a0b2",
+          "x": 300,
+          "y": 620,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 14,
+          "name": "协作节点 14",
+          "id": "node-14-f3a0b2",
+          "x": 576,
+          "y": 620,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 15,
+          "name": "协作节点 15",
+          "id": "node-15-f3a0b2",
+          "x": 852,
+          "y": 620,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 16,
+          "name": "协作节点 16",
+          "id": "node-16-f3a0b2",
+          "x": 24,
+          "y": 739,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 17,
+          "name": "协作节点 17",
+          "id": "node-17-f3a0b2",
+          "x": 300,
+          "y": 739,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 18,
+          "name": "协作节点 18",
+          "id": "node-18-f3a0b2",
+          "x": 576,
+          "y": 739,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 19,
+          "name": "协作节点 19",
+          "id": "node-19-f3a0b2",
+          "x": 852,
+          "y": 739,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 20,
+          "name": "协作节点 20",
+          "id": "node-20-f3a0b2",
+          "x": 24,
+          "y": 858,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 21,
+          "name": "协作节点 21",
+          "id": "node-21-f3a0b2",
+          "x": 300,
+          "y": 858,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 22,
+          "name": "协作节点 22",
+          "id": "node-22-f3a0b2",
+          "x": 576,
+          "y": 858,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 23,
+          "name": "协作节点 23",
+          "id": "node-23-f3a0b2",
+          "x": 852,
+          "y": 858,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 24,
+          "name": "协作节点 24",
+          "id": "node-24-f3a0b2",
+          "x": 24,
+          "y": 977,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 25,
+          "name": "协作节点 25",
+          "id": "node-25-f3a0b2",
+          "x": 300,
+          "y": 977,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 26,
+          "name": "协作节点 26",
+          "id": "node-26-f3a0b2",
+          "x": 576,
+          "y": 977,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 27,
+          "name": "协作节点 27",
+          "id": "node-27-f3a0b2",
+          "x": 852,
+          "y": 977,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 28,
+          "name": "协作节点 28",
+          "id": "node-28-f3a0b2",
+          "x": 24,
+          "y": 1096,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 29,
+          "name": "协作节点 29",
+          "id": "node-29-f3a0b2",
+          "x": 300,
+          "y": 1096,
+          "w": 264,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "30",
+          "actual": "30"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "thirty-1024-light",
+      "page": "thirty.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 1024,
+      "windowHeight": 768,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootScrollWidth": 1024,
+      "rootClientWidth": 1024,
+      "layoutDisplay": "grid",
+      "layoutColumns": 1,
+      "layoutTemplate": "976px",
+      "primaryWidth": 976,
+      "detailWidth": 976,
+      "detailDisplay": "block",
+      "topologyDisplay": "none",
+      "topologyHeight": 0,
+      "topologyNodePosition": "",
+      "edgesDisplay": "none",
+      "spokes": 0,
+      "listDisplay": "grid",
+      "listColumns": 3,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 30,
+      "visibleNodes": 12,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 24,
+          "y": 263,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 353,
+          "y": 263,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 683,
+          "y": 263,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 3,
+          "name": "协作节点 3",
+          "id": "node-3-f3a0b2",
+          "x": 24,
+          "y": 382,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 4,
+          "name": "协作节点 4",
+          "id": "node-4-f3a0b2",
+          "x": 353,
+          "y": 382,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 5,
+          "name": "协作节点 5",
+          "id": "node-5-f3a0b2",
+          "x": 683,
+          "y": 382,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 6,
+          "name": "协作节点 6",
+          "id": "node-6-f3a0b2",
+          "x": 24,
+          "y": 501,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 7,
+          "name": "协作节点 7",
+          "id": "node-7-f3a0b2",
+          "x": 353,
+          "y": 501,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 8,
+          "name": "协作节点 8",
+          "id": "node-8-f3a0b2",
+          "x": 683,
+          "y": 501,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 9,
+          "name": "协作节点 9",
+          "id": "node-9-f3a0b2",
+          "x": 24,
+          "y": 620,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 10,
+          "name": "协作节点 10",
+          "id": "node-10-f3a0b2",
+          "x": 353,
+          "y": 620,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 11,
+          "name": "协作节点 11",
+          "id": "node-11-f3a0b2",
+          "x": 683,
+          "y": 620,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 12,
+          "name": "协作节点 12",
+          "id": "node-12-f3a0b2",
+          "x": 24,
+          "y": 739,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 13,
+          "name": "协作节点 13",
+          "id": "node-13-f3a0b2",
+          "x": 353,
+          "y": 739,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 14,
+          "name": "协作节点 14",
+          "id": "node-14-f3a0b2",
+          "x": 683,
+          "y": 739,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 15,
+          "name": "协作节点 15",
+          "id": "node-15-f3a0b2",
+          "x": 24,
+          "y": 858,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 16,
+          "name": "协作节点 16",
+          "id": "node-16-f3a0b2",
+          "x": 353,
+          "y": 858,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 17,
+          "name": "协作节点 17",
+          "id": "node-17-f3a0b2",
+          "x": 683,
+          "y": 858,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 18,
+          "name": "协作节点 18",
+          "id": "node-18-f3a0b2",
+          "x": 24,
+          "y": 977,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 19,
+          "name": "协作节点 19",
+          "id": "node-19-f3a0b2",
+          "x": 353,
+          "y": 977,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 20,
+          "name": "协作节点 20",
+          "id": "node-20-f3a0b2",
+          "x": 683,
+          "y": 977,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 21,
+          "name": "协作节点 21",
+          "id": "node-21-f3a0b2",
+          "x": 24,
+          "y": 1096,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 22,
+          "name": "协作节点 22",
+          "id": "node-22-f3a0b2",
+          "x": 353,
+          "y": 1096,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 23,
+          "name": "协作节点 23",
+          "id": "node-23-f3a0b2",
+          "x": 683,
+          "y": 1096,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 24,
+          "name": "协作节点 24",
+          "id": "node-24-f3a0b2",
+          "x": 24,
+          "y": 1215,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 25,
+          "name": "协作节点 25",
+          "id": "node-25-f3a0b2",
+          "x": 353,
+          "y": 1215,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 26,
+          "name": "协作节点 26",
+          "id": "node-26-f3a0b2",
+          "x": 683,
+          "y": 1215,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 27,
+          "name": "协作节点 27",
+          "id": "node-27-f3a0b2",
+          "x": 24,
+          "y": 1334,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 28,
+          "name": "协作节点 28",
+          "id": "node-28-f3a0b2",
+          "x": 353,
+          "y": 1334,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 29,
+          "name": "协作节点 29",
+          "id": "node-29-f3a0b2",
+          "x": 683,
+          "y": 1334,
+          "w": 317,
+          "h": 107,
+          "nameClipped": false,
+          "insideRoot": false
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "30",
+          "actual": "30"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "thirty-640-light",
+      "page": "thirty.html",
+      "width": 640,
+      "height": 768,
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 640,
+      "windowHeight": 768,
+      "rootWidth": 640,
+      "rootHeight": 732,
+      "rootScrollWidth": 640,
+      "rootClientWidth": 640,
+      "layoutDisplay": "grid",
+      "layoutColumns": 1,
+      "layoutTemplate": "608px",
+      "primaryWidth": 608,
+      "detailWidth": 608,
+      "detailDisplay": "block",
+      "topologyDisplay": "none",
+      "topologyHeight": 0,
+      "topologyNodePosition": "",
+      "edgesDisplay": "none",
+      "spokes": 0,
+      "listDisplay": "grid",
+      "listColumns": 2,
+      "compactNotice": "none",
+      "summaryColumns": 1,
+      "staleVisible": false,
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 30,
+      "visibleNodes": 6,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 16,
+          "y": 342,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 326,
+          "y": 342,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 16,
+          "y": 458,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 3,
+          "name": "协作节点 3",
+          "id": "node-3-f3a0b2",
+          "x": 326,
+          "y": 458,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 4,
+          "name": "协作节点 4",
+          "id": "node-4-f3a0b2",
+          "x": 16,
+          "y": 574,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 5,
+          "name": "协作节点 5",
+          "id": "node-5-f3a0b2",
+          "x": 326,
+          "y": 574,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 6,
+          "name": "协作节点 6",
+          "id": "node-6-f3a0b2",
+          "x": 16,
+          "y": 690,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 7,
+          "name": "协作节点 7",
+          "id": "node-7-f3a0b2",
+          "x": 326,
+          "y": 690,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 8,
+          "name": "协作节点 8",
+          "id": "node-8-f3a0b2",
+          "x": 16,
+          "y": 806,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 9,
+          "name": "协作节点 9",
+          "id": "node-9-f3a0b2",
+          "x": 326,
+          "y": 806,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 10,
+          "name": "协作节点 10",
+          "id": "node-10-f3a0b2",
+          "x": 16,
+          "y": 922,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 11,
+          "name": "协作节点 11",
+          "id": "node-11-f3a0b2",
+          "x": 326,
+          "y": 922,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 12,
+          "name": "协作节点 12",
+          "id": "node-12-f3a0b2",
+          "x": 16,
+          "y": 1038,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 13,
+          "name": "协作节点 13",
+          "id": "node-13-f3a0b2",
+          "x": 326,
+          "y": 1038,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 14,
+          "name": "协作节点 14",
+          "id": "node-14-f3a0b2",
+          "x": 16,
+          "y": 1154,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 15,
+          "name": "协作节点 15",
+          "id": "node-15-f3a0b2",
+          "x": 326,
+          "y": 1154,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 16,
+          "name": "协作节点 16",
+          "id": "node-16-f3a0b2",
+          "x": 16,
+          "y": 1270,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 17,
+          "name": "协作节点 17",
+          "id": "node-17-f3a0b2",
+          "x": 326,
+          "y": 1270,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 18,
+          "name": "协作节点 18",
+          "id": "node-18-f3a0b2",
+          "x": 16,
+          "y": 1386,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 19,
+          "name": "协作节点 19",
+          "id": "node-19-f3a0b2",
+          "x": 326,
+          "y": 1386,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 20,
+          "name": "协作节点 20",
+          "id": "node-20-f3a0b2",
+          "x": 16,
+          "y": 1502,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 21,
+          "name": "协作节点 21",
+          "id": "node-21-f3a0b2",
+          "x": 326,
+          "y": 1502,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 22,
+          "name": "协作节点 22",
+          "id": "node-22-f3a0b2",
+          "x": 16,
+          "y": 1618,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 23,
+          "name": "协作节点 23",
+          "id": "node-23-f3a0b2",
+          "x": 326,
+          "y": 1618,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 24,
+          "name": "协作节点 24",
+          "id": "node-24-f3a0b2",
+          "x": 16,
+          "y": 1734,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 25,
+          "name": "协作节点 25",
+          "id": "node-25-f3a0b2",
+          "x": 326,
+          "y": 1734,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 26,
+          "name": "协作节点 26",
+          "id": "node-26-f3a0b2",
+          "x": 16,
+          "y": 1850,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 27,
+          "name": "协作节点 27",
+          "id": "node-27-f3a0b2",
+          "x": 326,
+          "y": 1850,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 28,
+          "name": "协作节点 28",
+          "id": "node-28-f3a0b2",
+          "x": 16,
+          "y": 1966,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        },
+        {
+          "index": 29,
+          "name": "协作节点 29",
+          "id": "node-29-f3a0b2",
+          "x": 326,
+          "y": 1966,
+          "w": 298,
+          "h": 104,
+          "nameClipped": false,
+          "insideRoot": false
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "30",
+          "actual": "30"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "1",
+          "actual": "1"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ],
+      "status": "PASS"
     }
   ],
-  "runtimeErrors": []
+  "runtimeErrors": [],
+  "source": {
+    "css": "ui/network/network-workbench.css",
+    "sha1": "916537473c52c29e93827e6001bbf42ec6737318",
+    "bytes": 6879
+  },
+  "fixtures": [
+    {
+      "page": "one.html",
+      "rewritten": false,
+      "drifted": false
+    },
+    {
+      "page": "three.html",
+      "rewritten": false,
+      "drifted": false
+    },
+    {
+      "page": "three-stale.html",
+      "rewritten": false,
+      "drifted": false
+    },
+    {
+      "page": "ten.html",
+      "rewritten": false,
+      "drifted": false
+    },
+    {
+      "page": "ten-narrow.html",
+      "rewritten": false,
+      "drifted": false
+    },
+    {
+      "page": "thirty.html",
+      "rewritten": false,
+      "drifted": false
+    }
+  ],
+  "browser": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  "generatedBy": "scripts/network-workbench-preview.mjs"
 }
