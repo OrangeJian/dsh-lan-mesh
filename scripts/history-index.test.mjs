@@ -116,7 +116,7 @@ test('a long history pages identically with an offset index and reads a fraction
   assert.equal(pages.at(-1).cursor, '', 'the oldest page must end with an empty cursor');
 
   const index = JSON.parse(await readFile(files.index, 'utf8'));
-  assert.equal(index.v, 1, 'the sidecar carries a layout version');
+  assert.equal(index.v, 2, 'the sidecar carries a layout version');
   assert.equal(index.size, fileSize, 'the sidecar pins the file size it describes');
 
   const first = await metered(() => store.readRoomHistory({ port: 0, room: 'a', limit: LIMIT }));
@@ -220,4 +220,9 @@ test('cursor errors keep their exact text with an index in place', async (t) => 
   const empty = await store.readRoomHistory({ port: 0, room: 'a' });
   assert.deepEqual(empty.records, []);
   assert.equal(empty.cursor, '');
+});
+test('same-size prefix rewrite outside pinned tail invalidates an absent-room shortcut',async t=>{
+ const files=await fixture(t);await seed(100);await store.readRoomHistory({port:0,room:'z'});
+ const raw=await readFile(files.inbox,'utf8');const changed=raw.replace('"room":"a"','"room":"z"');assert.equal(Buffer.byteLength(raw),Buffer.byteLength(changed));assert.equal(raw.slice(-4096),changed.slice(-4096));await writeFile(files.inbox,changed);
+ const result=await store.readRoomHistory({port:0,room:'z'});assert.deepEqual(result.records.map(r=>r.envelope.id),['m0']);
 });

@@ -61,3 +61,7 @@ Room自动已读与Inbox分页标读保持同步返回，改为串行队列+写�
 ## 跨批已读、历史索引与取证（0.4.21）
 
 0.4.20 的队列在失败时会把「上一批尚未落地」的记录一并翻回未读，制造出磁盘已读、内存未读的分裂态；改为「一次成功写入只认领自己 batch 内的记录，失败只回滚未被任何成功写入覆盖者」，并用注入故障的回归证明旧码必失败（memory must agree with the durable flag actual false / expected true）。Room 历史新增 inbox.room-index.json 偏移索引：warm 首屏读 173 行/36532 B 对 3020 行/637876 B，任何 sidecar 异常都回退全量扫描且结果逐字节相同。Network 与任务看板的取证生成器入库（11 例 / 19 例全 PASS），看板唯一 FAIL 的根因是 @media 只认窗口宽度，改为容器查询并把 padding 留在 @media。另交付 Team 只读 Owner 契约文档（257 行，三条红线、16 格权限矩阵、23 条验收条件，未写实现）与 UX-6 矩阵报告（生产 PASS 0/15、真双机 PASS 0）。完整499/499、panel283、schema82、构建一致、Composer PASS@0.2.2-rc.3；新增 version-consistency 门禁。详见ux-workbench-v0.4.21-report.md；实机与双机仍未验收，不推送。
+
+## 历史索引边界修复与C0静态核实（0.4.22）
+
+修复同长度日志前段改写导致Room历史误判为空；索引v2绑定文件身份及高精度元数据，任何追加/改写均重建，保留静态日志快速读取。代价为追加后的首次全量扫描；不提供多进程并发一致性。完整500/500、panel283、schema82、构建和Composer rc.3通过，原保护13/13未变。C0源码事实与未验证能力见docs/architecture/c0-capability-contract-audit.md；动态探针、UX实机、双机、G2及M6准入未完成，不推送。
