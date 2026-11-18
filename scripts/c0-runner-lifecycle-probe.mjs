@@ -1,4 +1,4 @@
-import {verifyRunnerWorkspace} from '../lib/runner-workspace.mjs';
+import {prepareRunnerWorkspace,verifyRunnerWorkspace} from '../lib/runner-workspace.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -11,7 +11,7 @@ try {resolve.resolve('@deepseek-ai/dsh/package.json');} catch {
 }
 const fromHost=createRequire(resolve.resolve('@deepseek-ai/dsh/package.json'));
 const {Context}=await import(pathToFileURL(fromHost.resolve('@deepseek-ai/cordis')).href);
-import {mkdtemp,mkdir,rm,readFile,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,readFile,writeFile,realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 
@@ -56,7 +56,7 @@ if(stage==='create'||stage==='resume'){
     ctx.plugin((await load(pkg))[service],{});
   }
   await (await load('dsh-session-persistence-jsonl')).apply(ctx,{root:join(root,'storage')});
-  const cwd=join(root,'workspace');
+  const cwd=await realpath(join(root,'workspace'));
   if(stage==='create'){
     const empty=await ctx.agents.create({sessionId:'session-empty-probe',meta:{cwd}});
     await empty.dispose();
@@ -98,8 +98,12 @@ if(stage==='create'||stage==='resume'){
     git(repo,'-c','user.name=Runner Probe','-c','user.email=runner-probe@example.invalid','-c','commit.gpgsign=false','-c',`core.hooksPath=${hooks}`,'commit','--quiet','-m','baseline');
     const base=git(repo,'rev-parse','HEAD');
     await writeFile(tracked,'source edit\n');
-    git(repo,'worktree','add','--quiet','--detach',workspace,base);
     const binding={repoId:'probe-repo',root:repo};
+    const prepare={binding,repoId:binding.repoId,baseCommit:base,resourceRoot:directory};
+    await assert.rejects(prepareRunnerWorkspace({...prepare,resourceRoot:repo}),{code:'WORKSPACE_INSIDE_SOURCE'});
+    await assert.rejects(prepareRunnerWorkspace({...prepare,baseCommit:'0'.repeat(base.length)}),{code:'BASE_COMMIT_MISMATCH'});
+    assert.equal((await prepareRunnerWorkspace(prepare)).workspace,await realpath(workspace));
+    await assert.rejects(prepareRunnerWorkspace(prepare),{code:'WORKSPACE_EXISTS'});
     const check={binding,repoId:binding.repoId,baseCommit:base,workspace};
     assert.equal((await verifyRunnerWorkspace(check)).baseCommit,base);
     await assert.rejects(verifyRunnerWorkspace({...check,repoId:'foreign'}),{code:'REPO_MISMATCH'});
