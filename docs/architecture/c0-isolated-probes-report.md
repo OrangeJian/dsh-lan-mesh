@@ -17,3 +17,7 @@
 真实Host多实例及Session生命周期、Owner撤权、Runner启动ACK丢失/崩溃恢复/隔离、物理双机仍NOT RUN。hostInstanceId是否必要尚无足够证据；Registry/Binding尚未实施。原五份未跟踪冻结方案及0.4.5/M6保护工作未覆盖。
 
 执行方式：node scripts/c0-identity-probe.mjs；node scripts/c0-sdk-inventory.mjs；node scripts/c0-owner-route-probe.mjs。全部失败时非零退出。输出含时间，重跑会变化，不是确定性快照门禁。
+
+## Coordinator磁盘恢复补充
+
+新增starting/running/uncertain三种状态的真实临时账本关闭、重新打开、recover及重复tick回归。三项均无重复wake，uncertain和started标记再次读取仍持久保留。Coordinator测试24/24通过。这是本插件账本恢复证据，不证明真实Host进程/工具副作用已经停止，也不等同Runner全生命周期通过。

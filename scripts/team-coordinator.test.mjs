@@ -27,7 +27,7 @@ async function fixture(t) {
   nodes.b = new TeamCoordinator({ ...opts, nodeId: 'b', store: b, send, wake: () => { wakes++; return true; } });
   await nodes.a.create({ roomId: 'room-team', actorKey: 'a/leader' });
   const dispatch = (extra = {}) => nodes.a.dispatch({ roomId: 'room-team', actorKey: 'a/leader', title: 'Build', workerKey: 'b/worker', taskId: 't1', executionId: 'e1', ...extra });
-  return { nodes, a, b, dispatch, sent, wakes: () => wakes, advance: ms => { now += ms; }, offline: value => { offline = value; }, loseAck: () => { loseAck = true; }, loseResult: () => { loseResult = true; }, opts, send };
+  return { directory, nodes, a, b, dispatch, sent, wakes: () => wakes, advance: ms => { now += ms; }, offline: value => { offline = value; }, loseAck: () => { loseAck = true; }, loseResult: () => { loseResult = true; }, opts, send };
 }
 
 test('archive blocks new Team dispatch but preserves result and reconciliation authorization', async t => {
@@ -240,3 +240,29 @@ test('recovery does not repeat a wake across the start-marker crash window', asy
 test('context authorization, pinned snapshot, audit failure blocks wake',async t=>{const f=await fixture(t);let prepared=0;f.nodes.a.prepareContext=async input=>{prepared++;return {roomId:input.roomId,selectedDocumentVersions:[{documentId:'d',revisionId:'r1',contentHash:'hash',content:'old'}],confirmedDecisions:[],openQuestions:[],referencedMessages:[],attachmentRefs:[],skillRefs:[],fetchRefs:[]};};f.nodes.a.authorize=()=>false;await assert.rejects(f.dispatch({contextSelection:{documentIds:['d']}}));assert.equal(prepared,0);f.nodes.a.authorize=()=>true;await f.dispatch({contextSelection:{documentIds:['d']}});assert.equal(f.b.read().workerExecutions.e1.descriptor.contextPacket.selectedDocumentVersions[0].revisionId,'r1');f.nodes.b.recordContextDelivery=async()=>{throw new Error('audit unavailable');};await f.nodes.b.tick();assert.equal(f.wakes(),0);assert.equal(f.b.read().workerExecutions.e1.state,'uncertain');await f.nodes.b.tick();assert.equal(f.wakes(),0);});
 test('context packet remains pinned across retransmission and audit precedes wake',async t=>{const f=await fixture(t);let revision='old',audited=false;f.nodes.a.prepareContext=async input=>({roomId:input.roomId,selectedDocumentVersions:[{documentId:'d',revisionId:revision,contentHash:'hash',content:'body'}],confirmedDecisions:[],openQuestions:[],referencedMessages:[],attachmentRefs:[],skillRefs:[]});f.nodes.b.recordContextDelivery=async audit=>{assert.equal(audit.packet.selectedDocumentVersions[0].revisionId,'old');audited=true;};f.nodes.b.wake=({task})=>{assert.equal(audited,true);assert.equal(task.contextPacket.selectedDocumentVersions[0].revisionId,'old');return true;};f.loseAck();await f.dispatch({contextSelection:{documentIds:['d']}});revision='new';const retry=await f.dispatch({contextSelection:{documentIds:['d']}});assert.equal(retry.contextPacket.selectedDocumentVersions[0].revisionId,'old');await f.nodes.a.tick();await f.nodes.b.tick();assert.equal(f.a.read().executions.e1.descriptor.contextPacket.selectedDocumentVersions[0].revisionId,'old');assert.equal(f.b.read().workerExecutions.e1.state,'running');});
 test('context rejects content declarations, cross-room and oversized incoming packets',async t=>{const f=await fixture(t);await assert.rejects(f.dispatch({contextSelection:{content:'untrusted'}}),{code:'BAD_REQUEST'});const body={roomId:'room-team',actorKey:'a/leader',leaderKey:'a/leader',generation:1,workerKey:'b/worker',taskId:'t1',executionId:'e1',title:'Build',detail:'',contextPacket:{roomId:'other'}};await assert.rejects(f.nodes.b.handle({operation:'dispatch',body}),{code:'BAD_REQUEST'});body.contextPacket={roomId:'room-team',content:'x'.repeat(65536)};await assert.rejects(f.nodes.b.handle({operation:'dispatch',body}),{code:'BAD_REQUEST'});assert.equal(Object.keys(f.b.read().workerExecutions).length,0);});
+
+
+for (const crashState of ['starting', 'running', 'uncertain']) {
+ test(`disk reopen recovers ${crashState} without repeating worker side effects`, async t => {
+  const f = await fixture(t);
+  await f.dispatch();
+  await f.b.transact(state => {
+   const execution = state.workerExecutions.e1;
+   execution.state = crashState;
+   execution.started = true;
+   return { state };
+  });
+  await f.nodes.b.close();
+  const reopened = await openTeamStore({ directory: join(f.directory, 'b') });
+  let repeated = 0;
+  const restarted = new TeamCoordinator({ ...f.opts, nodeId: 'b', store: reopened, send: f.send, wake: () => { repeated++; return true; } });
+  t.after(() => restarted.close());
+  await restarted.recover();
+  await restarted.tick();
+  await restarted.tick();
+  assert.equal(repeated, 0);
+  assert.equal(reopened.read().workerExecutions.e1.state, 'uncertain');
+  assert.equal(reopened.read().workerExecutions.e1.started, true);
+  assert.equal((await openTeamStore({ directory: join(f.directory, 'b') })).read().workerExecutions.e1.state, 'uncertain');
+ });
+}
