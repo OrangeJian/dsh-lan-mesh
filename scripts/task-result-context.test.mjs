@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { resultHash, taskResultReferences, selectTaskResults, validateTaskResultEvidence } from '../lib/task-result-context.mjs';
 const result={status:'succeeded',summary:'Built candidate',artifacts:[{type:'file',value:'C:/worker/output.txt'}]};
 const execution={executionId:'e1',taskId:'t1',roomId:'r1',workerKey:'node-b/worker',generation:1,attempt:2,state:'succeeded',result};
-const state={tasks:{t1:{taskId:'t1',roomId:'r1',status:'review'}},executions:{e1:execution},workerExecutions:{}};
+const state={tasks:{t1:{taskId:'t1',roomId:'r1',status:'review',currentExecutionId:'e1'}},executions:{e1:execution},workerExecutions:{}};
 const selection=()=>[{executionId:'e1',resultHash:resultHash(result)}];
 test('task evidence pins canonical result with source and keeps review separate from acceptance',()=>{
  assert.equal(resultHash(result),resultHash({artifacts:result.artifacts,summary:result.summary,status:result.status}));
@@ -37,4 +37,21 @@ test('context transports validated evidence and rejects tampering and evidence t
  assert.throws(()=>buildRoomContextPacket({roomId:'other',taskResultRefs:evidence}));
  assert.throws(()=>buildRoomContextPacket({roomId:'r1',taskResultRefs:evidence},{maxBytes:400}));
  assert.deepEqual(CONTEXT_SELECTION_SCHEMA.properties.selectedTaskResults.items.required,['executionId','resultHash']);
+});
+
+test('an old result retains its hash without inheriting the current task review state',()=>{
+ const snapshot=structuredClone(state);
+ for(const currentExecutionId of ['e2',null]){
+  snapshot.tasks.t1.currentExecutionId=currentExecutionId;
+  const [row]=selectTaskResults(snapshot,{roomId:'r1',actorKey:'node-a/human',selections:selection()});
+  assert.equal(row.resultHash,selection()[0].resultHash);
+  assert.equal(row.reviewStatus,'unverified');
+ }
+});
+test('a context cannot carry two results for one execution',()=>{
+ const [row]=selectTaskResults(state,{roomId:'r1',actorKey:'node-a/human',selections:selection()});
+ const packet=buildRoomContextPacket({roomId:'r1',taskResultRefs:[row]});
+ assert.throws(()=>buildRoomContextPacket({roomId:'r1',taskResultRefs:[row,row]}),/Invalid task result/);
+ packet.taskResultRefs.push(row);
+ assert.throws(()=>normalizeContextPacket(packet,'r1'),/Invalid task result/);
 });
