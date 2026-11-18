@@ -1,3 +1,4 @@
+import {verifyRunnerWorkspace} from '../lib/runner-workspace.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -98,6 +99,17 @@ if(stage==='create'||stage==='resume'){
     const base=git(repo,'rev-parse','HEAD');
     await writeFile(tracked,'source edit\n');
     git(repo,'worktree','add','--quiet','--detach',workspace,base);
+    const binding={repoId:'probe-repo',root:repo};
+    const check={binding,repoId:binding.repoId,baseCommit:base,workspace};
+    assert.equal((await verifyRunnerWorkspace(check)).baseCommit,base);
+    await assert.rejects(verifyRunnerWorkspace({...check,repoId:'foreign'}),{code:'REPO_MISMATCH'});
+    const foreign=join(directory,'foreign');
+    await mkdir(foreign);
+    git(foreign,'init','--quiet');
+    git(foreign,'-c','user.name=Runner Probe','-c','user.email=runner-probe@example.invalid','-c','commit.gpgsign=false','-c','core.hooksPath='+hooks,'commit','--quiet','--allow-empty','-m','foreign');
+    await assert.rejects(verifyRunnerWorkspace({...check,workspace:foreign}),{code:'REPO_MISMATCH'});
+    await assert.rejects(verifyRunnerWorkspace({...check,baseCommit:'0'.repeat(base.length)}),{code:'BASE_COMMIT_MISMATCH'});
+    await assert.rejects(verifyRunnerWorkspace({...check,workspace:repo}),{code:'WORKTREE_REQUIRED'});
     assert.equal(git(workspace,'rev-parse','HEAD'),base);
     assert.match(await readFile(join(workspace,'tracked.txt'),'utf8'),/^baseline\r?\n$/);
     for(const phase of ['create','resume']){
