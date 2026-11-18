@@ -17,6 +17,34 @@ import {fileURLToPath} from 'node:url';
 const load=name=>import(pathToFileURL(fromHost.resolve('@deepseek-ai/'+name)).href);
 const [stage,root]=process.argv.slice(2);
 const sessionId='session-runner-probe';
+async function verifyCancellation(agent){
+  const stop=Promise.withResolvers();
+  const entered=Promise.withResolvers();
+  const task=agent.runMaintenance(async signal=>{
+    entered.resolve(signal);
+    await stop.promise;
+    signal.throwIfAborted();
+  });
+  const outcome=task.then(()=>({ok:true}),error=>({ok:false,error}));
+  const signal=await entered.promise;
+  try{
+    let idle=false;
+    const quiescence=agent.whenIdle().then(()=>{idle=true;});
+    agent.cancel({kind:'user'});
+    assert.equal(signal.aborted,true);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(idle,false,'cancellation is not proof of quiescence');
+    stop.resolve();
+    const result=await outcome;
+    assert.equal(result.ok,false);
+    assert.equal(result.error,signal.reason);
+    await quiescence;
+    assert.equal(agent.status,'idle');
+  }finally{
+    stop.resolve();
+    await outcome;
+  }
+}
 if(stage==='create'||stage==='resume'){
   const ctx=new Context();
   for(const [pkg,service] of [
@@ -43,6 +71,7 @@ if(stage==='create'||stage==='resume'){
     assert.equal(ctx.agents.get(sessionId),handle.agent);
     await handle.agent.whenIdle();
     if(stage==='create'){
+      await verifyCancellation(handle.agent);
       handle.agent.session.append('session/title',{title:'Probe',messageSeqs:[],source:{kind:'user'}});
       assert.equal(await ctx.sessions.flush(handle.agent.session),true);
     }
@@ -59,7 +88,7 @@ if(stage==='create'||stage==='resume'){
     for(const phase of ['create','resume']){
       execFileSync(process.execPath,[fileURLToPath(import.meta.url),phase,directory],{timeout:15000,windowsHide:true});
     }
-    console.log(JSON.stringify({status:'PASS',scope:'installed DSH services in two isolated processes',cases:['create and release','flush and resume with same cwd','empty session cannot resume'],notRun:['model turn','running cancellation','crash during wake','worktree isolation','multi-host']},null,2));
+    console.log(JSON.stringify({status:'PASS',scope:'installed DSH services in two isolated processes',cases:['create and release','flush and resume with same cwd','empty session cannot resume','maintenance cancellation and separate quiescence'],notRun:['model turn cancellation','external process cancellation','crash during wake','worktree isolation','multi-host']},null,2));
   }finally{
     await rm(directory,{recursive:true,force:true});
   }

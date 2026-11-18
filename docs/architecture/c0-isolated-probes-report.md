@@ -27,3 +27,5 @@
 运行 node scripts/c0-runner-lifecycle-probe.mjs。安装的 DSH 组件在两个子进程共享一个临时 JSONL 目录。创建、idle 观测、按创建者句柄释放通过。显式追加无模型副作用的 title 事件并确认 flush 成功后，第二进程按原 Session ID 恢复并核对 cwd。空 Session 释放后第二进程无法恢复，返回 SessionPersistenceNotFoundError。
 
 Runner 恢复不能把 create 成功或内存目录可见当成持久化证据。空 Session 缺失也不能证明 Worker 的所有外部副作用均未发生。保留现有 uncertain 和人工核对规则。运行中取消、唤醒崩溃窗口、工作树隔离、真实浏览器撤权和多机仍待验证。
+
+维护任务取消补验：真实 DSH cancel 立即设置维护任务的 AbortSignal。任务刻意等待本地闸门时，whenIdle 仍未完成。释放闸门后任务以相同取消原因退出，whenIdle 才完成。Runner 应分别记录取消请求和宿主活动停止的证据。模型 turn 和子进程停机不在此次探针覆盖范围内。
