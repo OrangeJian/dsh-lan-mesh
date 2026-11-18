@@ -292,3 +292,19 @@ test('close during asynchronous dispatch authorization prevents durable admissio
  assert.deepEqual(f.a.read(), before);
  assert.equal(f.sent.length, 0);
 });
+
+test('an uncertain execution preserves its first submitted result', async t => {
+  const f = await fixture(t);
+  const descriptor = await f.dispatch();
+  await f.nodes.b.tick();
+  await f.nodes.b.handle({operation:'cancel',body:descriptor});
+  f.advance(90001);
+  const result = {status:'succeeded',summary:'Original evidence'};
+  await f.nodes.b.report({executionId:'e1',actorKey:'b/worker',result});
+  await f.nodes.b.tick();
+  const replacement = {...result,summary:'Replacement'};
+  await assert.rejects(f.nodes.b.report({executionId:'e1',actorKey:'b/worker',result:replacement}),{code:'RESULT_ALREADY_RECORDED'});
+  await assert.rejects(f.nodes.a.handle({operation:'result',body:{...descriptor,actorKey:'b/worker',seq:3,result:replacement}}),{code:'RESULT_ALREADY_RECORDED'});
+  assert.deepEqual(f.a.read().executions.e1.result,result);
+  assert.deepEqual(f.b.read().workerExecutions.e1.result,result);
+});
