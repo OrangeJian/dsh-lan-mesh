@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';import {apply} from '../index.js';
+test('registered owner RPC exposes local Registry with stable request replay',async t=>{
+ const previous=process.env.DSH_HOME,home=await mkdtemp(join(tmpdir(),'registry-host-'));process.env.DSH_HOME=home;
+ const routes=new Map(),disposers=[];
+ const ctx={get:()=>undefined,effect:fn=>{const dispose=fn();if(typeof dispose==='function')disposers.push(dispose);},inject(names,fn){if(names.includes('connection'))return fn({connection:{fetch:{register:route=>{routes.set(route.path,route);return ()=>{};}}}});}};
+ t.after(async()=>{for(const dispose of disposers.reverse())await dispose();if(previous===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=previous;await rm(home,{recursive:true,force:true});});
+ apply(ctx,{port:39883,discoveryPort:39884,autoWake:false});
+ const rpc=async(method,payload)=>{const response=await routes.get('/api/lan-mesh').fetch(new Request('http://localhost/api/lan-mesh',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'registry-test',payload:{method,payload}})}));return (await response.json()).result;};
+ const payload={requestId:'define-one',command:{type:'define',agentId:'agent-one',name:'Builder'}};
+ const first=await rpc('agentRegistryCommand',payload);assert.equal(first.ok,true,JSON.stringify(first));
+ assert.deepEqual(await rpc('agentRegistryCommand',payload),first);
+ const list=await rpc('agentRegistry',{});assert.equal(list.ok,true);assert.equal(list.value.agents.length,1);assert.equal(list.value.agents[0].revision,1);
+ assert.equal(JSON.stringify(list).includes(home),false);
+ const forged=await rpc('agentRegistryCommand',{requestId:'spoof',command:{type:'define',agentId:'agent-two',name:'Spoof',authorityNodeId:'foreign'},owner:true});assert.equal(forged.ok,false);
+});

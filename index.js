@@ -22,6 +22,8 @@ import { MeshNode } from './lib/service.mjs';
 import { normalizeStaticPeers } from './lib/static-peers.mjs';
 import { Notifier } from './lib/notify.mjs';
 import { teamToolDefinitions } from './lib/team-tools.mjs';
+import { createRegistryPanel } from './lib/agent-registry-panel.mjs';
+import { meshRootDir } from './lib/store.mjs';
 
 export const name = 'dsh-lan-mesh';
 /** Every service is optional: a node runs even with no tools, agents or UI. */
@@ -618,6 +620,7 @@ export function apply(ctx, rawConfig) {
     getNotify: () => notifier.describe(),
     log,
   });
+  const registryPanel = createRegistryPanel({ node, directory: meshRootDir(config.port) });
   /** Resolve the calling agent id so a wake-up reaches the right session. */
   const callerId = (exec) => (typeof exec?.agent?.id === 'string' ? exec.agent.id : '');
   /**
@@ -1411,6 +1414,10 @@ export function apply(ctx, rawConfig) {
         }),
       ]);
       switch (endpoint) {
+        case 'agentRegistry':
+          return { ok: true, value: { agents: await registryPanel.list() } };
+        case 'agentRegistryCommand':
+          return { ok: true, value: await registryPanel.command(request.command, str('requestId')) };
         case 'contextDeliveries':
           return {ok:true,value:await node.contextDeliveryHistory({roomId:str('roomId'),sessionId:'human',limit:request.limit})};
         case 'documents':
@@ -1632,7 +1639,7 @@ export function apply(ctx, rawConfig) {
     return () => {
       live = false;
       void live;
-      return node.close();
+      return Promise.all([registryPanel.close(), node.close()]);
     };
   });
 }
