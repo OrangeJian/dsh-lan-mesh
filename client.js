@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.30';
+    const PLUGIN_VERSION = '0.4.31';
     const React = require('react');
     const h = React.createElement;
 
@@ -708,6 +708,33 @@ function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
     retry.current={key,requestId:crypto.randomUUID(),agentId,createName};
     return agentId;
   }
+}
+
+function OwnerTeamOverview({h,React,call,roomId}) {
+  const [attempt,setAttempt]=React.useState(0);
+  const [result,setResult]=React.useState(null);
+  React.useEffect(()=>{
+    let current=true;
+    setResult(null);
+    Promise.resolve().then(()=>call('teamOverview',{roomId})).then(
+      value=>{if(current)setResult({value});},
+      error=>{if(current)setResult({error:error?.code==='FORBIDDEN'?'当前无权查看 Team 概览。':'暂时无法读取 Team 概览。'});},
+    );
+    return ()=>{current=false;};
+  },[call,roomId,attempt]);
+
+  const states={absent:'本机暂无 Team 记录',active:'活动中',paused:'已暂停',archived:'已归档'};
+  const labels={planned:'已计划',ready:'就绪',active:'进行中',review:'待审查',accepted:'已验收',blocked:'受阻',failed:'失败',cancelled:'已取消',queued:'排队中',acknowledged:'已确认',running:'运行中',uncertain:'待人工核对',succeeded:'已提交结果'};
+  const value=result?.value;
+  let summary='正在读取 Team 概览…';
+  if(result?.error)summary=result.error;
+  else if(result&&!value?.known)summary=value?.reason==='TEAM_DISABLED'?'本机未启用 Team 执行。':'本机 Team 状态暂不可用。';
+  else if(value?.known)summary=states[value.status]??'未知状态';
+  const counts=(title,items)=>h('div',null,h('strong',null,title),h('ul',null,...Object.entries(items).map(([state,count])=>h('li',{key:state},(labels[state]??state)+' '+count)),Object.keys(items).length?null:h('li',null,'暂无记录')));
+  return h('section',{className:'lm-task lm-ownerTeamOverview','aria-label':'Team 概览'},
+    h('div',{className:'lm-workspacePageHead'},h('h3',null,'Team 概览 · 本机'),h('button',{type:'button',className:'lm-btn',disabled:result===null,onClick:()=>{setResult(null);setAttempt(value=>value+1);}},'刷新概览')),
+    h('p',{role:'status'},summary),
+    value?.known&&value.status!=='absent'&&value.taskCounts&&value.executionCounts?h('div',null,counts('任务状态',value.taskCounts),counts('执行状态',value.executionCounts)):null);
 }
     /* @ux-shell:workspace-components:end */
     /* @ux-shell:workspace-nav-model:start */
@@ -3848,6 +3875,7 @@ function RoomTabs(props) {
       const taskContent=panelTab==='tasks'?h(
           'div',
           { className:'lm-tasksWrap lm-roomTabSurface',role:'tabpanel',id:roomTabPrefix+'-tasks-panel','aria-labelledby':roomTabPrefix+'-tasks-tab' },
+          isLeader && sessionId === HUMAN_SESSION_ID ? h(OwnerTeamOverview,{key:roomId,h,React,call,roomId}) : null,
           panelTab==='tasks'
             ? h(
                 'div',
