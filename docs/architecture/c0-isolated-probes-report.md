@@ -21,3 +21,9 @@
 ## Coordinator磁盘恢复补充
 
 新增starting/running/uncertain三种状态的真实临时账本关闭、重新打开、recover及重复tick回归。三项均无重复wake，uncertain和started标记再次读取仍持久保留。Coordinator测试24/24通过。这是本插件账本恢复证据，不证明真实Host进程/工具副作用已经停止，也不等同Runner全生命周期通过。
+
+## 真实 Session 组件跨进程补验
+
+运行 node scripts/c0-runner-lifecycle-probe.mjs。安装的 DSH 组件在两个子进程共享一个临时 JSONL 目录。创建、idle 观测、按创建者句柄释放通过。显式追加无模型副作用的 title 事件并确认 flush 成功后，第二进程按原 Session ID 恢复并核对 cwd。空 Session 释放后第二进程无法恢复，返回 SessionPersistenceNotFoundError。
+
+Runner 恢复不能把 create 成功或内存目录可见当成持久化证据。空 Session 缺失也不能证明 Worker 的所有外部副作用均未发生。保留现有 uncertain 和人工核对规则。运行中取消、唤醒崩溃窗口、工作树隔离、真实浏览器撤权和多机仍待验证。
