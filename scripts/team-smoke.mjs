@@ -43,10 +43,16 @@ try {
   for (const id of ['worker-1', 'worker-2']) executions.push(await a.teamDispatch({ roomId: room.id, sessionId: 'leader', workerKey: `${b.nodeId}/${id}`, title: `Task ${id}` }));
   await b.team.tick();
   assert.equal(wakes.length, 2);
+  const worker = await b.teamStatus({ roomId: room.id, sessionId: 'worker-1' });
+  assert.equal(worker.localExecutions.length, 1);
+  assert.equal(worker.localExecutions[0].state, 'running');
+  assert.equal(worker.localSessionObservation.scope, 'session');
+  assert.equal(worker.localSessionObservation.status, 'idle');
   await b.team.tick();
   assert.equal(wakes.length, 2);
   for (const e of executions) await b.teamReport({ sessionId: e.workerKey.split('/')[1], executionId: e.executionId, status: 'succeeded', summary: 'Integration result' });
   const status = await a.teamStatus({ roomId: room.id, sessionId: 'leader' });
+  assert.equal(status.localSessionObservation, null);
   assert.equal(status.tasks.length, 2);
   assert.ok(status.tasks.every(task => task.status === 'review'));
   assert.ok(status.executions.every(e => e.state === 'succeeded'));
