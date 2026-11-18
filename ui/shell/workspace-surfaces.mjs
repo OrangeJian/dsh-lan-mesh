@@ -80,7 +80,7 @@ export function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
   }
 }
 
-export function OwnerTeamOverview({h,React,call,roomId}) {
+export function OwnerTeamOverview({h,React,call,roomId,selectedResults=[],onSelectResult}) {
   const [attempt,setAttempt]=React.useState(0);
   const [result,setResult]=React.useState(null);
   React.useEffect(()=>{
@@ -104,5 +104,11 @@ export function OwnerTeamOverview({h,React,call,roomId}) {
   return h('section',{className:'lm-task lm-ownerTeamOverview','aria-label':'Team 概览'},
     h('div',{className:'lm-workspacePageHead'},h('h3',null,'Team 概览 · 本机'),h('button',{type:'button',className:'lm-btn',disabled:result===null,onClick:()=>{setResult(null);setAttempt(value=>value+1);}},'刷新概览')),
     h('p',{role:'status'},summary),
+    onSelectResult&&value?.known?value.resultRefs?.map(ref=>{
+      const selected=selectedResults.some(row=>row.executionId===ref.executionId&&row.resultHash===ref.resultHash);
+      return h('div',{key:ref.executionId},
+        h('span',null,ref.executionId+' · '+(labels[ref.reviewStatus]??ref.reviewStatus)+' · '+ref.resultHash.slice(0,12)+' '),
+        h('button',{type:'button',className:'lm-btn lm-selectTaskResult','aria-pressed':selected,disabled:!selected&&selectedResults.length>=8,onClick:()=>onSelectResult(ref)},selected?'取消引用':'引用成果'));
+    }):null,
     value?.known&&value.status!=='absent'&&value.taskCounts&&value.executionCounts?h('div',null,counts('任务状态',value.taskCounts),counts('执行状态',value.executionCounts)):null);
 }

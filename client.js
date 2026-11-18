@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.33';
+    const PLUGIN_VERSION = '0.4.34';
     const React = require('react');
     const h = React.createElement;
 
@@ -710,7 +710,7 @@ function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
   }
 }
 
-function OwnerTeamOverview({h,React,call,roomId}) {
+function OwnerTeamOverview({h,React,call,roomId,selectedResults=[],onSelectResult}) {
   const [attempt,setAttempt]=React.useState(0);
   const [result,setResult]=React.useState(null);
   React.useEffect(()=>{
@@ -734,6 +734,12 @@ function OwnerTeamOverview({h,React,call,roomId}) {
   return h('section',{className:'lm-task lm-ownerTeamOverview','aria-label':'Team 概览'},
     h('div',{className:'lm-workspacePageHead'},h('h3',null,'Team 概览 · 本机'),h('button',{type:'button',className:'lm-btn',disabled:result===null,onClick:()=>{setResult(null);setAttempt(value=>value+1);}},'刷新概览')),
     h('p',{role:'status'},summary),
+    onSelectResult&&value?.known?value.resultRefs?.map(ref=>{
+      const selected=selectedResults.some(row=>row.executionId===ref.executionId&&row.resultHash===ref.resultHash);
+      return h('div',{key:ref.executionId},
+        h('span',null,ref.executionId+' · '+(labels[ref.reviewStatus]??ref.reviewStatus)+' · '+ref.resultHash.slice(0,12)+' '),
+        h('button',{type:'button',className:'lm-btn lm-selectTaskResult','aria-pressed':selected,disabled:!selected&&selectedResults.length>=8,onClick:()=>onSelectResult(ref)},selected?'取消引用':'引用成果'));
+    }):null,
     value?.known&&value.status!=='absent'&&value.taskCounts&&value.executionCounts?h('div',null,counts('任务状态',value.taskCounts),counts('执行状态',value.executionCounts)):null);
 }
     /* @ux-shell:workspace-components:end */
@@ -3178,6 +3184,11 @@ function RoomTabs(props) {
       const draftField=(name,initial)=>useComposerField(React,draftRecord,name,initial,()=>draftLifetime.current.alive);
 
       const [contextDocuments, setContextDocuments] = draftField('contextDocuments',[]);
+      const [contextResults,setContextResults]=draftField('contextResults',[]);
+      const contextSelection={
+        ...(contextDocuments.length?{selectedDocumentVersions:contextDocuments.map(({documentId,revisionId,contentHash})=>({documentId,revisionId,contentHash}))}:{}),
+        ...(contextResults.length?{selectedTaskResults:contextResults.map(({executionId,resultHash})=>({executionId,resultHash}))}:{}),
+      };
       const [documentCatalogue,setDocumentCatalogue]=React.useState({status:'idle',rows:[]});
       const [documentPicking,setDocumentPicking]=React.useState(false);
       const documentPicker=React.useRef({alive:true,pending:false,sequence:0});
@@ -3558,7 +3569,7 @@ function RoomTabs(props) {
         const sendingDraft=attachmentDraft.current;
         setBusy('say');
         try {
-          const sayArgs = { room: roomId, sessionId, text, ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments.map(({documentId,revisionId,contentHash})=>({documentId,revisionId,contentHash}))}}:{}) };
+          const sayArgs = { room: roomId, sessionId, text, ...(Object.keys(contextSelection).length?{contextSelection}:{}) };
           if (draftMentions.length > 0 && !/@all(?:\s|$)/i.test(text)) sayArgs.mentions = draftMentions.map(({ memberKey, label }) => ({ memberKey, label }));
           // Only confirmed picks become references. `skillRefs` is metadata for
           // the reader, never an instruction to this node: nothing is loaded,
@@ -3691,7 +3702,7 @@ function RoomTabs(props) {
             assignee: assigneeValue,
             title: taskTitle.trim(),
             detail: taskDetail,
-            ...(contextDocuments.length?{contextSelection:{selectedDocumentVersions:contextDocuments.map(({documentId,revisionId,contentHash})=>({documentId,revisionId,contentHash}))}}:{}),
+            ...(Object.keys(contextSelection).length?{contextSelection}:{}),
           });
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
           const failed = delivered.filter((row) => row.ok !== true);
@@ -3875,7 +3886,7 @@ function RoomTabs(props) {
       const taskContent=panelTab==='tasks'?h(
           'div',
           { className:'lm-tasksWrap lm-roomTabSurface',role:'tabpanel',id:roomTabPrefix+'-tasks-panel','aria-labelledby':roomTabPrefix+'-tasks-tab' },
-          isLeader && sessionId === HUMAN_SESSION_ID ? h(OwnerTeamOverview,{key:roomId,h,React,call,roomId}) : null,
+          isLeader && sessionId === HUMAN_SESSION_ID ? h(OwnerTeamOverview,{key:roomId,h,React,call,roomId,selectedResults:contextResults,onSelectResult:roomArchived?undefined:ref=>setContextResults(rows=>rows.some(row=>row.executionId===ref.executionId&&row.resultHash===ref.resultHash)?rows.filter(row=>row.executionId!==ref.executionId):rows.filter(row=>row.executionId!==ref.executionId).concat(ref))}) : null,
           panelTab==='tasks'
             ? h(
                 'div',
@@ -4111,6 +4122,7 @@ function RoomTabs(props) {
           { disabled:busy==='say'||roomArchived,className: 'lm-composer', onDragOver:event=>event.preventDefault(),onDrop:event=>transferFiles(event),onPaste:event=>transferFiles(event,true) },
           roomArchived ? h('div',{role:'status'},'房间已归档，仅供阅读。已有任务仍可核对。') : null,
           documentPicking?h('div',{role:'status'},'正在固定文档版本…'):null,
+          contextResults.length?h('div',{className:'lm-referenceRail'},...contextResults.map(ref=>h('span',{className:'lm-badge',key:ref.executionId},'成果 · '+ref.executionId+' · '+ref.resultHash.slice(0,12),h('button',{type:'button','aria-label':'移除成果引用',onClick:()=>setContextResults(rows=>rows.filter(row=>row.executionId!==ref.executionId))},'×')))):null,
           contextDocuments.length?h('div',{className:'lm-referenceRail'},...contextDocuments.map(ref=>h('span',{className:'lm-contextDocument lm-badge',key:ref.documentId},(ref.title||ref.documentId)+' · '+ref.revisionId,h('button',{type:'button','aria-label':'移除文档引用',onClick:()=>setContextDocuments(rows=>rows.filter(row=>row.documentId!==ref.documentId))},'×'))),h('button',{type:'button',onClick:()=>setContextDocuments([])},'移除全部文档引用')):null,
           mention!==undefined&&documentCatalogue.status==='loading'?h('div',{role:'status'},'正在读取文档候选…'):null,
           mention!==undefined&&documentCatalogue.status==='error'?h('div',{className:'lm-muted'},'文档候选暂不可用：'+documentCatalogue.reason):null,

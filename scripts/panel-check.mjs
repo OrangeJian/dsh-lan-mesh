@@ -1852,6 +1852,21 @@ await switchTo(TaskOwnerRoom);await clickOn(TaskOwnerRoom,'lm-roomTab-tasks');
 checks.push(['same human session on a different node never grants task controls',count('lm-statusBtns')===0&&count('lm-ownerTeamOverview')===0&&lastText.includes('Exact owner task')]);
 ownerNode='node-a';[...intervals.values()].find(timer=>timer.ms===2000).fn();await settleIn(TaskOwnerRoom);
 checks.push(['exact local human owner retains existing task controls',count('lm-statusBtns')===1]);
+let resultSend;
+const resultRef={executionId:'exec-pinned',resultHash:'a'.repeat(64),reviewStatus:'review'};
+const resultCall=async(method,args)=>{
+ if(method==='teamOverview')return {known:true,status:'active',resultRefs:[resultRef]};
+ if(method==='roomSay'){resultSend=args;return {delivered:[]};}
+ if(method==='roomDetail')return {room:{id:args.room,members:[human],tasks:[]},viewer:{isMember:true,isLeader:true},messages:[]};
+ return {};
+};
+const ResultRoom=()=>h(window.__roomPane,{room:{id:'room-result-ref'},sessionId:'human',self:answers.snapshot.self,call:resultCall});
+await switchTo(ResultRoom);await clickOn(ResultRoom,'lm-roomTab-tasks');
+await clickOn(ResultRoom,'lm-selectTaskResult');await clickOn(ResultRoom,'lm-roomTab-chat');
+const resultVisible=lastText.includes('成果 · exec-pinned');
+lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'Check this result',selectionStart:17}});
+await settleIn(ResultRoom);await clickOn(ResultRoom,'lm-sendBtn');
+checks.push(['selected Team result reaches Room send with its exact hash',resultVisible&&JSON.stringify(resultSend?.contextSelection?.selectedTaskResults)===JSON.stringify([{executionId:resultRef.executionId,resultHash:resultRef.resultHash}])]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;
