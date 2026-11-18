@@ -62,10 +62,26 @@ try {
   assert.ok(packet.taskResultRefs.every(row=>row.reviewStatus==='review'));
   await assert.rejects(a.buildRoomContextPacket({roomId:room.id,sessionId:'outsider',contextSelection:{selectedTaskResults}}),{code:'NOT_ROOM_MEMBER'});
   console.log('Team HTTP smoke: two Worker sessions woke once each; both results persisted for review.');
+  const followup = await a.teamDispatch({
+    roomId: room.id, sessionId: 'leader', workerKey: `${b.nodeId}/worker-1`,
+    title: 'Review pinned results', contextSelection: { selectedTaskResults },
+  });
+  await b.team.tick();
+  assert.equal(wakes.length, 3);
+  const expected = packet.taskResultRefs;
+  assert.deepEqual(b.team.store.read().workerExecutions[followup.executionId].descriptor.contextPacket.taskResultRefs, expected);
+  const input = wakes.at(-1).value.content[0].text;
+  assert.ok(expected.every(ref => input.includes(ref.resultHash)));
+  const audit = await b.contextDeliveryHistory({roomId:room.id,sessionId:'worker-1'});
+  assert.equal(audit.deliveries.length, 1);
+  assert.equal(audit.deliveries[0].status, 'delivered');
+  assert.deepEqual(audit.deliveries[0].packet.taskResultRefs, expected.map(({executionId,resultHash,reviewStatus})=>({executionId,resultHash,reviewStatus})));
+  await b.teamReport({sessionId:'worker-1',executionId:followup.executionId,status:'succeeded',summary:'Reviewed'});
+  console.log('Team HTTP smoke: pinned results survived transfer, worker input and delivery audit.');
   b.config.teamAuthorizations = [];
   const denied = await a.teamDispatch({ roomId: room.id, sessionId: 'leader', workerKey: `${b.nodeId}/worker-1`, title: 'Revoked authorization' });
   await b.team.tick();
-  assert.equal(wakes.length, 2);
+  assert.equal(wakes.length, 3);
   assert.equal(a.team.store.read().executions[denied.executionId].state, 'queued');
   console.log('Team HTTP smoke: revoked local authorization prevents execution.');
 } finally {
