@@ -59,3 +59,18 @@ test('owner overview is scoped to current local human leadership and redacts exe
  room.leader.key='foreign/human';
  await assert.rejects(node.ownerTeamOverview(room.id),{code:'FORBIDDEN'});
 });
+
+test('context audit exposes pinned result metadata and rechecks membership after reading',async()=>{
+ const node=new MeshNode({config:{}});
+ node.started=true;
+ node.identity={nodeId:'node-local'};
+ const room={id:'room-audit',members:[{key:'node-local/human'}]};
+ node.roomsDoc.rooms[room.id]=room;
+ const hash='a'.repeat(64);
+ const rows=[{deliveryId:'one',recipient:'node-local/worker',packet:{roomId:room.id,selectedDocumentVersions:[],taskResultRefs:[{executionId:'execution-one',resultHash:hash,reviewStatus:'review',result:{summary:'private'}}]}}];
+ node.contextDeliveryStore=()=>({list:async()=>rows});
+ const view=await node.contextDeliveryHistory({roomId:room.id});
+ assert.deepEqual(view.deliveries[0].packet.taskResultRefs,[{executionId:'execution-one',resultHash:hash,reviewStatus:'review'}]);
+ node.contextDeliveryStore=()=>({list:async()=>{room.members=[];return rows;}});
+ await assert.rejects(node.contextDeliveryHistory({roomId:room.id}),{code:'NOT_ROOM_MEMBER'});
+});

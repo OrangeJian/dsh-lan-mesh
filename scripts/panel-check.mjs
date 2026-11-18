@@ -1610,12 +1610,12 @@ checks.push(['remote proposal initializes missing resolution',lastNodes.some(n=>
 
 
 let deliveryFail=true,releaseDelivery;
-const deliveryCall=async(method,payload)=>method==='contextDeliveries'?(deliveryFail?{status:'error',reason:'audit offline'}:{status:'ready',deliveries:[{deliveryId:'delivery-test',recipient:'Agent Remote',status:'delivered',packet:{selectedDocumentVersions:[{documentId:docView.documentId,title:'Pinned document',revisionId:'rev-pinned',contentHash:'hash-pinned',content:'PRIVATE FULL CONTENT'}]}}]}):docCall(method,payload);
+const deliveryCall=async(method,payload)=>method==='contextDeliveries'?(deliveryFail?{status:'error',reason:'audit offline'}:{status:'ready',deliveries:[{deliveryId:'delivery-test',recipient:'Agent Remote',status:'delivered',packet:{selectedDocumentVersions:[{documentId:docView.documentId,title:'Pinned document',revisionId:'rev-pinned',contentHash:'hash-pinned',content:'PRIVATE FULL CONTENT'}],taskResultRefs:[{executionId:'audit-exec',resultHash:'a'.repeat(64),reviewStatus:'review'}]}}]}):docCall(method,payload);
 const DeliveryComponent=()=>window.__documentsPane({roomId:'room-delivery',call:deliveryCall,isMember:true});await switchTo(DeliveryComponent);
 await lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesToggle')).props.onClick();await settleIn(DeliveryComponent);
 checks.push(['context delivery errors are visible with retry',lastText.includes('audit offline')&&lastNodes.some(n=>hasClass(n,'lm-contextDeliveriesRetry'))]);
 deliveryFail=false;await lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesRetry')).props.onClick();await settleIn(DeliveryComponent);
-checks.push(['delivery audit renders recipient and pinned version only',lastText.includes('Agent Remote')&&lastText.includes('delivered')&&lastText.includes('Pinned document')&&lastText.includes('rev-pinned')&&lastText.includes('hash-pinned')&&!lastText.includes('PRIVATE FULL CONTENT')]);
+checks.push(['delivery audit renders recipient and pinned version only',lastText.includes('Agent Remote')&&lastText.includes('delivered')&&lastText.includes('Pinned document')&&lastText.includes('rev-pinned')&&lastText.includes('hash-pinned')&&lastText.includes('audit-exec')&&lastText.includes('待审查')&&!lastText.includes('PRIVATE FULL CONTENT')]);
 lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesToggle')).props.onClick();await settleIn(DeliveryComponent);checks.push(['delivery audit can collapse',!lastText.includes('Agent Remote')]);
 const DeferredDelivery=()=>window.__documentsPane({roomId:'room-old-audit',call:async(method,payload)=>method==='contextDeliveries'?await new Promise(resolve=>releaseDelivery=resolve):docCall(method,payload),isMember:true});
 await switchTo(DeferredDelivery);const loadingDelivery=lastNodes.find(n=>hasClass(n,'lm-contextDeliveriesToggle')).props.onClick();await settleIn(DeferredDelivery);checks.push(['delivery audit displays loading state',lastText.includes('正在加载投递记录')]);

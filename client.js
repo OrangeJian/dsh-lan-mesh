@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.34';
+    const PLUGIN_VERSION = '0.4.35';
     const React = require('react');
     const h = React.createElement;
 
@@ -3146,7 +3146,9 @@ function MessageBody(props) {
           deliveries.status==='ready'&&deliveries.rows.length===0?h('div',{},'暂无投递记录'):null,
           ...deliveries.rows.map(row=>h('article',{key:row.deliveryId},
             h('div',{},'Agent: '+String(row.recipient??'')+' · '+String(row.status??'')),
-            ...(row.packet?.selectedDocumentVersions??[]).map((ref,index)=>h('div',{key:String(ref.documentId??index)},String(ref.title??ref.documentId??'')+' · '+String(ref.revisionId??'')+' · '+String(ref.contentHash??'')))
+            ...(row.packet?.selectedDocumentVersions??[]).map((ref,index)=>h('div',{key:String(ref.documentId??index)},String(ref.title??ref.documentId??'')+' · '+String(ref.revisionId??'')+' · '+String(ref.contentHash??''))),
+            ...(row.packet?.taskResultRefs??[]).map(ref=>h('div',{key:'result:'+ref.executionId},
+              '成果 · '+ref.executionId+' · '+ref.resultHash+' · '+({review:'待审查',accepted:'已验收',failed:'失败',blocked:'受阻',cancelled:'已取消',unverified:'未经核验'}[ref.reviewStatus]??'未知状态')))
           ))) : null,
         createOpen === true ? createForm : null,
         listBlock,
