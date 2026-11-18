@@ -56,6 +56,11 @@ try {
   assert.equal(status.tasks.length, 2);
   assert.ok(status.tasks.every(task => task.status === 'review'));
   assert.ok(status.executions.every(e => e.state === 'succeeded'));
+  const selectedTaskResults = status.resultRefs.map(({executionId,resultHash})=>({executionId,resultHash}));
+  const packet = await a.buildRoomContextPacket({roomId:room.id,sessionId:'leader',contextSelection:{selectedTaskResults}});
+  assert.equal(packet.taskResultRefs.length,2);
+  assert.ok(packet.taskResultRefs.every(row=>row.reviewStatus==='review'));
+  await assert.rejects(a.buildRoomContextPacket({roomId:room.id,sessionId:'outsider',contextSelection:{selectedTaskResults}}),{code:'NOT_ROOM_MEMBER'});
   console.log('Team HTTP smoke: two Worker sessions woke once each; both results persisted for review.');
   b.config.teamAuthorizations = [];
   const denied = await a.teamDispatch({ roomId: room.id, sessionId: 'leader', workerKey: `${b.nodeId}/worker-1`, title: 'Revoked authorization' });
