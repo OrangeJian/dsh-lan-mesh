@@ -44,6 +44,13 @@
       "sha256": "151b62928a300e84"
     },
     {
+      "page": "board-authority.html",
+      "rows": 5,
+      "groups": 1,
+      "bytes": 6753,
+      "sha256": "cf0f46d9747450dc"
+    },
+    {
       "page": "index.html",
       "copyOf": "board.html",
       "bytes": 7294,
@@ -127,6 +134,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -216,6 +234,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -305,6 +334,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -394,6 +434,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -483,6 +534,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -573,6 +635,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -662,6 +735,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -751,6 +835,17 @@
       },
       "focusTargets": 10,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -845,6 +940,17 @@
         "outlineWidth": 3,
         "outlineStyle": "none"
       },
+      "statusBadges": [
+        "待开始",
+        "进行中",
+        "受阻",
+        "已完成",
+        "已完成",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -926,6 +1032,10 @@
       },
       "focusTargets": 4,
       "focused": null,
+      "statusBadges": [],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1007,6 +1117,10 @@
       },
       "focusTargets": 4,
       "focused": null,
+      "statusBadges": [],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1093,6 +1207,13 @@
       },
       "focusTargets": 6,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1179,6 +1300,13 @@
       },
       "focusTargets": 6,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "进行中"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1268,6 +1396,23 @@
       },
       "focusTargets": 16,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "待开始",
+        "待开始",
+        "进行中",
+        "进行中",
+        "受阻",
+        "受阻",
+        "已完成",
+        "已完成",
+        "已完成",
+        "未知状态 · merged",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1357,6 +1502,23 @@
       },
       "focusTargets": 16,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "待开始",
+        "待开始",
+        "进行中",
+        "进行中",
+        "受阻",
+        "受阻",
+        "已完成",
+        "已完成",
+        "已完成",
+        "未知状态 · merged",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1446,6 +1608,23 @@
       },
       "focusTargets": 16,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "待开始",
+        "待开始",
+        "进行中",
+        "进行中",
+        "受阻",
+        "受阻",
+        "已完成",
+        "已完成",
+        "已完成",
+        "未知状态 · merged",
+        "未知状态 · future"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1533,6 +1712,14 @@
       },
       "focusTargets": 7,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "受阻",
+        "已完成"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1620,6 +1807,14 @@
       },
       "focusTargets": 7,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "受阻",
+        "已完成"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1709,6 +1904,14 @@
       },
       "focusTargets": 7,
       "focused": null,
+      "statusBadges": [
+        "待开始",
+        "受阻",
+        "已完成"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
       "checks": {
         "rows": true,
         "noHorizontalOverflow": true,
@@ -1721,6 +1924,202 @@
       "verdict": "PASS",
       "failedChecks": [],
       "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-authority-1440-light-default.png",
+        "bytes": 87395,
+        "sha256": "2a1c825d4e30c264"
+      },
+      "notes": [
+        "groups: 未知状态 5",
+        "authority statuses rendered as badges: 未知状态 · uncertain | 未知状态 · planned | 未知状态 · review | 未知状态 · accepted | 未知状态 · succeeded; non-row buttons: 刷新; raw values kept, no success/acceptance shown, no approve/merge/retry control"
+      ],
+      "name": "board-authority-1440-light-default",
+      "page": "board-authority.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "expectation": {
+        "rows": 5,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1440,
+        "padding": 24,
+        "containerContentWidth": 1392
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainWidth": 1440,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": false,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 1,
+      "groupTitles": [
+        "未知状态 5"
+      ],
+      "rows": 5,
+      "cardsWithDetail": 1,
+      "rowLayout": "flex/column",
+      "rowWidth": 1392,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          1053,
+          106,
+          217
+        ]
+      },
+      "rowHeads": {
+        "measured": 5,
+        "sameLine": 5
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 5,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 36,
+        "clipped": false
+      },
+      "focusTargets": 9,
+      "focused": null,
+      "statusBadges": [
+        "未知状态 · uncertain",
+        "未知状态 · planned",
+        "未知状态 · review",
+        "未知状态 · accepted",
+        "未知状态 · succeeded"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true,
+        "authorityStatusBadges": true,
+        "noAuthorityControls": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
+    },
+    {
+      "screenshot": {
+        "path": "screenshots/board-authority-1024-dark-default.png",
+        "bytes": 83921,
+        "sha256": "7924ecb50fc8f112"
+      },
+      "notes": [
+        "groups: 未知状态 5",
+        "authority statuses rendered as badges: 未知状态 · uncertain | 未知状态 · planned | 未知状态 · review | 未知状态 · accepted | 未知状态 · succeeded; non-row buttons: 刷新; raw values kept, no success/acceptance shown, no approve/merge/retry control"
+      ],
+      "name": "board-authority-1024-dark-default",
+      "page": "board-authority.html",
+      "width": 1024,
+      "height": 768,
+      "theme": "dark",
+      "expectation": {
+        "rows": 5,
+        "narrow": false,
+        "narrowBasis": "window",
+        "paneWidth": 1024,
+        "padding": 24,
+        "containerContentWidth": 976
+      },
+      "ready": "complete",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "bodyBackground": "rgb(21, 25, 31)",
+      "mainWidth": 1024,
+      "rootWidth": 1024,
+      "rootHeight": 732,
+      "rootPadding": 24,
+      "rootDisplay": "flex/column",
+      "rootOverflowY": "auto",
+      "rootScrollable": true,
+      "narrowPadding": false,
+      "narrowApplied": false,
+      "groups": 1,
+      "groupTitles": [
+        "未知状态 5"
+      ],
+      "rows": 5,
+      "cardsWithDetail": 1,
+      "rowLayout": "flex/column",
+      "rowWidth": 976,
+      "filters": {
+        "count": 3,
+        "rowsUsed": 1,
+        "widths": [
+          637,
+          106,
+          217
+        ]
+      },
+      "rowHeads": {
+        "measured": 5,
+        "sameLine": 5
+      },
+      "overflow": false,
+      "rootOverflow": false,
+      "clippedRows": 0,
+      "clampedPreviews": 0,
+      "overflowingText": 0,
+      "emptyText": "",
+      "visibleRows": 5,
+      "shellNote": {
+        "height": 36,
+        "contentHeight": 44,
+        "clipped": true
+      },
+      "focusTargets": 9,
+      "focused": null,
+      "statusBadges": [
+        "未知状态 · uncertain",
+        "未知状态 · planned",
+        "未知状态 · review",
+        "未知状态 · accepted",
+        "未知状态 · succeeded"
+      ],
+      "nonRowButtons": [
+        "刷新"
+      ],
+      "checks": {
+        "rows": true,
+        "noHorizontalOverflow": true,
+        "noClippedRows": true,
+        "noOverflowingText": true,
+        "narrowStyleAsExpected": true,
+        "screenshotCaptured": true,
+        "noRuntimeErrors": true,
+        "authorityStatusBadges": true,
+        "noAuthorityControls": true
+      },
+      "verdict": "PASS",
+      "failedChecks": [],
+      "runtimeErrors": []
     }
   ],
   "runtimeErrors": [],
@@ -1729,6 +2128,10 @@
     "真实 DSH 宿主壳（侧栏/抽屉/分栏）里的主区宽度：需要运行中的 DSH GUI 与真实 Room，本脚本仅用 1440 宽窗口内 640px 主区近似，原样实机 NOT RUN。",
     "服务端对已删除房间/未知状态的裁剪：fixture 由 roomTaskBoardView 本地生成，服务端路径 NOT RUN。",
     "筛选与点击交互：由 scripts/room-task-board.test.mjs 覆盖，截图不证明交互，交互 NOT RUN。",
-    "键盘 focus-visible 真实 Tab 走查：程序化 focus() 不触发 :focus-visible，计算 outline 仍为 none，NOT RUN。"
+    "键盘 focus-visible 真实 Tab 走查：程序化 focus() 不触发 :focus-visible，计算 outline 仍为 none，NOT RUN。",
+    "A11 Leader 不可达（连通性语义）：只读 Room 任务投影没有 leader / 连通性字段（ui/models/room-task-board.mjs 只消费 task.status / assignee / room / lifecycle 等既有字段），无法在 fixture 中构造真实 Leader 断网状态；仅有 uncertain 任务经既有 unknown 回退渲染为「未知状态 · uncertain」的字段级证据。真实 Leader 断网与其状态机语义 NOT RUN。",
+    "A11 不自动重试 / 任务停止自动推进：属 Team 状态机行为，看板不渲染也不控制，静止截图无法观察；只能由 scripts/team-coordinator.test.mjs 的 L3 断言覆盖，实机 UI NOT RUN。",
+    "A12 后端二次验证拒绝：看板没有任何派发/批准/合并/验收控件，但「按钮消失 ≠ 权限生效」；需要真实后端返回拒绝响应才能验证，静态取证 NOT RUN。",
+    "A12 计划未批准 / Review 未通过的真实流程态：看板不建模审批/评审状态，本目录仅用既有 task.status 字段注入样本值验证只读回退（一律显示「未知状态 · 原值」），真实 Team/M6 审批与评审流程 NOT RUN。"
   ]
 }

@@ -119,6 +119,20 @@ const fixtures = [
       ] },
     ],
   },
+  {
+    page: 'board-authority',
+    note: 'A11/A12 只读展示取证：用既有 task.status 字段注入 uncertain / planned / review / accepted / succeeded，看板一律渲染成「未知状态 · 原值」，不显示成功、不提供批准/合并/验收/重试控件 · 静态取证',
+    expectStatusBadges: ['未知状态 · uncertain', '未知状态 · planned', '未知状态 · review', '未知状态 · accepted', '未知状态 · succeeded'],
+    rooms: [
+      { id: 'room-authority', name: '审批与评审样本', tasks: [
+        task('t-uncertain', 'Leader 失联后待人工核对的任务', 'uncertain', person('node-0', '工作电脑'), { detail: 'A11：Leader 不可达时任务状态未确认；看板只显示未知状态，不显示成功或进度条。', updatedAt: '2026-11-17T09:00:00Z' }),
+        task('t-planned', '计划未批准的任务', 'planned', person('node-1')),
+        task('t-review', 'Review 未通过的任务', 'review', person('node-1')),
+        task('t-accepted', '已验收样本对照', 'accepted', person('node-2', '会议室备用机')),
+        task('t-succeeded', '已提交结果样本对照', 'succeeded', person('node-2', '会议室备用机')),
+      ] },
+    ],
+  },
 ];
 
 const cases = [
@@ -145,6 +159,8 @@ const cases = [
   { name: 'board-long-1024-light-default', page: 'board-long', width: 1024, height: 768, theme: 'light' },
   { name: 'board-long-640-dark-narrow', page: 'board-long', width: 640, height: 768, theme: 'dark' },
   { name: 'board-long-390-light-narrow', page: 'board-long', width: 390, height: 780, theme: 'light' },
+  { name: 'board-authority-1440-light-default', page: 'board-authority', width: 1440, height: 900, theme: 'light' },
+  { name: 'board-authority-1024-dark-default', page: 'board-authority', width: 1024, height: 768, theme: 'dark' },
 ];
 
 // The narrow stylesheet is a container query on the board itself, the same
@@ -246,6 +262,12 @@ const notRun = [
   '服务端对已删除房间/未知状态的裁剪：fixture 由 roomTaskBoardView 本地生成，服务端路径 NOT RUN。',
   '筛选与点击交互：由 scripts/room-task-board.test.mjs 覆盖，截图不证明交互，交互 NOT RUN。',
   '键盘 focus-visible 真实 Tab 走查：程序化 focus() 不触发 :focus-visible，计算 outline 仍为 none，NOT RUN。',
+  // A11/A12: only the display-half is covered by the read-only board. The
+  // state-machine/backend/real-machine half is listed here, not claimed as PASS.
+  'A11 Leader 不可达（连通性语义）：只读 Room 任务投影没有 leader / 连通性字段（ui/models/room-task-board.mjs 只消费 task.status / assignee / room / lifecycle 等既有字段），无法在 fixture 中构造真实 Leader 断网状态；仅有 uncertain 任务经既有 unknown 回退渲染为「未知状态 · uncertain」的字段级证据。真实 Leader 断网与其状态机语义 NOT RUN。',
+  'A11 不自动重试 / 任务停止自动推进：属 Team 状态机行为，看板不渲染也不控制，静止截图无法观察；只能由 scripts/team-coordinator.test.mjs 的 L3 断言覆盖，实机 UI NOT RUN。',
+  'A12 后端二次验证拒绝：看板没有任何派发/批准/合并/验收控件，但「按钮消失 ≠ 权限生效」；需要真实后端返回拒绝响应才能验证，静态取证 NOT RUN。',
+  'A12 计划未批准 / Review 未通过的真实流程态：看板不建模审批/评审状态，本目录仅用既有 task.status 字段注入样本值验证只读回退（一律显示「未知状态 · 原值」），真实 Team/M6 审批与评审流程 NOT RUN。',
 ];
 
 // --------------------------------------------------------------- browser ----
@@ -333,6 +355,10 @@ const measureSource = [
   '    shellNote: note ? { height: Math.round(box(note).height), contentHeight: note.scrollHeight, clipped: note.scrollHeight > Math.round(box(note).height) + 1 } : null,',
   '    focusTargets: focusables.length,',
   '    focused: insideBoard ? { tag: active.tagName.toLowerCase(), outlineWidth: px(css(active).outlineWidth), outlineStyle: css(active).outlineStyle } : null,',
+  '    // A11/A12 read-only evidence: the exact badge text on each row and every',
+  '    // non-row button. The read-only board must only ever expose the refresh button.',
+  '    statusBadges: rows.map((row) => { const badge = row.querySelector(".lm-taskBoardRowHead > span"); return badge ? badge.textContent.trim() : ""; }),',
+  '    nonRowButtons: many(".lm-roomTaskBoard button").filter((button) => !button.classList.contains("lm-taskBoardRow")).map((button) => button.textContent.trim()),',
   '  };',
   '})()',
 ].join('\n');
@@ -451,6 +477,13 @@ try {
       screenshotCaptured: screenshotLooksReal,
       noRuntimeErrors: caseErrors.length === 0,
     };
+    if (item.page === 'board-authority') {
+      // Existing task.status values must fall back to the unknown state with the
+      // raw value kept, and no approve/merge/accept/retry control may appear.
+      const authorityFixture = fixtures.find((fixture) => fixture.page === item.page);
+      checks.authorityStatusBadges = JSON.stringify(value.statusBadges) === JSON.stringify(authorityFixture.expectStatusBadges);
+      checks.noAuthorityControls = value.nonRowButtons.length === 1 && value.nonRowButtons[0] === '刷新';
+    }
     const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([key]) => key);
     const notes = [];
     if (item.mainWidth) {
@@ -471,6 +504,7 @@ try {
         + ' row heads let the status badge wrap under the title (@media flex-wrap:wrap at <=650px, designed)');
     }
     if (value.groupTitles.length) notes.push('groups: ' + value.groupTitles.join(' | '));
+    if (item.page === 'board-authority') notes.push('authority statuses rendered as badges: ' + value.statusBadges.join(' | ') + '; non-row buttons: ' + value.nonRowButtons.join('/') + '; raw values kept, no success/acceptance shown, no approve/merge/retry control');
     results.push({
       screenshot: { path: 'screenshots/' + item.name + '.png', bytes: shotBytes, sha256: shotSha },
       notes,
@@ -535,7 +569,7 @@ async function writeReport({ measurements, component, fixtures: fixtureMeta, err
   lines.push('');
   const passed = measurements.filter((item) => item.verdict === 'PASS');
   const failed = measurements.filter((item) => item.verdict === 'FAIL');
-  lines.push(measurements.length + ' 例覆盖：默认看板（1440 浅色、1024 深浅）、空看板（1440 浅 / 640 深）、少量卡（2 张）、多任务（4 个 Room / 12 张卡 / 含已归档 Room 与未知状态）、长标题长名字、窄窗 640 与 390、容器查询断点两侧 699/698，以及 1440 宽窗口内主区只有 640px 的用例。'
+  lines.push(measurements.length + ' 例覆盖：默认看板（1440 浅色、1024 深浅）、空看板（1440 浅 / 640 深）、少量卡（2 张）、多任务（4 个 Room / 12 张卡 / 含已归档 Room 与未知状态）、长标题长名字、窄窗 640 与 390、容器查询断点两侧 699/698、1440 宽窗口内主区只有 640px 的用例，以及 A11/A12 只读权限样本（用既有 ' + code('task.status') + ' 注入 ' + code('uncertain/planned/review/accepted/succeeded') + '，一律回退为「未知状态 · 原值」，无派发/批准/合并/验收/重试控件）。'
     + '全部 ' + measurements.length + ' 例 ' + code('overflow:false') + '、' + code('rootOverflow:false') + '、' + code('clippedRows:0') + '、' + code('overflowingText:0') + '、' + code('runtimeErrors:' + errors.length) + '；结论 **PASS ' + passed.length + ' / ' + measurements.length + '**'
     + (failed.length ? '，FAIL：' + failed.map((item) => code(item.name)).join('、') : '，无 FAIL') + '。');
   lines.push('');
@@ -548,7 +582,7 @@ async function writeReport({ measurements, component, fixtures: fixtureMeta, err
   lines.push('脚本做两件事，都不依赖人工：');
   lines.push('');
   lines.push('1. 读 ' + code(component.path) + '（断言首行以 ' + code('.lm-roomTaskBoard{') + ' 开头），把每个 fixture 的组件样式段整体重写，再用真实的 ' + code('RoomTaskBoard') + ' 重新渲染 <main> 里的 DOM（'
-    + fixtureMeta.map((fixture) => code(fixture.page)).join('、') + '；' + code('index.html') + ' 是目录入口，与 ' + code('board.html') + ' 逐字节相同）。手写的主题变量/外壳样式保留在组件段之前，以 ' + code('/* @component:ui/tasks/room-task-board.css */') + ' 哨兵标记边界，因此重复运行幂等：连跑两次，5 个 fixture、' + code('index.html') + ' 与 ' + code('preview-validation.json') + ' 的 sha256 完全一致。');
+    + fixtureMeta.map((fixture) => code(fixture.page)).join('、') + '；' + code('index.html') + ' 是目录入口，与 ' + code('board.html') + ' 逐字节相同）。手写的主题变量/外壳样式保留在组件段之前，以 ' + code('/* @component:ui/tasks/room-task-board.css */') + ' 哨兵标记边界，因此重复运行幂等：连跑两次，' + fixtures.length + ' 个 fixture、' + code('index.html') + ' 与 ' + code('preview-validation.json') + ' 的 sha256 完全一致。');
   lines.push('2. 用本机 Edge（' + code('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe') + '，headless=new + CDP）逐例设置视口与 ' + code('prefers-color-scheme') + '，实测几何、截 PNG、抓 ' + code('Runtime.exceptionThrown') + '/' + code('console.error') + '/' + code('Log.entryAdded') + '。找不到浏览器时只刷新 fixture 并明确退出，不写测量值、不碰截图——本机 Chrome headless 输出 0 字节，所以探测列表里只留 Edge 与常见 Chromium 路径。');
   lines.push('');
   lines.push('本目录先前的问题正是这个脚本要根治的：' + code('preview-validation.json') + ' 每例只有 6 个字段且 ' + code('rows') + ' 恒为 0（看板明明渲染 6 张卡），' + code('report.md') + ' 里没有生成器也没有重跑命令。inbox 目录踩过同类坑——组件从 ' + code('@media') + ' 换成 ' + code('@container') + ' 后 fixture 的 CSS 停在旧版本，640px 那张「窄窗」其实还是双栏。现在样式和 DOM 都从组件现算，不可能再滞后。');
@@ -579,6 +613,10 @@ async function writeReport({ measurements, component, fixtures: fixtureMeta, err
   lines.push('');
   lines.push('空看板实测空态文案为「当前没有房间任务」（' + code('model.counts.all === 0') + ' 分支），' + code('groups:0') + '。' + code('board-many') + ' 的 12 张卡分布在 5 个状态组（待开始/进行中/受阻/已完成/未知状态），已归档 Room 保留但带「已归档」标注，' + code('future') + '/' + code('merged') + ' 状态渲染成「未知状态 · 原值」而不是被吞掉。' + code('board-long') + ' 例中 390px 宽下 2/3 个行头让状态徽章换行到标题下方，且有 1 处卡片详情被 ' + code('-webkit-line-clamp:2') + ' 截到两行——都是样式表里写明的设计（' + code('ui/tasks/room-task-board.css:8') + ' 的限制、行头 ' + code('flex-wrap:wrap') + '），不是内容被压坏：' + code('overflowingText:0') + ' 表示没有文本在单行内被切掉。');
   lines.push('');
+  lines.push('## A11/A12 只读展示取证');
+  lines.push('');
+  lines.push('只看板的**展示半**可以取证，状态机/后端/实机半在下方 `明确 NOT RUN` 与 `docs/ux/task-board-preview/a11-a12-evidence.md` 逐条列明。' + code('board-authority') + ' 只使用既有 ' + code('task.status') + ' 自由文本字段（没有新增组件状态、没有新增审批/评审/连通性字段）注入 ' + code('uncertain') + '/' + code('planned') + '/' + code('review') + '/' + code('accepted') + '/' + code('succeeded') + '，依赖既有 unknown 回退渲染成「未知状态 · 原值」。两例实测 ' + code('authorityStatusBadges') + '=true、' + code('noAuthorityControls') + '=true：5 张卡全落在唯一「未知状态」组、徽章保留原值且没有任何状态显示成已完成/已验收，非行按钮只有「刷新」，没有派发/批准/合并/验收/重试控件。字段级 ' + code('scripts/room-task-board.test.mjs') + ' 另有两条断言锁定同一口径。Leader 连通性、自动重试/自动推进、后端二次校验与真实审批/评审流程**均 NOT RUN**，不得据此把 A11/A12 记为通过。');
+  lines.push('');
   lines.push('## 断点与容器查询');
   lines.push('');
   lines.push('组件的窄样式分成两条规则，判据不同，必须分别验证：');
@@ -605,7 +643,7 @@ async function writeReport({ measurements, component, fixtures: fixtureMeta, err
   lines.push('');
   lines.push('## 数据');
   lines.push('');
-  lines.push(code('preview-validation.json') + ' 由脚本直接写出，记录每例的 ' + code('page') + '/' + code('theme') + '/' + code('width') + '/' + code('height') + '/' + code('mainWidth') + '、实测 ' + code('rootWidth') + '/' + code('rootHeight') + '/' + code('rootPadding') + '/' + code('rootDisplay') + '/' + code('rootOverflowY') + '/' + code('rootScrollable') + '、' + code('narrowApplied') + '/' + code('narrowPadding') + '、' + code('groups') + '/' + code('groupTitles') + '/' + code('rows') + '/' + code('visibleRows') + '/' + code('cardsWithDetail') + '、' + code('rowLayout') + '/' + code('rowWidth') + '、' + code('filters') + '（数量/占用行数/各宽度）、' + code('rowHeads') + '（行头标题与徽章是否同行）、' + code('overflow') + '/' + code('rootOverflow') + '/' + code('clippedRows') + '/' + code('clampedPreviews') + '/' + code('overflowingText') + '、' + code('emptyText') + '、' + code('focusTargets') + '/' + code('focused') + '、7 项 ' + code('checks') + ' 与 ' + code('verdict') + '/' + code('failedChecks') + '/' + code('runtimeErrors') + '，以及截图路径/字节数/sha256 前 16 位。顶层另有 ' + code('component') + '（' + code(component.path) + ' 的行数/字节/sha256 前 16 位，当前 ' + component.lines + ' 行 / ' + component.bytes + ' 字节 / ' + code(component.sha256) + '）、' + code('fixtures') + '（每个 html 的 sha256 与行数）、' + code('browser') + '、' + code('runtimeErrors') + ' 与 ' + code('notRun') + '。');
+  lines.push(code('preview-validation.json') + ' 由脚本直接写出，记录每例的 ' + code('page') + '/' + code('theme') + '/' + code('width') + '/' + code('height') + '/' + code('mainWidth') + '、实测 ' + code('rootWidth') + '/' + code('rootHeight') + '/' + code('rootPadding') + '/' + code('rootDisplay') + '/' + code('rootOverflowY') + '/' + code('rootScrollable') + '、' + code('narrowApplied') + '/' + code('narrowPadding') + '、' + code('groups') + '/' + code('groupTitles') + '/' + code('rows') + '/' + code('visibleRows') + '/' + code('cardsWithDetail') + '、' + code('rowLayout') + '/' + code('rowWidth') + '、' + code('filters') + '（数量/占用行数/各宽度）、' + code('rowHeads') + '（行头标题与徽章是否同行）、' + code('overflow') + '/' + code('rootOverflow') + '/' + code('clippedRows') + '/' + code('clampedPreviews') + '/' + code('overflowingText') + '、' + code('emptyText') + '、' + code('focusTargets') + '/' + code('focused') + '/' + code('statusBadges') + '/' + code('nonRowButtons') + '、通用 7 项 ' + code('checks') + '（' + code('board-authority') + ' 两例另含 ' + code('authorityStatusBadges') + '/' + code('noAuthorityControls') + '）与 ' + code('verdict') + '/' + code('failedChecks') + '/' + code('runtimeErrors') + '，以及截图路径/字节数/sha256 前 16 位。顶层另有 ' + code('component') + '（' + code(component.path) + ' 的行数/字节/sha256 前 16 位，当前 ' + component.lines + ' 行 / ' + component.bytes + ' 字节 / ' + code(component.sha256) + '）、' + code('fixtures') + '（每个 html 的 sha256 与行数）、' + code('browser') + '、' + code('runtimeErrors') + ' 与 ' + code('notRun') + '。');
   lines.push('');
   const shotBytes = measurements.map((item) => item.screenshot.bytes);
   lines.push('每张截图都记录了字节数（' + Math.min(...shotBytes).toLocaleString('en-US') + '–' + Math.max(...shotBytes).toLocaleString('en-US') + ' 字节）与 sha256；脚本把「截图 < 4KB」判为失败检查项，避免 headless 静默产出空帧时被当成有效证据（本机 Chrome headless 正是 0 字节）。');

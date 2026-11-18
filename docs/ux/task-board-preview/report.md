@@ -2,7 +2,7 @@
 
 实际 `RoomTaskBoard()` + `roomTaskBoardView()` 渲染，`React.useState` 桩只提供初始筛选状态；fixture 由生成器按 `ui/tasks/room-task-board.css` 现算样式、由组件现渲染 DOM，不派发/变更任务，不读写真实消息或房间。截图不等于 DSH 实机操作、真实 Team 执行或成果验收。
 
-19 例覆盖：默认看板（1440 浅色、1024 深浅）、空看板（1440 浅 / 640 深）、少量卡（2 张）、多任务（4 个 Room / 12 张卡 / 含已归档 Room 与未知状态）、长标题长名字、窄窗 640 与 390、容器查询断点两侧 699/698，以及 1440 宽窗口内主区只有 640px 的用例。全部 19 例 `overflow:false`、`rootOverflow:false`、`clippedRows:0`、`overflowingText:0`、`runtimeErrors:0`；结论 **PASS 19 / 19**，无 FAIL。
+21 例覆盖：默认看板（1440 浅色、1024 深浅）、空看板（1440 浅 / 640 深）、少量卡（2 张）、多任务（4 个 Room / 12 张卡 / 含已归档 Room 与未知状态）、长标题长名字、窄窗 640 与 390、容器查询断点两侧 699/698、1440 宽窗口内主区只有 640px 的用例，以及 A11/A12 只读权限样本（用既有 `task.status` 注入 `uncertain/planned/review/accepted/succeeded`，一律回退为「未知状态 · 原值」，无派发/批准/合并/验收/重试控件）。全部 21 例 `overflow:false`、`rootOverflow:false`、`clippedRows:0`、`overflowingText:0`、`runtimeErrors:0`；结论 **PASS 21 / 21**，无 FAIL。
 
 ## 重新生成
 
@@ -12,7 +12,7 @@ node scripts/task-board-preview.mjs
 
 脚本做两件事，都不依赖人工：
 
-1. 读 `ui/tasks/room-task-board.css`（断言首行以 `.lm-roomTaskBoard{` 开头），把每个 fixture 的组件样式段整体重写，再用真实的 `RoomTaskBoard` 重新渲染 <main> 里的 DOM（`board.html`、`board-empty.html`、`board-few.html`、`board-many.html`、`board-long.html`、`index.html`；`index.html` 是目录入口，与 `board.html` 逐字节相同）。手写的主题变量/外壳样式保留在组件段之前，以 `/* @component:ui/tasks/room-task-board.css */` 哨兵标记边界，因此重复运行幂等：连跑两次，5 个 fixture、`index.html` 与 `preview-validation.json` 的 sha256 完全一致。
+1. 读 `ui/tasks/room-task-board.css`（断言首行以 `.lm-roomTaskBoard{` 开头），把每个 fixture 的组件样式段整体重写，再用真实的 `RoomTaskBoard` 重新渲染 <main> 里的 DOM（`board.html`、`board-empty.html`、`board-few.html`、`board-many.html`、`board-long.html`、`board-authority.html`、`index.html`；`index.html` 是目录入口，与 `board.html` 逐字节相同）。手写的主题变量/外壳样式保留在组件段之前，以 `/* @component:ui/tasks/room-task-board.css */` 哨兵标记边界，因此重复运行幂等：连跑两次，6 个 fixture、`index.html` 与 `preview-validation.json` 的 sha256 完全一致。
 2. 用本机 Edge（`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`，headless=new + CDP）逐例设置视口与 `prefers-color-scheme`，实测几何、截 PNG、抓 `Runtime.exceptionThrown`/`console.error`/`Log.entryAdded`。找不到浏览器时只刷新 fixture 并明确退出，不写测量值、不碰截图——本机 Chrome headless 输出 0 字节，所以探测列表里只留 Edge 与常见 Chromium 路径。
 
 本目录先前的问题正是这个脚本要根治的：`preview-validation.json` 每例只有 6 个字段且 `rows` 恒为 0（看板明明渲染 6 张卡），`report.md` 里没有生成器也没有重跑命令。inbox 目录踩过同类坑——组件从 `@media` 换成 `@container` 后 fixture 的 CSS 停在旧版本，640px 那张「窄窗」其实还是双栏。现在样式和 DOM 都从组件现算，不可能再滞后。
@@ -42,8 +42,14 @@ node scripts/task-board-preview.mjs
 | `board-long-1024-light-default` | 1024×768 | light | 1024px | 976px | 24px | 宽 | 3 | 3(3) | 无 | 0 | 0 | PASS |
 | `board-long-640-dark-narrow` | 640×768 | dark | 640px | 608px | 16px | 窄 | 3 | 3(3) | 无 | 0 | 0 | PASS |
 | `board-long-390-light-narrow` | 390×780 | light | 390px | 358px | 16px | 窄 | 3 | 3(2) | 无 | 0 | 0 | PASS |
+| `board-authority-1440-light-default` | 1440×900 | light | 1440px | 1392px | 24px | 宽 | 1 | 5(5) | 无 | 0 | 0 | PASS |
+| `board-authority-1024-dark-default` | 1024×768 | dark | 1024px | 976px | 24px | 宽 | 1 | 5(5) | 无 | 0 | 0 | PASS |
 
 空看板实测空态文案为「当前没有房间任务」（`model.counts.all === 0` 分支），`groups:0`。`board-many` 的 12 张卡分布在 5 个状态组（待开始/进行中/受阻/已完成/未知状态），已归档 Room 保留但带「已归档」标注，`future`/`merged` 状态渲染成「未知状态 · 原值」而不是被吞掉。`board-long` 例中 390px 宽下 2/3 个行头让状态徽章换行到标题下方，且有 1 处卡片详情被 `-webkit-line-clamp:2` 截到两行——都是样式表里写明的设计（`ui/tasks/room-task-board.css:8` 的限制、行头 `flex-wrap:wrap`），不是内容被压坏：`overflowingText:0` 表示没有文本在单行内被切掉。
+
+## A11/A12 只读展示取证
+
+只看板的**展示半**可以取证，状态机/后端/实机半在下方 `明确 NOT RUN` 与 `docs/ux/task-board-preview/a11-a12-evidence.md` 逐条列明。`board-authority` 只使用既有 `task.status` 自由文本字段（没有新增组件状态、没有新增审批/评审/连通性字段）注入 `uncertain`/`planned`/`review`/`accepted`/`succeeded`，依赖既有 unknown 回退渲染成「未知状态 · 原值」。两例实测 `authorityStatusBadges`=true、`noAuthorityControls`=true：5 张卡全落在唯一「未知状态」组、徽章保留原值且没有任何状态显示成已完成/已验收，非行按钮只有「刷新」，没有派发/批准/合并/验收/重试控件。字段级 `scripts/room-task-board.test.mjs` 另有两条断言锁定同一口径。Leader 连通性、自动重试/自动推进、后端二次校验与真实审批/评审流程**均 NOT RUN**，不得据此把 A11/A12 记为通过。
 
 ## 断点与容器查询
 
@@ -67,20 +73,24 @@ node scripts/task-board-preview.mjs
 - 服务端对已删除房间/未知状态的裁剪：fixture 由 roomTaskBoardView 本地生成，服务端路径 NOT RUN。
 - 筛选与点击交互：由 scripts/room-task-board.test.mjs 覆盖，截图不证明交互，交互 NOT RUN。
 - 键盘 focus-visible 真实 Tab 走查：程序化 focus() 不触发 :focus-visible，计算 outline 仍为 none，NOT RUN。
+- A11 Leader 不可达（连通性语义）：只读 Room 任务投影没有 leader / 连通性字段（ui/models/room-task-board.mjs 只消费 task.status / assignee / room / lifecycle 等既有字段），无法在 fixture 中构造真实 Leader 断网状态；仅有 uncertain 任务经既有 unknown 回退渲染为「未知状态 · uncertain」的字段级证据。真实 Leader 断网与其状态机语义 NOT RUN。
+- A11 不自动重试 / 任务停止自动推进：属 Team 状态机行为，看板不渲染也不控制，静止截图无法观察；只能由 scripts/team-coordinator.test.mjs 的 L3 断言覆盖，实机 UI NOT RUN。
+- A12 后端二次验证拒绝：看板没有任何派发/批准/合并/验收控件，但「按钮消失 ≠ 权限生效」；需要真实后端返回拒绝响应才能验证，静态取证 NOT RUN。
+- A12 计划未批准 / Review 未通过的真实流程态：看板不建模审批/评审状态，本目录仅用既有 task.status 字段注入样本值验证只读回退（一律显示「未知状态 · 原值」），真实 Team/M6 审批与评审流程 NOT RUN。
 
 `board-1440-light-focus` 用程序化 `input.focus()` 只验证了焦点能落到看板内（<input>，计算样式 `outline` 仍为 none），因为 `:focus-visible`（`:9`）只匹配键盘发起的焦点。真实 Tab 走查未做。
 
 ## 数据
 
-`preview-validation.json` 由脚本直接写出，记录每例的 `page`/`theme`/`width`/`height`/`mainWidth`、实测 `rootWidth`/`rootHeight`/`rootPadding`/`rootDisplay`/`rootOverflowY`/`rootScrollable`、`narrowApplied`/`narrowPadding`、`groups`/`groupTitles`/`rows`/`visibleRows`/`cardsWithDetail`、`rowLayout`/`rowWidth`、`filters`（数量/占用行数/各宽度）、`rowHeads`（行头标题与徽章是否同行）、`overflow`/`rootOverflow`/`clippedRows`/`clampedPreviews`/`overflowingText`、`emptyText`、`focusTargets`/`focused`、7 项 `checks` 与 `verdict`/`failedChecks`/`runtimeErrors`，以及截图路径/字节数/sha256 前 16 位。顶层另有 `component`（`ui/tasks/room-task-board.css` 的行数/字节/sha256 前 16 位，当前 13 行 / 2059 字节 / `3f972cc29078841e`）、`fixtures`（每个 html 的 sha256 与行数）、`browser`、`runtimeErrors` 与 `notRun`。
+`preview-validation.json` 由脚本直接写出，记录每例的 `page`/`theme`/`width`/`height`/`mainWidth`、实测 `rootWidth`/`rootHeight`/`rootPadding`/`rootDisplay`/`rootOverflowY`/`rootScrollable`、`narrowApplied`/`narrowPadding`、`groups`/`groupTitles`/`rows`/`visibleRows`/`cardsWithDetail`、`rowLayout`/`rowWidth`、`filters`（数量/占用行数/各宽度）、`rowHeads`（行头标题与徽章是否同行）、`overflow`/`rootOverflow`/`clippedRows`/`clampedPreviews`/`overflowingText`、`emptyText`、`focusTargets`/`focused`/`statusBadges`/`nonRowButtons`、通用 7 项 `checks`（`board-authority` 两例另含 `authorityStatusBadges`/`noAuthorityControls`）与 `verdict`/`failedChecks`/`runtimeErrors`，以及截图路径/字节数/sha256 前 16 位。顶层另有 `component`（`ui/tasks/room-task-board.css` 的行数/字节/sha256 前 16 位，当前 13 行 / 2059 字节 / `3f972cc29078841e`）、`fixtures`（每个 html 的 sha256 与行数）、`browser`、`runtimeErrors` 与 `notRun`。
 
-每张截图都记录了字节数（21,611–86,815 字节）与 sha256；脚本把「截图 < 4KB」判为失败检查项，避免 headless 静默产出空帧时被当成有效证据（本机 Chrome headless 正是 0 字节）。
+每张截图都记录了字节数（21,611–87,395 字节）与 sha256；脚本把「截图 < 4KB」判为失败检查项，避免 headless 静默产出空帧时被当成有效证据（本机 Chrome headless 正是 0 字节）。
 
 ## 改了哪些文件
 
 - 生成器 `scripts/task-board-preview.mjs`（含本文）：读组件 CSS、现渲染 DOM、无头浏览器实测、写 JSON 与本报告。
-- fixture `board.html`、`board-empty.html`、`board-few.html`、`board-many.html`、`board-long.html`、`index.html`（组件样式段 + 组件渲染的 DOM）。
-- `docs/ux/task-board-preview/screenshots/*.png`（19 张）。
+- fixture `board.html`、`board-empty.html`、`board-few.html`、`board-many.html`、`board-long.html`、`board-authority.html`、`index.html`（组件样式段 + 组件渲染的 DOM）。
+- `docs/ux/task-board-preview/screenshots/*.png`（21 张）。
 - `docs/ux/task-board-preview/preview-validation.json`、`docs/ux/task-board-preview/report.md`。
 
 组件侧改动只有 `ui/tasks/room-task-board.css` 末尾的容器查询三行（`:10`–`:13`）；生成器不修改 `lib/`、`client.js`、`index.js`、`package.json`、`package-lock.json` 或任何测试，也不执行任何 git 写操作。
