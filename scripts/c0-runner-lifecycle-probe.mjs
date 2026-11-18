@@ -10,7 +10,7 @@ try {resolve.resolve('@deepseek-ai/dsh/package.json');} catch {
 }
 const fromHost=createRequire(resolve.resolve('@deepseek-ai/dsh/package.json'));
 const {Context}=await import(pathToFileURL(fromHost.resolve('@deepseek-ai/cordis')).href);
-import {mkdtemp,mkdir,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 
@@ -72,6 +72,7 @@ if(stage==='create'||stage==='resume'){
     await handle.agent.whenIdle();
     if(stage==='create'){
       await verifyCancellation(handle.agent);
+      await writeFile(join(cwd,'tracked.txt'),'worker edit\n');
       handle.agent.session.append('session/title',{title:'Probe',messageSeqs:[],source:{kind:'user'}});
       assert.equal(await ctx.sessions.flush(handle.agent.session),true);
     }
@@ -84,11 +85,29 @@ if(stage==='create'||stage==='resume'){
 }else{
   const directory=await mkdtemp(join(tmpdir(),'dsh-runner-lifecycle-'));
   try{
-    await mkdir(join(directory,'workspace'));
+    const repo=join(directory,'source');
+    const workspace=join(directory,'workspace');
+    const hooks=join(directory,'empty-hooks');
+    await Promise.all([mkdir(repo),mkdir(hooks)]);
+    const git=(cwd,...args)=>execFileSync('git',args,{cwd,encoding:'utf8',timeout:15000,windowsHide:true}).trim();
+    git(repo,'init','--quiet');
+    const tracked=join(repo,'tracked.txt');
+    await writeFile(tracked,'baseline\n');
+    git(repo,'add','--','tracked.txt');
+    git(repo,'-c','user.name=Runner Probe','-c','user.email=runner-probe@example.invalid','-c','commit.gpgsign=false','-c',`core.hooksPath=${hooks}`,'commit','--quiet','-m','baseline');
+    const base=git(repo,'rev-parse','HEAD');
+    await writeFile(tracked,'source edit\n');
+    git(repo,'worktree','add','--quiet','--detach',workspace,base);
+    assert.equal(git(workspace,'rev-parse','HEAD'),base);
+    assert.match(await readFile(join(workspace,'tracked.txt'),'utf8'),/^baseline\r?\n$/);
     for(const phase of ['create','resume']){
       execFileSync(process.execPath,[fileURLToPath(import.meta.url),phase,directory],{timeout:15000,windowsHide:true});
     }
-    console.log(JSON.stringify({status:'PASS',scope:'installed DSH services in two isolated processes',cases:['create and release','flush and resume with same cwd','empty session cannot resume','maintenance cancellation and separate quiescence'],notRun:['model turn cancellation','external process cancellation','crash during wake','worktree isolation','multi-host']},null,2));
+    assert.equal(await readFile(tracked,'utf8'),'source edit\n');
+    assert.equal(await readFile(join(workspace,'tracked.txt'),'utf8'),'worker edit\n');
+    assert.equal(git(repo,'rev-parse','HEAD'),base);
+    assert.equal(git(workspace,'rev-parse','HEAD'),base);
+    console.log(JSON.stringify({status:'PASS',scope:'installed DSH services in two isolated processes',cases:['create and release','flush and resume with same cwd','empty session cannot resume','maintenance cancellation and separate quiescence','detached worktree retains pinned base and separate working files'],notRun:['model turn cancellation','external process cancellation','crash during wake','tool filesystem confinement','multi-host']},null,2));
   }finally{
     await rm(directory,{recursive:true,force:true});
   }

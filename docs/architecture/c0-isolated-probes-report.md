@@ -31,3 +31,5 @@ Runner 恢复不能把 create 成功或内存目录可见当成持久化证据�
 维护任务取消补验：真实 DSH cancel 立即设置维护任务的 AbortSignal。任务刻意等待本地闸门时，whenIdle 仍未完成。释放闸门后任务以相同取消原因退出，whenIdle 才完成。Runner 应分别记录取消请求和宿主活动停止的证据。模型 turn 和子进程停机不在此次探针覆盖范围内。
 
 Coordinator 进程退出补验：测试子进程通过实际 TeamStore 写入启动标记，在 wake 回调产生一条临时记录后以退出码 73 退出，跳过正常关闭和 wake 结果写入。父进程读回 starting；新进程执行 recover 和 tick 后，磁盘记录是 uncertain，临时唤醒记录仍仅一条。该测试覆盖 Coordinator 与账本的重启行为，wake 使用本地替身。真实 DSH 模型任务、外部进程和物理双机仍需验证。
+
+Worktree 补验：探针创建独立临时仓库，将 Worker 工作树以 detached HEAD 固定在指定提交，然后以该目录创建并恢复 DSH Session。原工作树先写入未提交改动，探针进程在 Worker 工作树编辑同名文件。两个目录各自保留内容，HEAD 均保持基准提交。此项验证 Git 工作文件分离与 Session cwd 持久化。工具能否访问工作树之外的路径、可信仓库绑定和自动资源回收仍待验证。
