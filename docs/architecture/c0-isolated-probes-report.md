@@ -29,3 +29,5 @@
 Runner 恢复不能把 create 成功或内存目录可见当成持久化证据。空 Session 缺失也不能证明 Worker 的所有外部副作用均未发生。保留现有 uncertain 和人工核对规则。运行中取消、唤醒崩溃窗口、工作树隔离、真实浏览器撤权和多机仍待验证。
 
 维护任务取消补验：真实 DSH cancel 立即设置维护任务的 AbortSignal。任务刻意等待本地闸门时，whenIdle 仍未完成。释放闸门后任务以相同取消原因退出，whenIdle 才完成。Runner 应分别记录取消请求和宿主活动停止的证据。模型 turn 和子进程停机不在此次探针覆盖范围内。
+
+Coordinator 进程退出补验：测试子进程通过实际 TeamStore 写入启动标记，在 wake 回调产生一条临时记录后以退出码 73 退出，跳过正常关闭和 wake 结果写入。父进程读回 starting；新进程执行 recover 和 tick 后，磁盘记录是 uncertain，临时唤醒记录仍仅一条。该测试覆盖 Coordinator 与账本的重启行为，wake 使用本地替身。真实 DSH 模型任务、外部进程和物理双机仍需验证。

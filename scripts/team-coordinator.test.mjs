@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openTeamStore } from '../lib/team-store.mjs';
@@ -307,4 +308,36 @@ test('an uncertain execution preserves its first submitted result', async t => {
   await assert.rejects(f.nodes.a.handle({operation:'result',body:{...descriptor,actorKey:'b/worker',seq:3,result:replacement}}),{code:'RESULT_ALREADY_RECORDED'});
   assert.deepEqual(f.a.read().executions.e1.result,result);
   assert.deepEqual(f.b.read().workerExecutions.e1.result,result);
+});
+
+test('process exit after the Worker side effect leaves one durable attempt and does not wake again', async t => {
+  const f = await fixture(t);
+  await f.dispatch();
+  const directory = join(f.directory, 'b');
+  const marker = join(f.directory, 'wake-count');
+  await f.nodes.b.close();
+
+  const mod = name => JSON.stringify(new URL('../lib/'+name,import.meta.url).href);
+  const script = [
+    'import { appendFile } from "node:fs/promises";',
+    'import { openTeamStore } from '+mod('team-store.mjs')+';',
+    'import { TeamCoordinator } from '+mod('team-coordinator.mjs')+';',
+    'const [directory,marker,stage]=process.argv.slice(1);',
+    'const store=await openTeamStore({directory});',
+    'const coordinator=new TeamCoordinator({nodeId:"b",store,authorize:()=>true,',
+    'getRoom:()=>({leader:{key:"a/leader"},members:[{key:"b/worker"}]}),',
+    'send:()=>({leaseMs:90000}),wake:async()=>{await appendFile(marker,"wake\\n");process.exit(73);}});',
+    'if(stage==="recover")await coordinator.recover();',
+    'await coordinator.tick();await coordinator.close();',
+  ].join('\n');
+  const run = stage => spawnSync(process.execPath,['--input-type=module','-e',script,directory,marker,stage],{encoding:'utf8',timeout:15000,windowsHide:true});
+  const crashed=run('start');
+  assert.equal(crashed.status,73,crashed.stderr||crashed.error?.message);
+  const before=(await openTeamStore({directory})).read().workerExecutions.e1;
+  assert.equal(before.state,'starting');
+  assert.equal(before.started,true);
+  const recovered=run('recover');
+  assert.equal(recovered.status,0,recovered.stderr||recovered.error?.message);
+  assert.equal(await readFile(marker,'utf8'),'wake\n');
+  assert.equal((await openTeamStore({directory})).read().workerExecutions.e1.state,'uncertain');
 });
