@@ -78,6 +78,21 @@ try {
   assert.deepEqual(audit.deliveries[0].packet.taskResultRefs, expected.map(({executionId,resultHash,reviewStatus})=>({executionId,resultHash,reviewStatus})));
   await b.teamReport({sessionId:'worker-1',executionId:followup.executionId,status:'succeeded',summary:'Reviewed'});
   console.log('Team HTTP smoke: pinned results survived transfer, worker input and delivery audit.');
+  const registry = b.agents;
+  const originalGet = registry.get;
+  try {
+    const started = await b.team.wake({
+      executionId:'test-session-replacement', sessionId:'worker-1', task:executions[0],
+      canStart:async()=>{
+        registry.get = id => id === 'worker-1' ? {id,status:'idle',followup:()=>wakes.push({id})} : originalGet(id);
+        return true;
+      },
+    });
+    assert.equal(started,false);
+    assert.equal(wakes.length,3);
+  } finally {
+    registry.get = originalGet;
+  }
   b.config.teamAuthorizations = [];
   const denied = await a.teamDispatch({ roomId: room.id, sessionId: 'leader', workerKey: `${b.nodeId}/worker-1`, title: 'Revoked authorization' });
   await b.team.tick();
