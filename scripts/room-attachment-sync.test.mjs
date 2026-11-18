@@ -70,6 +70,31 @@ function makeNode(context, name, port) {
     },
     log: () => {},
   });
+  // UDP broadcast discovery is not a deterministic test substrate on Windows:
+  // with several sockets bound to the same port, a node can hear stale peers
+  // yet never hear its room Leader, so resolvePeers(leader) returns empty and
+  // an otherwise valid send fails with LEADER_UNAVAILABLE. This suite tests
+  // attachment sync, not discovery, so resolve peers from the set of nodes the
+  // test actually started. Only address resolution is made deterministic —
+  // every prepare/prepare-ACK/commit and blob transfer still runs over real
+  // HTTP and is verified end to end (same pattern as room-attachments.test.mjs).
+  const livePeers = () => (context.meshNodes ?? []).filter(
+    (other) => other !== node && !other.closed && other.server,
+  );
+  const view = (peer) => ({
+    nodeId: peer.nodeId,
+    name: peer.identity?.name ?? peer.nodeId,
+    address: '127.0.0.1',
+    port: peer.server.port,
+    httpPort: peer.server.port,
+    ageSeconds: 0,
+  });
+  node.resolvePeers = (id) => {
+    const peers = livePeers();
+    if (id === '*' || id === '') return peers.map(view);
+    const key = String(id).toLowerCase();
+    return peers.filter((peer) => peer.nodeId === id || (peer.identity?.name ?? '').toLowerCase() === key).map(view);
+  };
   // home() owns teardown: nodes must flush while the isolated DSH_HOME exists.
   (context.meshNodes ??= []).push(node);
   return node;
@@ -79,6 +104,19 @@ function makeNode(context, name, port) {
 async function startNode(context, name, port, wanted = 1) {
   const node = makeNode(context, name, port);
   await node.start();
+  // `syncRooms()` with no explicit targets reads discovery.list(), so override
+  // that view as well: a join must push its membership to the Leader and a late
+  // member must pull the Leader's state without depending on UDP broadcasts.
+  if (node.discovery) {
+    node.discovery.list = () => node.resolvePeers('*').map((peer) => ({
+      nodeId: peer.nodeId,
+      name: peer.name,
+      address: peer.address,
+      httpPort: peer.httpPort,
+      lastSeen: Date.now(),
+      firstSeen: 0,
+    }));
+  }
   if (wanted > 0) await until(() => node.peers().length >= wanted, `${name} to discover peers`);
   return node;
 }
@@ -122,10 +160,12 @@ async function roomWithLeader(t) {
   const b = await startNode(t, 'Leader', 39_201, 0);
   const { room } = await b.createRoom({ name: 'History', sessionId: 'human' });
   const a = await startNode(t, 'Sender', 39_202);
-  await a.syncRooms();
+  // Address the known Leader explicitly: a broadcast-only syncRooms() would
+  // depend on the same flaky discovery this suite deliberately avoids.
+  await a.syncRooms([b.nodeId]);
   await until(() => a.listRooms({ all: true }).some((row) => row.id === room.id), 'sender to replicate the room');
   await a.joinRoom({ room: room.id, sessionId: 'human' });
-  await b.syncRooms();
+  await b.syncRooms([a.nodeId]);
   await until(() => b.roomDetail({ room: room.id }).room.members.some((m) => m.nodeId === a.nodeId), 'leader to learn the sender');
   return { a, b, room };
 }
@@ -144,7 +184,7 @@ test('a late member obtains committed history through the product join path and 
   await until(() => b.peers().every((peer) => peer.nodeId !== a.nodeId), 'leader to see the sender leave', 20_000).catch(() => {});
 
   const c = await startNode(t, 'Late', 39_203);
-  await c.syncRooms();
+  await c.syncRooms([b.nodeId]);
   await until(() => c.listRooms({ all: true }).some((row) => row.id === room.id), 'late node to replicate the room');
   // Product entry point only — no ledger is touched by the test.
   await c.joinRoom({ room: room.id, sessionId: 'human' });
@@ -273,7 +313,7 @@ test('a synced reference with no reachable holder fails clearly instead of prete
   await a.close();
 
   const c = await startNode(t, 'Late', 39_205, 1);
-  await c.syncRooms();
+  await c.syncRooms([b.nodeId]);
   await until(() => c.listRooms({ all: true }).some((row) => row.id === room.id), 'late node to replicate the room');
   await c.joinRoom({ room: room.id, sessionId: 'human' });
   await until(() => c.roomDetail({ room: room.id }).messages.some((m) => m.id === 'leader-only'), 'late node to import history');
@@ -294,7 +334,7 @@ test('importing history keeps read state and never wakes an agent', async (t) =>
   await a.sayInRoom({ room: room.id, sessionId: 'human', text: 'state', attachments: [ref], messageId: 'state-1' });
 
   const c = await startNode(t, 'Late', 39_206);
-  await c.syncRooms();
+  await c.syncRooms([b.nodeId]);
   await until(() => c.listRooms({ all: true }).some((row) => row.id === room.id), 'late node to replicate the room');
   await c.joinRoom({ room: room.id, sessionId: 'human' });
   await until(() => c.roomDetail({ room: room.id }).messages.some((m) => m.id === 'state-1'), 'history import');
