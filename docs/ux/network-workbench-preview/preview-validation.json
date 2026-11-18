@@ -29,6 +29,10 @@
       "compactNotice": "none",
       "summaryColumns": 3,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 1,
@@ -95,6 +99,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -138,6 +148,12 @@
       "compactNotice": "none",
       "summaryColumns": 3,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 3,
@@ -228,6 +244,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -271,6 +293,12 @@
       "compactNotice": "block",
       "summaryColumns": 1,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 3,
@@ -361,6 +389,12 @@
           "actual": "block"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -371,6 +405,151 @@
           "ok": true,
           "expected": "grid/static/edges-hidden",
           "actual": "grid/static/edges-none"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "name": "three-aged-1440-light",
+      "page": "three-aged.html",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "ready": "complete",
+      "windowWidth": 1440,
+      "windowHeight": 900,
+      "rootWidth": 1440,
+      "rootHeight": 864,
+      "rootScrollWidth": 1440,
+      "rootClientWidth": 1440,
+      "layoutDisplay": "grid",
+      "layoutColumns": 2,
+      "layoutTemplate": "1092px 280px",
+      "primaryWidth": 1092,
+      "detailWidth": 280,
+      "detailDisplay": "block",
+      "topologyDisplay": "block",
+      "topologyHeight": 560,
+      "topologyNodePosition": "absolute",
+      "edgesDisplay": "block",
+      "spokes": 2,
+      "listDisplay": "none",
+      "listColumns": 0,
+      "compactNotice": "none",
+      "summaryColumns": 3,
+      "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 86400 秒前观测",
+        "约 604800 秒前观测"
+      ],
+      "overflow": false,
+      "rootOverflow": false,
+      "nodes": 3,
+      "visibleNodes": 3,
+      "clippedNodes": 0,
+      "clippedNames": 0,
+      "duplicateNames": [
+        "Reviewer 所在设备"
+      ],
+      "collisions": [],
+      "rects": [
+        {
+          "index": 0,
+          "name": "建哥的工作站",
+          "id": "node-0-f3a0b2",
+          "x": 495,
+          "y": 494,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 1,
+          "name": "Reviewer 所在设备",
+          "id": "node-1-f3a0b2",
+          "x": 495,
+          "y": 293,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        },
+        {
+          "index": 2,
+          "name": "Reviewer 所在设备",
+          "id": "node-2-f3a0b2",
+          "x": 495,
+          "y": 695,
+          "w": 150,
+          "h": 98,
+          "nameClipped": false,
+          "insideRoot": true
+        }
+      ],
+      "buttons": [
+        {
+          "label": "刷新",
+          "width": 54,
+          "overflow": false
+        }
+      ],
+      "checks": [
+        {
+          "name": "page-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "workbench-horizontal-overflow",
+          "ok": true,
+          "expected": "false",
+          "actual": "false"
+        },
+        {
+          "name": "nodes-rendered",
+          "ok": true,
+          "expected": "3",
+          "actual": "3"
+        },
+        {
+          "name": "node-collisions",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "layout-columns",
+          "ok": true,
+          "expected": "2",
+          "actual": "2"
+        },
+        {
+          "name": "compact-notice",
+          "ok": true,
+          "expected": "none",
+          "actual": "none"
+        },
+        {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "runtime-errors",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
+          "name": "topology-layout",
+          "ok": true,
+          "expected": "absolute/edges-visible",
+          "actual": "block/absolute/edges-block"
         }
       ],
       "status": "PASS"
@@ -404,6 +583,15 @@
       "compactNotice": "none",
       "summaryColumns": 3,
       "staleVisible": true,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "数量未核对",
+        "当前可见性未核对",
+        "数量未核对",
+        "当前可见性未核对",
+        "数量未核对"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 3,
@@ -494,6 +682,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -537,6 +731,21 @@
       "compactNotice": "none",
       "summaryColumns": 3,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测",
+        "约 5 秒前观测",
+        "目录会话未核对",
+        "约 6 秒前观测",
+        "目录会话未核对",
+        "约 7 秒前观测",
+        "目录会话未核对",
+        "约 8 秒前观测",
+        "目录会话未核对",
+        "约 9 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 10,
@@ -704,6 +913,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -747,6 +962,21 @@
       "compactNotice": "none",
       "summaryColumns": 3,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测",
+        "约 5 秒前观测",
+        "目录会话未核对",
+        "约 6 秒前观测",
+        "目录会话未核对",
+        "约 7 秒前观测",
+        "目录会话未核对",
+        "约 8 秒前观测",
+        "目录会话未核对",
+        "约 9 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 10,
@@ -914,6 +1144,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -957,6 +1193,21 @@
       "compactNotice": "block",
       "summaryColumns": 1,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测",
+        "约 5 秒前观测",
+        "目录会话未核对",
+        "约 6 秒前观测",
+        "目录会话未核对",
+        "约 7 秒前观测",
+        "目录会话未核对",
+        "约 8 秒前观测",
+        "目录会话未核对",
+        "约 9 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 10,
@@ -1124,6 +1375,12 @@
           "actual": "block"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -1167,6 +1424,21 @@
       "compactNotice": "block",
       "summaryColumns": 3,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测",
+        "约 5 秒前观测",
+        "目录会话未核对",
+        "约 6 秒前观测",
+        "目录会话未核对",
+        "约 7 秒前观测",
+        "目录会话未核对",
+        "约 8 秒前观测",
+        "目录会话未核对",
+        "约 9 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 10,
@@ -1334,6 +1606,12 @@
           "actual": "block"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -1377,6 +1655,21 @@
       "compactNotice": "none",
       "summaryColumns": 3,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测",
+        "约 5 秒前观测",
+        "目录会话未核对",
+        "约 6 秒前观测",
+        "目录会话未核对",
+        "约 7 秒前观测",
+        "目录会话未核对",
+        "约 8 秒前观测",
+        "目录会话未核对",
+        "约 9 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 30,
@@ -1764,6 +2057,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -1801,6 +2100,21 @@
       "compactNotice": "none",
       "summaryColumns": 3,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测",
+        "约 5 秒前观测",
+        "目录会话未核对",
+        "约 6 秒前观测",
+        "目录会话未核对",
+        "约 7 秒前观测",
+        "目录会话未核对",
+        "约 8 秒前观测",
+        "目录会话未核对",
+        "约 9 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 30,
@@ -2188,6 +2502,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -2225,6 +2545,21 @@
       "compactNotice": "none",
       "summaryColumns": 1,
       "staleVisible": false,
+      "offlineClaims": 0,
+      "observationFacts": [
+        "本机",
+        "约 3 秒前观测",
+        "约 4 秒前观测",
+        "约 5 秒前观测",
+        "目录会话未核对",
+        "约 6 秒前观测",
+        "目录会话未核对",
+        "约 7 秒前观测",
+        "目录会话未核对",
+        "约 8 秒前观测",
+        "目录会话未核对",
+        "约 9 秒前观测"
+      ],
       "overflow": false,
       "rootOverflow": false,
       "nodes": 30,
@@ -2612,6 +2947,12 @@
           "actual": "none"
         },
         {
+          "name": "no-offline-verdict",
+          "ok": true,
+          "expected": "0",
+          "actual": "0"
+        },
+        {
           "name": "runtime-errors",
           "ok": true,
           "expected": "0",
@@ -2635,6 +2976,11 @@
     },
     {
       "page": "three.html",
+      "rewritten": false,
+      "drifted": false
+    },
+    {
+      "page": "three-aged.html",
       "rewritten": false,
       "drifted": false
     },

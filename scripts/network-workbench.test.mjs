@@ -23,3 +23,47 @@ test('local running count stays unknown unless every catalogue state is explicit
  assert.equal(project([]).running,0);assert.equal(project([{status:'idle'},{status:'running'}]).running,1);
 });
 test('topology exposes narrow-container arrangement notice without relying on window geometry',()=>{const tree=app(model(10)).render();assert.equal(by(tree,'lm-networkCompactNotice').length,1);assert.match(text(by(tree,'lm-networkCompactNotice')[0]),/小窗.*节点排列/);assert.equal(by(tree,'lm-networkNode').length,10);});
+
+// A10 state evidence. The discovery protocol has no authoritative offline signal:
+// a peer carries only lastSeen-derived ageSeconds, and `stale` means a snapshot
+// read failed so the previous data is retained. These pin the honest wording so
+// missing/stale/aged data can never be presented as a definite offline device.
+test('an old observation stays an observation and never becomes an offline verdict',()=>{
+ const value=model(3);value.nodes[1].ageSeconds=86400;value.nodes[2].ageSeconds=604800;
+ const tree=app(value).render();
+ assert.match(text(tree),/约 86400 秒前观测/);
+ assert.match(text(tree),/约 604800 秒前观测/);
+ assert.match(text(tree),/发现节点 2/);
+ assert.doesNotMatch(text(tree),/离线|offline/i);
+});
+test('a stale snapshot with aged peers explains 未核对 without claiming offline',()=>{
+ const value=model(3);value.stale=true;value.nodes.forEach(n=>{n.ageSeconds=86400;});
+ const tree=app(value).render();
+ assert.match(text(tree),/快照已过期/);
+ assert.match(text(tree),/当前可见性未核对/);
+ assert.match(text(tree),/数量未核对/);
+ assert.doesNotMatch(text(tree),/正在运行 1/);
+ assert.doesNotMatch(text(tree),/离线|offline/i);
+});
+test('a missing observation time reads 未知, not offline or a zero-age reading',()=>{
+ const value=model(3);value.nodes[1].ageSeconds=null;value.nodes[2].ageSeconds=undefined;
+ const tree=app(value).render();
+ assert.match(text(tree),/最近观测时间未知/);
+ assert.doesNotMatch(text(tree),/约 0 秒前观测/);
+ assert.doesNotMatch(text(tree),/离线|offline/i);
+});
+test('a partial catalogue leaves remote sessions and execution 未核对, not offline',()=>{
+ const value=model(3);value.nodes.forEach(n=>{if(!n.local){n.sessions=null;n.running=null;}});
+ const a=app(value);let tree=a.render();
+ by(tree,'lm-networkNode')[1].props.onClick();tree=a.render();
+ const detail=text(by(tree,'lm-networkDetail')[0]);
+ assert.match(detail,/目录会话未核对/);
+ assert.match(detail,/远端执行状态未知/);
+ assert.doesNotMatch(text(tree),/离线|offline/i);
+});
+test('a missing peer count reads 未核对 rather than an offline or zero conclusion',()=>{
+ const value=model(3);delete value.peerCount;
+ const tree=app(value).render();
+ assert.match(text(tree),/发现节点 未核对/);
+ assert.doesNotMatch(text(tree),/离线|offline/i);
+});

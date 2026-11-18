@@ -45,8 +45,8 @@ const marker = '.lm-networkWorkbench{flex:1;min-width:0;min-height:0;overflow:au
 if (!componentCss.startsWith(marker)) throw new Error('network stylesheet must start with ' + marker);
 const cssHash = createHash('sha1').update(componentCss).digest('hex');
 
-const fixtures = ['one', 'three', 'three-stale', 'ten', 'ten-narrow', 'thirty'];
-const expectedNodes = { one: 1, three: 3, 'three-stale': 3, ten: 10, 'ten-narrow': 10, thirty: 30 };
+const fixtures = ['one', 'three', 'three-aged', 'three-stale', 'ten', 'ten-narrow', 'thirty'];
+const expectedNodes = { one: 1, three: 3, 'three-aged': 3, 'three-stale': 3, ten: 10, 'ten-narrow': 10, thirty: 30 };
 
 const refreshed = [];
 const drifted = [];
@@ -85,6 +85,7 @@ const cases = [
   { name: 'one-1440-light', page: 'one', width: 1440, height: 900, theme: 'light' },
   { name: 'three-1440-light', page: 'three', width: 1440, height: 900, theme: 'light' },
   { name: 'three-640-light', page: 'three', width: 640, height: 768, theme: 'light' },
+  { name: 'three-aged-1440-light', page: 'three-aged', width: 1440, height: 900, theme: 'light' },
   { name: 'three-stale-1024-dark', page: 'three-stale', width: 1024, height: 768, theme: 'dark' },
   { name: 'ten-1440-light', page: 'ten', width: 1440, height: 900, theme: 'light' },
   { name: 'ten-1024-dark', page: 'ten', width: 1024, height: 768, theme: 'dark' },
@@ -249,6 +250,11 @@ try {
     '    compactNotice: notice ? style(notice).display : "none",',
     '    summaryColumns: tracks(pick(".lm-networkSummary")),',
     '    staleVisible: Boolean(pick(".lm-networkStale")),',
+    // A10 state evidence: the protocol exposes observation age and snapshot
+    // staleness, never an authoritative offline verdict. Count offline language
+    // inside the workbench only, and retain the real wording that is rendered.
+    '    offlineClaims: ((((root && root.textContent) || "").match(/离线|offline/gi) || []).length),',
+    '    observationFacts: [...document.querySelectorAll(".lm-networkNodeFact")].map((element) => (element.textContent || "").trim()).filter((text) => /观测|未核对|本机/.test(text)).slice(0, 12),',
     '    overflow: scrolling.scrollWidth > scrolling.clientWidth,',
     '    rootOverflow: root ? root.scrollWidth > root.clientWidth + 1 : false,',
     '    nodes: rects.length,',
@@ -309,6 +315,7 @@ try {
       { name: 'node-collisions', ok: value.collisions.length === 0, expected: '0', actual: String(value.collisions.length) },
       { name: 'layout-columns', ok: value.layoutColumns === expectedColumns, expected: String(expectedColumns), actual: String(value.layoutColumns) },
       { name: 'compact-notice', ok: value.compactNotice === expectedNotice, expected: expectedNotice, actual: value.compactNotice },
+      { name: 'no-offline-verdict', ok: value.offlineClaims === 0, expected: '0', actual: String(value.offlineClaims) },
       { name: 'runtime-errors', ok: caseErrors.length === 0, expected: '0', actual: String(caseErrors.length) },
     ];
     if (hasTopology) {
@@ -431,6 +438,15 @@ async function writeReport({ measurements, errors, caveat }) {
       lines.push('过期快照用例：' + stale.map((item) => code(item.name)).join('、') + ' 显示 ' + code('lm-networkStale') + ' 提示条，摘要三格改为“未核对”文案而不是实时计数。');
       lines.push('');
     }
+    // The aged fixture is the browser-level counterpart of the L3 invariant:
+    // a large lastSeen age is still reported as an observation, not as offline.
+    const aged = measurements.filter((item) => item.page === 'three-aged.html');
+    if (aged.length) {
+      lines.push('观测时长用例：' + aged.map((item) => code(item.name)).join('、') + ' 注入极端观测时长（远端节点 86400 / 604800 秒，非 ' + code('stale') + '），工作台仍以 ' + code('约 N 秒前观测') + ' 呈现，摘要保持 ' + code('发现节点 2') + '。它压测的是“观测时长再大也不是离线判定”的语义，不是一台真实离线设备。');
+      lines.push('');
+    }
+    lines.push('语义边界断言 ' + code('no-offline-verdict') + '：每例都统计工作台文本里 ' + code('离线|offline') + ' 的出现次数并写入 ' + code('preview-validation.json') + ' 的 ' + code('offlineClaims') + '，实测全为 0；' + code('observationFacts') + ' 保留组件真正渲染的 ' + code('观测/未核对/本机') + ' 文案。协议没有权威离线信号——' + code('lib/discovery.mjs') + ' 只按 ' + code('lastSeen') + ' 做 20 秒 ' + code('PEER_TTL_MS') + ' 静默清理，' + code('ageSeconds') + ' 是观测距今秒数，' + code('stale') + ' 是快照读取失败后沿用旧数据——因此这里证明的是“不把缺失/过期数据谎报成离线”，**不是**“离线检测已通过”。');
+    lines.push('');
     if (errors.length) {
       lines.push('浏览器侧错误：');
       lines.push('');
@@ -442,7 +458,7 @@ async function writeReport({ measurements, errors, caveat }) {
   lines.push('');
   lines.push('- 真实 DSH 宿主内的板块切换、滚动与真实主题变量：证据只渲染组件，不含 App 外壳。');
   lines.push('- 真实双机节点发现、失联与恢复：单机无法复现。' + code('stale') + ' 用例只证明过期快照的文案与排版，不证明失联检测本身。');
-  lines.push('- 离线/offline 设备的专属视觉状态：组件当前没有该状态（DOM 与 CSS 中都没有对应类名），fixture 无法呈现，因此未构造。若组件后续补上，需要同步新增 fixture 并让本脚本纳入。');
+  lines.push('- 离线/offline 设备的专属视觉状态：**保持 NOT RUN**。协议无权威离线信号：' + code('lib/discovery.mjs') + ' 的 ' + code('PEER_TTL_MS=20000') + ' 只把 ' + code('lastSeen') + ' 过旧的节点从发现表移除（启发式静默清理），' + code('peerView.ageSeconds') + ' 是观测距今秒数，' + code('stale') + ' 是快照读取失败后沿用上次成功数据；三者都不能上升为“确定离线”。据此组件不新增 offline 视觉态，以免把缺失或过期数据表达成确定离线。本轮新增的 ' + code('no-offline-verdict') + ' 只证明没有谎报离线，不构成离线判据的通过。');
   lines.push('- 键盘焦点顺序与读屏（NVDA/VoiceOver）验收：未运行。');
   lines.push('- 搜索输入后的过滤、拓扑/列表切换后的重绘：静态快照不含交互，未运行。');
   lines.push('');
@@ -454,7 +470,7 @@ async function writeReport({ measurements, errors, caveat }) {
   lines.push('node scripts/network-workbench-preview.mjs');
   lines.push(fence);
   lines.push('');
-  lines.push('脚本幂等：先把 6 个 fixture 的组件样式段按 ' + code('ui/network/network-workbench.css') + ' 重写（已是最新则不改文件），再用隔离的无头 Chromium（本机为 Edge，headless + CDP）在 1440/1024/640 三档窗口、深/浅色下实测 11 个用例，写出 ' + code('screenshots/*.png') + '、' + code('preview-validation.json') + ' 与本文。若本机找不到浏览器，脚本只刷新 fixture 并明确报告“未测量”，不会写入任何测量数字。');
+  lines.push('脚本幂等：先把 ' + fixtures.length + ' 个 fixture 的组件样式段按 ' + code('ui/network/network-workbench.css') + ' 重写（已是最新则不改文件），再用隔离的无头 Chromium（本机为 Edge，headless + CDP）在 1440/1024/640 三档窗口、深/浅色下实测 ' + measurements.length + ' 个用例，写出 ' + code('screenshots/*.png') + '、' + code('preview-validation.json') + ' 与本文。若本机找不到浏览器，脚本只刷新 fixture 并明确报告“未测量”，不会写入任何测量数字。');
   lines.push('');
   await writeFile(join(out, 'report.md'), lines.join('\n'));
 }
