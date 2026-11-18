@@ -44,3 +44,18 @@ test('enabled Team requires local identity, authorization and matching Room lead
   await node.team.tick();
   await assert.rejects(node.teamDispatch({ roomId: 'room-team', sessionId: 'leader', workerKey: 'remote-node/worker', title: 'Test' }), { code: 'ROOM_CHANGED' });
 });
+
+test('owner overview is scoped to current local human leadership and redacts execution data',async t=>{
+ const node=new MeshNode({config:{teamEnabled:true}});
+ node.started=true;
+ node.identity={nodeId:'node-local'};
+ const room={id:'room-test',leader:{key:'node-local/human'},members:[{key:'node-local/human'}]};
+ node.roomsDoc.rooms[room.id]=room;
+ node.team={store:{read:()=>({teams:{[room.id]:{revision:2,generation:1}},tasks:{a:{roomId:room.id,status:'review',detail:'private path'},b:{roomId:'other',status:'review'}},executions:{a:{roomId:room.id,state:'uncertain',result:'secret'}}})}};
+ const view=await node.ownerTeamOverview(room.id);
+ assert.equal(view.taskCounts.review,1);
+ assert.equal(view.executionCounts.uncertain,1);
+ assert.doesNotMatch(JSON.stringify(view),/private path|secret/);
+ room.leader.key='foreign/human';
+ await assert.rejects(node.ownerTeamOverview(room.id),{code:'FORBIDDEN'});
+});

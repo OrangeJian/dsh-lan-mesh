@@ -12,4 +12,10 @@ test('registered owner RPC exposes local Registry with stable request replay',as
  const list=await rpc('agentRegistry',{});assert.equal(list.ok,true);assert.equal(list.value.agents.length,1);assert.equal(list.value.agents[0].revision,1);
  assert.equal(JSON.stringify(list).includes(home),false);
  const forged=await rpc('agentRegistryCommand',{requestId:'spoof',command:{type:'define',agentId:'agent-two',name:'Spoof',authorityNodeId:'foreign'},owner:true});assert.equal(forged.ok,false);
+ const room=await rpc('roomCreate',{name:'Owner Team scope'});
+ assert.equal(room.ok,true,JSON.stringify(room));
+ const overview=await rpc('teamOverview',{roomId:room.value.room.id,sessionId:'foreign'});
+ assert.equal(overview.ok,true,JSON.stringify(overview));
+ assert.equal(overview.value.reason,'TEAM_DISABLED');
+ assert.equal(overview.value.known,false);
 });

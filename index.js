@@ -1416,6 +1416,8 @@ export function apply(ctx, rawConfig) {
       switch (endpoint) {
         case 'agentRegistry':
           return { ok: true, value: { agents: await registryPanel.list() } };
+        case 'teamOverview':
+          return { ok: true, value: await node.ownerTeamOverview(str('roomId')) };
         case 'agentRegistryCommand':
           return { ok: true, value: await registryPanel.command(request.command, str('requestId')) };
         case 'contextDeliveries':
