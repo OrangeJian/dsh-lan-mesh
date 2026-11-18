@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-17T15:49:18.657Z",
+  "runtime": "v24.11.1",
+  "platform": "win32",
+  "scope": "isolated-store-processes",
+  "cases": [
+    {
+      "name": "separate process restart preserves the complete persisted identity",
+      "status": "PASS"
+    },
+    {
+      "name": "workspace cwd changes do not create a new Node identity",
+      "status": "PASS"
+    },
+    {
+      "name": "distinct configured ports use independent identity slots",
+      "status": "PASS"
+    },
+    {
+      "name": "secondary slot survives separate process restart",
+      "status": "PASS"
+    },
+    {
+      "name": "distinct DSH_HOME uses an independent identity",
+      "status": "PASS"
+    },
+    {
+      "name": "configured primary port retains the legacy root identity",
+      "status": "PASS"
+    }
+  ],
+  "notRun": [
+    "real-multi-host-lifecycle",
+    "same-slot-concurrent-writers",
+    "physical-two-machine",
+    "session-lifecycle",
+    "authenticated-owner-revocation",
+    "runner-execution"
+  ],
+  "conclusion": "Node identity belongs to a DSH_HOME/mesh-port storage slot; it is not a physical-machine or workspace identity. No Host-instance-ID decision follows from this probe alone."
+}

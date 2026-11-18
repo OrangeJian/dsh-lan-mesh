@@ -1,0 +1,18 @@
+{
+  "scope": "installed-connection-component",
+  "observedAt": "2026-11-18T13:21:23.477Z",
+  "cases": [
+    "non-owner rejected before handler despite forged payload/headers",
+    "trusted in-process owner admitted",
+    "disposed exact route unavailable"
+  ],
+  "status": "PASS",
+  "authentication": "stubbed-deny-all; not exercised",
+  "notVerified": [
+    "browser-cookie-authentication",
+    "remote-owner-identity",
+    "room-team-acl",
+    "permission-revocation",
+    "physical-two-machine"
+  ]
+}

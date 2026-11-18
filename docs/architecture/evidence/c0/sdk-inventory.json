@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-17T15:49:19.634Z",
+  "hostVersion": "0.2.2-rc.3",
+  "packages": [
+    {
+      "id": "@deepseek-ai/dsh-agent",
+      "version": "0.2.2-rc.3",
+      "publicExports": [
+        ".",
+        "./types",
+        "./src/*",
+        "./package.json",
+        "./locale/*.json"
+      ],
+      "declaration": "./lib/types/index.d.ts",
+      "sha256": "7cfd3fd513389a2f2e3ecb0b5809cc1b743f4af0c8e2076cea55ec870fbfeca9",
+      "evidenceLevel": "installed-public-declaration-only"
+    },
+    {
+      "id": "@deepseek-ai/dsh-session",
+      "version": "0.2.2-rc.3",
+      "publicExports": [
+        ".",
+        "./types",
+        "./fork",
+        "./src/*",
+        "./package.json",
+        "./surface",
+        "./locale/*.json"
+      ],
+      "declaration": "./lib/types/index.d.ts",
+      "sha256": "eeeb05c947dbe288a1c2f2040534a27210ec0fb37953d24dbc7fd03792d7736c",
+      "evidenceLevel": "installed-public-declaration-only"
+    },
+    {
+      "id": "@deepseek-ai/dsh-client-connection",
+      "version": "0.2.2-rc.3",
+      "publicExports": [
+        ".",
+        "./client",
+        "./src/*",
+        "./package.json",
+        "./locale/*.json"
+      ],
+      "declaration": "./lib/types/index.d.ts",
+      "sha256": "131cbee1d336dc1a19d26203cf516fe90e664f54dbff4832be7cee0e5b9efa0e",
+      "evidenceLevel": "installed-public-declaration-only"
+    }
+  ],
+  "runtimeBehaviorVerified": false,
+  "notVerified": [
+    "session-create-resume",
+    "followup-ack-durability",
+    "cancel-quiescence",
+    "owned-handle-release",
+    "crash-recovery",
+    "workspace-isolation",
+    "owner-acl-revocation"
+  ]
+}
