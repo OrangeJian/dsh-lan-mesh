@@ -1,4 +1,4 @@
-import {prepareRunnerWorkspace,verifyRunnerWorkspace} from '../lib/runner-workspace.mjs';
+import {prepareRunnerWorkspace,releaseRunnerWorkspace,verifyRunnerWorkspace} from '../lib/runner-workspace.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -121,9 +121,17 @@ if(stage==='create'||stage==='resume'){
     }
     assert.equal(await readFile(tracked,'utf8'),'source edit\n');
     assert.equal(await readFile(join(workspace,'tracked.txt'),'utf8'),'worker edit\n');
+    await assert.rejects(releaseRunnerWorkspace({...prepare,canRelease:()=>true}),{code:'WORKSPACE_DIRTY'});
+    const cleanRoot=join(directory,'clean-resource');
+    await mkdir(cleanRoot);
+    const clean={...prepare,resourceRoot:cleanRoot};
+    const cleanWorkspace=(await prepareRunnerWorkspace(clean)).workspace;
+    await assert.rejects(releaseRunnerWorkspace({...clean,canRelease:()=>false}),{code:'RELEASE_NOT_AUTHORIZED'});
+    assert.equal((await releaseRunnerWorkspace({...clean,canRelease:()=>true})).released,true);
+    await assert.rejects(realpath(cleanWorkspace),{code:'ENOENT'});
     assert.equal(git(repo,'rev-parse','HEAD'),base);
     assert.equal(git(workspace,'rev-parse','HEAD'),base);
-    console.log(JSON.stringify({status:'PASS',scope:'installed DSH services in two isolated processes',cases:['create and release','flush and resume with same cwd','empty session cannot resume','maintenance cancellation and separate quiescence','detached worktree retains pinned base and separate working files'],notRun:['model turn cancellation','external process cancellation','crash during wake','tool filesystem confinement','multi-host']},null,2));
+    console.log(JSON.stringify({status:'PASS',scope:'installed DSH services in two isolated processes',cases:['create and release','flush and resume with same cwd','empty session cannot resume','maintenance cancellation and separate quiescence','detached worktree retains pinned base and separate files','authorized clean worktree release preserves dirty and unauthorized worktrees'],notRun:['model turn cancellation','external process cancellation','crash during wake','tool filesystem confinement','multi-host']},null,2));
   }finally{
     await rm(directory,{recursive:true,force:true});
   }
