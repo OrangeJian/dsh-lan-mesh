@@ -266,3 +266,29 @@ for (const crashState of ['starting', 'running', 'uncertain']) {
   assert.equal((await openTeamStore({ directory: join(f.directory, 'b') })).read().workerExecutions.e1.state, 'uncertain');
  });
 }
+
+test('closed coordinator rejects new create and dispatch without changing its ledger', async t => {
+ const f = await fixture(t);
+ await f.nodes.a.close();
+ const before = f.a.read();
+ await assert.rejects(f.nodes.a.create({roomId:'room-new',actorKey:'a/leader'}), {code:'CLOSED'});
+ await assert.rejects(f.dispatch(), {code:'CLOSED'});
+ assert.deepEqual(f.a.read(), before);
+ assert.equal(f.sent.length, 0);
+});
+
+test('close during asynchronous dispatch authorization prevents durable admission', async t => {
+ const f = await fixture(t);
+ let entered, release;
+ const waiting = new Promise(resolve => {entered=resolve;});
+ const gate = new Promise(resolve => {release=resolve;});
+ f.nodes.a.authorize = async () => {entered();await gate;return true;};
+ const dispatch = f.dispatch();
+ await waiting;
+ await f.nodes.a.close();
+ const before = f.a.read();
+ release();
+ await assert.rejects(dispatch, {code:'CLOSED'});
+ assert.deepEqual(f.a.read(), before);
+ assert.equal(f.sent.length, 0);
+});
