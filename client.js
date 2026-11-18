@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-lan-mesh',
   factory(require) {
-    const PLUGIN_VERSION = '0.4.26';
+    const PLUGIN_VERSION = '0.4.27';
     const React = require('react');
     const h = React.createElement;
 
@@ -644,6 +644,70 @@ function ManagementWorkspace({h,self,uiVersion,hostVersion,onOpenAgents,labels={
  const copy={title:'管理与诊断',intro:'本机身份与已公开的配置状态。',node:'节点身份',name:'本机名称',ui:'界面版本',host:'服务端版本',secret:'群组密钥',autoWake:'自动唤醒',configured:'已配置',notConfigured:'未配置',enabled:'已开启',disabled:'已关闭',unknown:'未知',agents:'会话管理',diagnostics:'诊断说明',diagnosticHint:'只读诊断报告需在本机生成。此页面不会执行系统命令；未检查的连接、授权和传输状态均不视为正常。',nickname:'本机显示名可在侧栏底部点击修改。',...labels};
  const flag=value=>value===true?copy.enabled:value===false?copy.disabled:copy.unknown;
  return h('section',{className:'lm-workspacePage lm-managementWorkspace'},h('header',{className:'lm-workspacePageHead'},h('div',null,h('h1',null,copy.title),h('p',null,copy.intro))),h('dl',{className:'lm-managementFacts'},...[[copy.name,self?.selfName||self?.name||copy.unknown],[copy.node,self?.nodeId||copy.unknown],[copy.ui,uiVersion||copy.unknown],[copy.host,hostVersion||copy.unknown],[copy.secret,self?.secured===true?copy.configured:self?.secured===false?copy.notConfigured:copy.unknown],[copy.autoWake,flag(self?.autoWake)]].flatMap(([label,value])=>[h('dt',{key:label+'-label'},label),h('dd',{key:label},value)])),h('p',{className:'lm-workspaceHint'},copy.nickname),h('button',{type:'button',className:'lm-btn lm-managementAgents',onClick:onOpenAgents},copy.agents),h('details',{className:'lm-diagnosticHelp'},h('summary',null,copy.diagnostics),h('p',null,copy.diagnosticHint)));
+}
+
+function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
+  const [rows,setRows]=React.useState(null);
+  const [name,setName]=React.useState('');
+  const [selected,setSelected]=React.useState('');
+  const [session,setSession]=React.useState('');
+  const [message,setMessage]=React.useState('');
+  const [busy,setBusy]=React.useState(false);
+  const running=React.useRef(false);
+  const retry=React.useRef(null);
+  const current=rows?.find(row=>row.agentId===selected);
+  const bound=new Set((rows??[]).flatMap(row=>row.bindings.map(binding=>binding.sessionId)));
+  async function refresh(){
+    const result=await call('agentRegistry',{});
+    if(!Array.isArray(result?.agents))throw new Error('无法读取 Agent 身份');
+    setRows(result.agents);
+  }
+  async function run(action){
+    if(running.current)return;
+    running.current=true;
+    setBusy(true);
+    setMessage('');
+    try{await action();}
+    catch(error){setMessage(error?.code==='CONFLICT'||error?.message==='CONFLICT'?'记录已变更，请刷新后核对再试。':String(error?.message??error));}
+    finally{running.current=false;setBusy(false);}
+  }
+  React.useEffect(()=>{void run(refresh);},[call]);
+  function submit(command){
+    void run(async()=>{
+      const key=JSON.stringify(command);
+      if(retry.current?.key!==key)retry.current={key,requestId:crypto.randomUUID()};
+      await call('agentRegistryCommand',{command,requestId:retry.current.requestId});
+      retry.current=null;
+      setName('');
+      setSession('');
+      await refresh();
+      setMessage('已保存');
+    });
+  }
+  const button=(label,onClick,disabled=false)=>h('button',{type:'button',className:'lm-btn',onClick,disabled:busy||disabled},label);
+  const nameInput=h('input',{value:name,maxLength:120,disabled:busy,'aria-label':'Agent 名称',placeholder:'Agent 名称',onChange:event=>setName(event.target.value)});
+  return h('section',{className:'lm-workspacePage','aria-label':'本机 Agent 身份'},
+    h('header',{className:'lm-workspacePageHead'},h('h2',null,'本机 Agent 身份'),button('刷新',()=>void run(refresh))),
+    h('p',{className:'lm-muted'},self?.selfName||self?.name||self?.nodeId||'本机'),
+    h('p',{role:'status'},message|| (busy?'处理中…':'')),
+    rows===null?null:h('div',null,
+      h('select',{value:selected,disabled:busy,'aria-label':'选择 Agent',onChange:event=>{setSelected(event.target.value);setName('');setSession('');}},
+        h('option',{value:''},'新建 Agent'),...rows.map(row=>h('option',{key:row.agentId,value:row.agentId},row.name+' · '+row.agentId))),
+      nameInput,
+      current?button('重命名',()=>submit({type:'rename',agentId:current.agentId,expectedRevision:current.revision,name:name.trim()}),!name.trim()):
+        button('创建',()=>submit({type:'define',agentId:retry.current?.createName===name.trim()?retry.current.agentId:prepareAgentId(name.trim()),name:name.trim()}),!name.trim()),
+      current?h('div',null,
+        h('p',{className:'lm-muted'},current.authorityNodeId+' · 版本 '+current.revision),
+        h('select',{value:session,disabled:busy,'aria-label':'选择本机会话',onChange:event=>setSession(event.target.value)},
+          h('option',{value:''},'选择本机会话'),...localAgents.filter(row=>row.cwd&&!bound.has(row.id)).map(row=>h('option',{key:row.id,value:row.id},(row.name||row.id)+' · '+row.id))),
+        button('绑定会话',()=>submit({type:'bind',agentId:current.agentId,expectedRevision:current.revision,sessionId:session}),!session),
+        h('ul',null,...current.bindings.map(binding=>h('li',{key:binding.sessionId},binding.sessionId,' ',button('解除绑定',()=>submit({type:'unbind',agentId:current.agentId,expectedRevision:current.revision,sessionId:binding.sessionId})))))):null));
+  function prepareAgentId(createName){
+    const agentId='agent-'+crypto.randomUUID();
+    const key=JSON.stringify({type:'define',agentId,name:createName});
+    retry.current={key,requestId:crypto.randomUUID(),agentId,createName};
+    return agentId;
+  }
 }
     /* @ux-shell:workspace-components:end */
     /* @ux-shell:workspace-nav-model:start */
@@ -4670,7 +4734,7 @@ function RoomTabs(props) {
       const agents = props.agents ?? { local: [], remote: [] };
       const workspaces = Array.isArray(props.workspaces) ? props.workspaces : [];
       if(view==='network')return h(NetworkWorkbench,{h,React,model:networkWorkspaceView({self:props.self,peers:props.peerSource,agents:props.agents,agentsStatus:props.agentsStatus,stale:props.snapshotStale}),onRefresh:props.onRefresh,labels:COPY.networkLabels});
-      if(view==='manage')return h(ManagementWorkspace,{h,self:props.self,uiVersion:PLUGIN_VERSION,hostVersion:props.pluginVersion,onOpenAgents:props.onOpenAgents,labels:COPY.managementLabels});
+      if(view==='manage')return h(React.Fragment,null,h(ManagementWorkspace,{h,self:props.self,uiVersion:PLUGIN_VERSION,hostVersion:props.pluginVersion,onOpenAgents:props.onOpenAgents,labels:COPY.managementLabels}),h(AgentRegistryPane,{h,React,call:props.call,self:props.self,localAgents:agents.local}));
       if (view === 'rooms') return RoomListPane(props);
       if (view === 'inbox') return h(InboxPane,props);
       if (view === 'board') return BoardPane(props);
@@ -5145,7 +5209,7 @@ function RoomTaskBoard(props){
       if (body.rpcId !== id) throw new Error('response mismatch');
       const result = body.result;
       if (result && result.ok === true) return result.value;
-      throw new Error(result?.error?.message ?? 'request failed');
+      throw Object.assign(new Error(result?.error?.message ?? 'request failed'), {code:result?.error?.code});
     }
 
     /**
@@ -5785,7 +5849,7 @@ function RoomTaskBoard(props){
                   setExpandedMessages((current) => ({ ...current, [id]: current[id] !== true })),
                 peers,peerSource:data?.peers,
                 agents,agentsStatus,snapshotStale:state.status==='error',pluginVersion:data?.pluginVersion,
-                onOpenAgents:()=>patchMeshNav({view:'agents',roomId:''}),
+                onOpenAgents:()=>patchMeshNav({view:'agents',roomId:''}),call,
                 messages: inbox,
                 unread: unreadCount,
                 rooms,

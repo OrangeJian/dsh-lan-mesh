@@ -519,6 +519,7 @@ const fetch = async (route, init) => {
     answers.snapshot.inbox.unread = answers.snapshot.inbox.messages.filter(message => !message.read && !(message.from?.nodeId === 'node-a' && (!message.from.sessionId || message.from.sessionId === 'human'))).length;
     return { ok: true, json: async () => ({ type: 'server-response', rpcId: body.rpcId, result: { ok: true, value: answers.snapshot.inbox } }) };
   }
+  if (endpoint === 'agentRegistry') return {ok:true,json:async()=>({type:'server-response',rpcId:body.rpcId,result:{ok:true,value:{agents:[{agentId:'agent-fixture',name:'Registry fixture',authorityNodeId:'node-a',revision:1,bindings:[]}]}}})};
   if (endpoint === 'agents' && agentsGate) await agentsGate;
   if (endpoint === 'roomJoin') {
     if(joinFailure)throw Error('Join rejected for verification');
@@ -1705,6 +1706,7 @@ await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Compon
 checks.push(['network workspace uses current snapshot identity and discovered devices',count('lm-networkWorkbench')===1&&count('lm-networkNode')>=1&&lastText.includes('node-a')&&!lastText.includes('允许派发：是')]);
 await switchTo(RailHost);await clickRail('lm-nav-manage');await switchTo(Component);
 checks.push(['management exposes actual UI version and existing session-management route',count('lm-managementWorkspace')===1&&lastText.includes(JSON.parse(readFileSync(join(here,'..','package.json'),'utf8')).version)&&count('lm-managementAgents')===1]);
+checks.push(['management loads and renders local Registry definitions',requested.some(row=>row.endpoint==='agentRegistry')&&lastText.includes('Registry fixture')]);
 await click('lm-managementAgents');checks.push(['management opens the existing agent catalogue',count('lm-agentImport')>0||lastText.includes('stored-one')]);
 await switchTo(RailHost);await clickRail('lm-nav-network');await switchTo(Component);
 const mainPoll=[...intervals.values()].filter(timer=>timer.ms===4000).at(-1);
