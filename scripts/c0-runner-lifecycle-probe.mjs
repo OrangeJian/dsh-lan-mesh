@@ -1,4 +1,4 @@
-import {executionResourceKey,inspectExecutionWorkspace,prepareExecutionWorkspace} from '../lib/runner-resources.mjs';
+import {executionResourceKey,inspectExecutionWorkspace,prepareExecutionWorkspace,reclaimExecutionWorkspace} from '../lib/runner-resources.mjs';
 import {openTeamStore} from '../lib/team-store.mjs';
 import {prepareRunnerWorkspace,releaseRunnerWorkspace,verifyRunnerWorkspace} from '../lib/runner-workspace.mjs';
 import assert from 'node:assert/strict';
@@ -273,6 +273,149 @@ async function reconcileScenarios(base,hooks){
 
   return cases;
 }
+
+/**
+ * Ledger-driven explicit reclamation evidence on isolated temp repos. Each
+ * scenario owns its source repo, ledger and resource root. A trusted local
+ * provider supplies two separately sourced proofs; nothing is scheduled or
+ * dispatched, and only the verified clean case reaches Git removal.
+ */
+async function reclaimScenarios(base,hooks){
+  const scenarios=join(base,'reclaim');
+  await mkdir(scenarios,{recursive:true});
+  const cases={};
+  const provider=s=>async ({executionId,key,resultHash})=>{
+    assert.equal(executionId,s.descriptor.executionId);
+    assert.equal(key,executionResourceKey(executionId,1));
+    assert.match(resultHash,/^[a-f0-9]{64}$/);
+    return{
+      quiescence:{stopped:true,source:'local-process-registry:'+executionId},
+      retention:{retained:true,source:'local-immutable-store:'+executionId,reference:'retained:'+resultHash,resultHash},
+    };
+  };
+  async function build(name){
+    const dir=join(scenarios,name);
+    const repo=join(dir,'source');
+    const resourcesRoot=join(dir,'resources');
+    await Promise.all([mkdir(repo,{recursive:true}),mkdir(resourcesRoot,{recursive:true})]);
+    git(repo,'init','--quiet');
+    const tracked=join(repo,'tracked.txt');
+    await writeFile(tracked,'baseline\n');
+    git(repo,'add','--','tracked.txt');
+    const identity=['-c','user.name=Runner Probe','-c','user.email=runner-probe@example.invalid','-c','commit.gpgsign=false'];
+    git(repo,...identity,'-c',`core.hooksPath=${hooks}`,'commit','--quiet','-m','baseline');
+    const baseCommit=git(repo,'rev-parse','HEAD');
+    const binding={repoId:'reclaim-repo',root:repo};
+    const ledgerDirectory=join(dir,'ledger');
+    const store=await openTeamStore({directory:ledgerDirectory});
+    const descriptor={roomId:'room-'+name,taskId:'task-'+name,executionId:'exec-'+name,generation:1,leaderKey:'node-a/leader',actorKey:'node-a/leader',workerKey:'node-b/worker',title:'Reclaim',detail:''};
+    await store.transact(state=>{state.workerExecutions[descriptor.executionId]={descriptor,state:'received',started:false,seq:1,result:null};return{state};});
+    const managed={store,executionId:descriptor.executionId,generation:1,binding,baseCommit,resourcesRoot,authorize:()=>true};
+    await prepareExecutionWorkspace({...managed,evidenceProvider:provider({descriptor})});
+    return{dir,repo,resourcesRoot,baseCommit,binding,ledgerDirectory,store,descriptor,managed,identity,options:extra=>({...managed,evidenceProvider:provider({descriptor}),...extra})};
+  }
+  const complete=(s,result={status:'succeeded',summary:'done'})=>s.store.transact(state=>{
+    const e=state.workerExecutions[s.descriptor.executionId];
+    e.state='succeeded';e.started=true;e.result=result;
+    return{state};
+  });
+  const reserveOnly=async s=>{
+    let calls=0;
+    await assert.rejects(reclaimExecutionWorkspace(s.options({authorize:()=>++calls<=2})),{code:'RELEASE_NOT_AUTHORIZED'});
+  };
+
+  // 1. A clean worktree is reclaimed, verified and reported as fully completed.
+  {
+    const s=await build('verified');
+    await complete(s);
+    const report=await reclaimExecutionWorkspace(s.options());
+    assert.equal(report.reclaimed,true);
+    const key=executionResourceKey(s.descriptor.executionId,1);
+    await assert.rejects(realpath(join(s.resourcesRoot,key,'workspace')),{code:'ENOENT'});
+    const inspection=await inspectExecutionWorkspace(s.managed);
+    assert.equal(inspection.status,'RECLAIMED');
+    assert.deepEqual(inspection.reclamation.completedSteps,['reserve','release','verify']);
+    assert.deepEqual(inspection.reclamation.pendingSteps,[]);
+    cases.verified=inspection.status;
+  }
+
+  // 2. A dirty worktree is retained and the failed step is recorded for recovery.
+  {
+    const s=await build('dirty');
+    await complete(s);
+    await writeFile(join(s.resourcesRoot,executionResourceKey(s.descriptor.executionId,1),'workspace','tracked.txt'),'dirty\n');
+    await assert.rejects(reclaimExecutionWorkspace(s.options()),{code:'WORKSPACE_DIRTY'});
+    const inspection=await inspectExecutionWorkspace(s.managed);
+    assert.equal(inspection.reclamation.failureCode,'WORKSPACE_DIRTY');
+    assert.deepEqual(inspection.reclamation.pendingSteps,['release','verify']);
+    cases.dirtyRetained=inspection.reclamation.status;
+  }
+
+  // 3. Revocation at canRelease blocks Git removal; crash re-entry stays conservative.
+  {
+    const s=await build('crash');
+    await complete(s);
+    await reserveOnly(s);
+    await assert.rejects(reclaimExecutionWorkspace(s.options()),{code:'RECLAIM_IN_PROGRESS'});
+    const inspection=await inspectExecutionWorkspace(s.managed);
+    assert.equal(inspection.reclamation.failureCode,'RELEASE_NOT_AUTHORIZED');
+    assert.deepEqual(inspection.reclamation.pendingSteps,['release','verify']);
+    cases.crashReentry=inspection.reclamation.status;
+    cases.revoked=inspection.reclamation.failureCode;
+  }
+
+  // 4. Missing result-retention evidence is refused with no reclamation started.
+  {
+    const s=await build('no-evidence');
+    await complete(s,null);
+    await assert.rejects(reclaimExecutionWorkspace(s.options()),{code:'RESULT_EVIDENCE_MISSING'});
+    const inspection=await inspectExecutionWorkspace(s.managed);
+    assert.equal(inspection.reclamation.status,'NOT_STARTED');
+    cases.noEvidence=inspection.reclamation.status;
+  }
+
+  // 5. A terminal state plus a summary without a trusted source is refused.
+  {
+    const s=await build('no-provider');
+    await complete(s);
+    await assert.rejects(reclaimExecutionWorkspace(s.options({evidenceProvider:undefined})),{code:'EVIDENCE_UNAVAILABLE'});
+    const inspection=await inspectExecutionWorkspace(s.managed);
+    assert.equal(inspection.reclamation.status,'NOT_STARTED');
+    cases.noSource=inspection.reclamation.status;
+  }
+
+  // 6. A directory reappearing after verified is not reported as RECLAIMED.
+  {
+    const s=await build('reappeared');
+    await complete(s);
+    await reclaimExecutionWorkspace(s.options());
+    assert.equal((await inspectExecutionWorkspace(s.managed)).status,'RECLAIMED');
+    const key=executionResourceKey(s.descriptor.executionId,1);
+    // The owned resource root persists after Git removal; only the workspace is gone.
+    await mkdir(join(s.resourcesRoot,key,'workspace'));
+    const inspection=await inspectExecutionWorkspace(s.managed);
+    assert.equal(inspection.status,'RECLAIMED_DIR_REAPPEARED');
+    cases.reappeared=inspection.status;
+  }
+
+  // 7. A path escape is never treated as a confirmed release on disk.
+  {
+    const s=await build('escape');
+    await complete(s);
+    await reserveOnly(s);
+    const outside=join(s.dir,'outside');
+    await mkdir(outside);
+    const key=executionResourceKey(s.descriptor.executionId,1);
+    await rm(join(s.resourcesRoot,key,'workspace'),{recursive:true,force:true});
+    await symlink(outside,join(s.resourcesRoot,key,'workspace'),process.platform==='win32'?'junction':'dir');
+    const inspection=await inspectExecutionWorkspace(s.managed);
+    assert.equal(inspection.disk.status,'PATH_ESCAPE');
+    assert.equal(inspection.reclamation.releaseObservedOnDisk,false);
+    cases.escapeNotReleased=inspection.reclamation.releaseObservedOnDisk;
+  }
+
+  return cases;
+}
 async function verifyCancellation(agent){
   const stop=Promise.withResolvers();
   const entered=Promise.withResolvers();
@@ -402,11 +545,12 @@ if(stage==='create'||stage==='resume'){
     assert.equal(git(repo,'rev-parse','HEAD'),base);
     assert.equal(git(workspace,'rev-parse','HEAD'),base);
     const reconcile=await reconcileScenarios(directory,hooks);
+    const reclaim=await reclaimScenarios(directory,hooks);
     console.log(JSON.stringify({
       status:'PASS',
-      scope:'installed DSH services in two isolated processes; read-only resource reconciliation on isolated temp repos',
-      cases:['create and release','flush and resume with same cwd','empty session cannot resume','maintenance cancellation and separate quiescence','detached worktree retains pinned base and separate files','authorized clean worktree release preserves dirty and unauthorized worktrees',reconcile],
-      notRun:['model turn cancellation','external process cancellation','crash during wake','tool filesystem confinement','multi-host','real dispatch or ledger promotion (intentionally disabled)']
+      scope:'installed DSH services in two isolated processes; read-only resource reconciliation and explicit ledger-driven reclamation on isolated temp repos',
+      cases:['create and release','flush and resume with same cwd','empty session cannot resume','maintenance cancellation and separate quiescence','detached worktree retains pinned base and separate files','authorized clean worktree release preserves dirty and unauthorized worktrees',{reconcile,reclaim}],
+      notRun:['model turn cancellation','external process cancellation','crash during wake','tool filesystem confinement','multi-host','real dispatch or ledger promotion (intentionally disabled)','automatic scheduling or automatic deletion (intentionally disabled)']
     },null,2));
   }finally{
     await rm(directory,{recursive:true,force:true});
