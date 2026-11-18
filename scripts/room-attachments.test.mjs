@@ -15,7 +15,7 @@ async function fixture(t) {
  const home=await mkdtemp(join(process.cwd(),'.attachment-test-')); const prev=process.env.DSH_HOME;process.env.DSH_HOME=home;
  const state=emptyState();const room=createRoom(state,{name:'Files',leader:{nodeId:'node-b',sessionId:'human',name:'B'}},()=> 'aaaaaaaaaaaa-1111-2222-3333-444444444444');
  joinRoom(state,room.id,{nodeId:'node-a',sessionId:'human',name:'A'});
- const nodes=['a','b'].map((s,i)=>{const n=new MeshNode({config:{port:39001+i,clusterSecret:'secret',trustedPeers:[],autoWake:false}});n.started=true;n.identity={nodeId:`node-${s}`,name:s};n.roomsDoc=structuredClone(state);return n;});
+ const nodes=['a','b'].map((s,i)=>{const n=new MeshNode({log:message=>{if(String(message).startsWith('cannot persist attachment receipt'))t.diagnostic(message);},config:{port:39001+i,clusterSecret:'secret',trustedPeers:[],autoWake:false}});n.started=true;n.identity={nodeId:`node-${s}`,name:s};n.roomsDoc=structuredClone(state);return n;});
  t.after(async()=>{for(const n of nodes)await n.close();if(prev===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=prev;await rm(home,{recursive:true,force:true});});
  return {nodes,room};
 }

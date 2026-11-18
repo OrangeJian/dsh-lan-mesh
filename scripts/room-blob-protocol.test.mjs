@@ -181,3 +181,16 @@ test('server close interrupts a backpressured GET and releases the read lease fo
   }
   assert.deepEqual(collected, [attachment.blobId]);
 });
+
+test('receipt write errors retain local diagnostics without exposing storage details to peers',async t=>{
+  const warnings=[];
+  const f=await setup(t,{
+    warn:message=>warnings.push(message),
+    onReceived:async()=>{throw Object.assign(new Error('private storage path'),{code:'EPERM'});},
+  });
+  const response=await raw(f.peer,signed(f.options));
+  assert.equal(response.status,503);
+  assert.match(response.body.toString(),/RECEIPT_UNAVAILABLE/);
+  assert.doesNotMatch(response.body.toString(),/private storage path|EPERM/);
+  assert.deepEqual(warnings,['cannot persist attachment receipt (EPERM)']);
+});
