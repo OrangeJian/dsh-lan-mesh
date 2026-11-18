@@ -1,3 +1,5 @@
+import {prepareExecutionWorkspace} from '../lib/runner-resources.mjs';
+import {openTeamStore} from '../lib/team-store.mjs';
 import {prepareRunnerWorkspace,releaseRunnerWorkspace,verifyRunnerWorkspace} from '../lib/runner-workspace.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -122,6 +124,22 @@ if(stage==='create'||stage==='resume'){
     assert.equal(await readFile(tracked,'utf8'),'source edit\n');
     assert.equal(await readFile(join(workspace,'tracked.txt'),'utf8'),'worker edit\n');
     await assert.rejects(releaseRunnerWorkspace({...prepare,canRelease:()=>true}),{code:'WORKSPACE_DIRTY'});
+    const resourcesRoot=join(directory,'managed-resources');
+    const ledgerDirectory=join(directory,'team-ledger');
+    await mkdir(resourcesRoot);
+    let store=await openTeamStore({directory:ledgerDirectory});
+    const descriptor={roomId:'room-probe',taskId:'task-probe',executionId:'exec-probe',generation:1,leaderKey:'node-a/leader',actorKey:'node-a/leader',workerKey:'node-b/worker',title:'Probe',detail:''};
+    await store.transact(state=>{
+      state.workerExecutions[descriptor.executionId]={descriptor,state:'received',started:false,seq:1,result:null};
+      return {state};
+    });
+    const managed={store,executionId:descriptor.executionId,generation:1,binding,baseCommit:base,resourcesRoot,authorize:()=>true};
+    await assert.rejects(prepareExecutionWorkspace({...managed,generation:2}),{code:'STALE_EXECUTION'});
+    const prepared=await prepareExecutionWorkspace(managed);
+    assert.equal(prepared.baseCommit,base);
+    store=await openTeamStore({directory:ledgerDirectory});
+    assert.equal(store.read().workerExecutions[descriptor.executionId].workspaceResource.phase,'prepared');
+    await assert.rejects(prepareExecutionWorkspace({...managed,store}),{code:'WORKSPACE_ALREADY_RESERVED'});
     const cleanRoot=join(directory,'clean-resource');
     await mkdir(cleanRoot);
     const clean={...prepare,resourceRoot:cleanRoot};
