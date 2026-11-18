@@ -69,3 +69,7 @@ Room自动已读与Inbox分页标读保持同步返回，改为串行队列+写�
 ## Coordinator关闭准入（0.4.23）
 
 修复关闭后或异步授权期间关闭仍可创建/派发任务；两项回归先失败后通过。完整505/505、panel283、schema82、版本一致及构建/Composer rc.3通过；保护13/13。仅本地提交，暂停推送。Runner真实生命周期、Registry/Binding、Owner撤权及多机门禁仍未完成。
+
+## I1本地身份基础（0.4.24）
+
+新增独立AgentDefinition及本地Session/Workspace映射模型、串行原子持久层、当前授权回调与revision冲突。公开投影不含路径；不接网络/UI，不自动迁移、不派单。相关7项、完整512/512、panel283、schema82、构建/Composer rc.3通过，保护13/13。后续继续请求幂等、审计及服务端身份接入；I1整体未完成，不推送。
