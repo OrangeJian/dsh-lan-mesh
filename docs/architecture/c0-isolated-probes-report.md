@@ -41,3 +41,27 @@ Worktree 补验：探针创建独立临时仓库，将 Worker 工作树以 detac
 工作树回收补验：releaseRunnerWorkspace 核对所属仓库、基准提交、独立目录和 detached HEAD，发现改动或未跟踪文件则拒绝。调用方必须从已有执行记录提供停止及成果保留许可，随后用 Git 的非强制移除。探针确认拒绝无许可和有改动的目录，并能移除有许可的干净工作树。当前许可回调仅由探针提供，生产账本尚未接入回收。
 
 执行资源归属补验：prepareExecutionWorkspace 在现有 Worker TeamStore 上按执行 ID 和代次记录 reserved，随后才创建工作树。准备成功后，事务复核执行仍处于收到且未启动的状态，并重新校验授权，再写 prepared。重开账本仍能读取归属，重复准备和旧代次拒绝。当前普通 Team 唤醒会跳过带资源记录的执行，隔离 Runner 尚无生产调用入口。Windows 探针发现深层临时目录中的 64 字符资源目录名过长，改用 128 位目录键后通过。失败后的补偿核对和账本驱动回收仍未接入。
+
+## 准备状态只读核对（R2 下一小批，基线 415d9f2 / v0.4.38）
+
+新增 inspectExecutionWorkspace（lib/runner-resources.mjs），并把资源目录键计算收敛为导出的 executionResourceKey，prepare 与核对共用同一 (executionId, generation) 派生。核对只接受现有 Worker 账本读快照加本机可信仓库绑定，按 executionId+generation 重算 128 位键，校验执行 ID、代次、资源归属（repoId/key/baseCommit）和完整固定提交（复用 verifyRunnerWorkspace）。
+
+账本观察与磁盘观察分别返回，互不覆盖：ledger 给出 executionPresent/state/started/generation 与 resource 字段及 status；disk 给出 expectedRoot/rootExists/workspaceExists/workspace/verification/observationError 与 status。合并 status 仅在「账本 prepared 且磁盘 COMPLETE 且无冲突」时为 COMPLETE，其余一律保守：STALE（代次不符）、FOREIGN（外来仓库）、MISMATCH（基准/键不符）、PATH_ESCAPE（符号链接或越界）、MISSING（磁盘缺失）、PARTIAL（部分创建）、UNPROMOTED（磁盘完整但账本仍 reserved）、ORPHAN（磁盘有资源但账本无归属）、UNCERTAIN。核对全程只读：无 mkdir、无 transact/晋升、无重试、无 release/删除、无派单，M6 仍暂停。
+
+在独立临时仓库（各自独立的源仓库、账本和资源根目录）实跑 scripts/c0-runner-lifecycle-probe.mjs，重启后完整=COMPLETE、缺失=MISSING、残留未晋升=UNPROMOTED、部分创建=PARTIAL、错误基准=MISMATCH、旧代次=STALE（gen-1 目录未被改动）、外来仓库=FOREIGN、符号链接根目录=PATH_ESCAPE。Windows 上符号链接需提权，路径越界场景改用目录 junction 验证。
+
+### 暂缓验收后的修正（同一未提交交付）
+
+主审暂缓后修正五点，仍保持只读、原范围与未提交状态：
+
+1. resourcesRoot 的 realpath 遇 EACCES/EIO 等 I/O 故障记为 UNKNOWN（带 observationError），只有 ENOENT 才记 ABSENT，不得报告 ABSENT/MISSING。
+2. resourceRoot 与 workspace 的 lstat→realpath 两次调用之间若条目消失或出错，捕获为 UNKNOWN，不再抛异常。
+3. workspace 经 realpath 解析后必须先确认仍是 resourceRoot 下预期的 `workspace` 子目录，否则记 PATH_ESCAPE，不把证据交给 Git 校验。
+4. workspace 为符号链接明确记 PATH_ESCAPE（不再落入 PARTIAL）。
+5. 合并结果新增 UNKNOWN 优先级规则，账本 reserved 不得把 UNKNOWN 降级为 PARTIAL。
+
+为确定性复现 I/O 故障与竞态，inspectExecutionWorkspace 增加可选 io 注入（默认真实 fs 的 lstat/realpath），不改变既有调用方式。新增六项最小回归：rootIoFault=UNKNOWN、unknownReserved=UNKNOWN（reserved 账本未降级）、raceRoot=UNKNOWN、raceWorkspace=UNKNOWN、workspaceLink=PATH_ESCAPE、workspaceSwap=PATH_ESCAPE（且 verification 为空、未触发 Git）。
+
+命令与退出码：node --check lib/runner-resources.mjs → 0；node --check scripts/c0-runner-lifecycle-probe.mjs → 0；node scripts/c0-runner-lifecycle-probe.mjs → 0（PASS，十四项核对全部命中预期）；node --test scripts/team-store.test.mjs scripts/team-coordinator.test.mjs scripts/team-service.test.mjs → 0（36/36）；npm test → 0（529/529）。
+
+NOT RUN / 未解决风险：真实 Host 重启后的进程副作用、真实派单、账本驱动的回收与失败补偿、工具文件访问隔离、物理双机仍未验证；UNCERTAIN/UNKNOWN 与实际崩溃窗口的区分需要更多真实证据。本批仅在原有未提交交付上修正，未改版本、未提交、未推送，五份既有未跟踪冻结方案与 0.4.5/M6 保护工作未覆盖；后续新任务走独立 worktree。
