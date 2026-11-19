@@ -51,7 +51,7 @@
 
 | 通道 | 谁在用 | 认证 |
 | --- | --- | --- |
-| `POST /api/lan-mesh`（26+ 端点） | 浏览器面板 | DSH 登录态（owner）；curl 无 cookie 得 401 是设计如此 |
+| `POST /api/lan-mesh`（53 个端点） | 浏览器面板 | DSH 登录态（owner，cookie + 同源）；curl 无 cookie 得 401 是设计如此 |
 | `/lan-mesh/v1/*`（info/send/hello/state/agents） | 其他 DSH 节点 | 无需登录；`clusterSecret` 非空时必须 HMAC-SHA256 签名 |
 | 模型工具 `lan_mesh_*` | Agent 会话 | 调用身份由宿主执行上下文提供，不接受自报 sessionId 的写操作 |
 
@@ -140,6 +140,8 @@ Team 建议关闭 `autoWake`：普通消息唤醒和 Team 唤醒是两套授权�
 ## 3. 功能使用
 
 ### 3.1 安装与确认
+
+前置要求：Node.js ≥ 22.19（入口使用 import attributes，低版本无法加载）。
 
 ```powershell
 plugin_manager install_bundle target="C:\path\to\dsh-lan-mesh"

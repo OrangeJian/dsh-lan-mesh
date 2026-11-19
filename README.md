@@ -60,12 +60,14 @@
 
 ## 安装
 
+前置要求：Node.js ≥ 22.19（入口使用 import attributes，低版本无法加载）。
+
 ```powershell
 # 在工作区里开发，再把包目录装进当前 profile
-dsh plugin install "C:\path\to\dsh-lan-mesh"
+plugin_manager install_bundle target="C:\path\to\dsh-lan-mesh"
 ```
 
-或者用插件管理工具指向包目录安装，然后用条目 id 启停：
+装好后用条目 id 启停：
 
 ```text
 plugin_manager set_plugin target=include:dsh-lan-mesh enabled=true
@@ -120,6 +122,8 @@ plugin_manager set_plugin target=include:dsh-lan-mesh enabled=true
 | `port` | `DSH_LAN_MESH_PORT` | `45871` | HTTP 直连端口；被占用会自动退到系统分配端口 |
 | `discoveryPort` | `DSH_LAN_MESH_DISCOVERY_PORT` | `45870` | UDP 广播发现端口，同一局域网内要一致 |
 | `clusterSecret` | `DSH_LAN_MESH_SECRET` | 空 | 非空时信封必须带 HMAC-SHA256 签名 |
+
+⚠️ 非可信局域网（办公室/公寓等共享网段）务必设置 clusterSecret（节点间签名）与 trustedPeers（白名单），否则任意节点可收发消息、加入房间。
 | `autoWake` | — | `true` | 收到消息时是否唤醒目标会话 |
 | `trustedPeers` | — | `[]` | 非空时只接受列表内 nodeId |
 | `notifyWebhook` | — | 空 | 额外通知渠道：POST `{text}` 到该 http(s) 地址。留空即可，本地 IM 渠道（微信等）会在发送时自动发现 |
@@ -171,7 +175,7 @@ Agent 层（把别处的 agent 拉进来干活的）：
 ## 架构
 
 ```
-index.js            Host 入口：11 个工具、/api/lan-mesh 面板路由（26 个端点）、系统提示
+index.js            Host 入口：11 个工具、/api/lan-mesh 面板路由（53 个端点）、系统提示
 client.js           面板：侧栏图标 + 主面板（房间、任务、聊天、agent 清单、待确认通知）
 lib/discovery.mjs   UDP 广播发现（TAG dsh-lan-mesh/1，5s 公告，20s 过期）
 lib/transport.mjs   HTTP JSON 直连、信封规范化、HMAC 签名、房间状态与 agent 清单交换
@@ -188,15 +192,17 @@ lib/store.mjs       持久化：node.json / inbox.jsonl / rooms.json / nicknames
 
 ## 验证
 
+以下命令仅在源码检出目录可用；通过插件包安装的用户无需执行，面板会在侧栏自动出现。
+
 ```powershell
-node --test scripts/rooms.test.mjs      # 房间状态纯函数，49 项
+node --test scripts/rooms.test.mjs      # 房间状态纯函数，54 项
 node --test scripts/notify.test.mjs     # 通知扩展点：渠道发现 / 自动发 / 挂起 / 确认，11 项
 node scripts/smoke.mjs                  # 双节点：身份/发现/投递/去重/持久化/安全
 node scripts/twin-transport-check.mjs   # 双节点状态交换与签名
 node scripts/rooms-smoke.mjs            # 双节点房间端到端：建房→加入→派任务→报进度→聊天→重启→退出
 node scripts/agents-smoke.mjs           # 双节点 agent 端到端：清单→跨 workspace 引入→新建→联络→唤醒→回收
-node scripts/schema-check.mjs           # 每个工具的 execute 输出是否满足它自己声明的 schema（46 项）
-node scripts/panel-check.mjs            # 面板渲染与交互冒烟（99 项）
+node scripts/schema-check.mjs           # 每个工具的 execute 输出是否满足它自己声明的 schema（82 项）
+node scripts/panel-check.mjs            # 面板渲染与交互冒烟（287 项）
 node scripts/probe-live.mjs             # 黑盒探测一个正在运行的实例
 ```
 

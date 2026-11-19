@@ -1,4 +1,0 @@
-2026-11-08T08:11:24.984Z wake(session-beta-live) text="来自局域网节点 alpha 的消息（鏋勫缓）：\n\n来自局域网节点 alpha（n"
-2026-11-08T08:11:24.984Z liveAgentId(session-beta-live) => session-beta-live
-2026-11-08T08:11:24.985Z agents.get(session-beta-live) => agent=ok status=idle followup=function
-2026-11-08T08:11:24.986Z followup called for session-beta-live

@@ -21,6 +21,8 @@
 
 ## 1. 装好并确认活着
 
+前置要求：Node.js ≥ 22.19（入口使用 import attributes，低版本无法加载）。
+
 ```powershell
 # 装（包目录指向源码目录即可）
 plugin_manager install_bundle target="C:\path\to\dsh-lan-mesh"
