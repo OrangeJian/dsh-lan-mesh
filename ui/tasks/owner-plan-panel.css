@@ -8,16 +8,17 @@
 .lm-ownerPlanBody{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:12px;min-width:0}
 .lm-ownerPlanList{display:flex;flex-direction:column;gap:6px;min-width:0}
 .lm-ownerPlanListHint{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
-.lm-ownerPlanRow{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;cursor:pointer}
+.lm-ownerPlanRow{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-sm,8px);background:var(--dsw-alias-bg-layer-1);color:inherit;cursor:pointer;transition:var(--lmr-raise)}
+.lm-ownerPlanRow:hover:not(.lm-ownerPlanRowActive){border-color:var(--dsw-alias-border-l2);box-shadow:var(--lmr-shadow-card)}
 .lm-ownerPlanRow strong,.lm-ownerPlanRow span{overflow-wrap:anywhere}
 .lm-ownerPlanRow small{font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
-.lm-ownerPlanRowActive{border-color:var(--dsw-alias-brand-primary)}
+.lm-ownerPlanRowActive{border-color:var(--dsw-alias-brand-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 7%,var(--dsw-alias-bg-layer-1));box-shadow:var(--lmr-shadow-card)}
 .lm-ownerPlanDetail{min-width:0;display:flex;flex-direction:column;gap:8px}
 .lm-ownerPlanMeta p{margin:0 0 4px;font-size:12px;overflow-wrap:anywhere}
 .lm-ownerPlanFingerprint{display:flex;gap:8px;align-items:flex-start}
 .lm-ownerPlanFingerprint code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;overflow-wrap:anywhere;user-select:text}
 .lm-ownerPlanTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.lm-ownerPlanTasks li{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanTasks li{border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-sm,8px);padding:7px 10px;font-size:12px;overflow-wrap:anywhere;background:var(--dsw-alias-bg-layer-1)}
 .lm-ownerPlanTasks small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}
 .lm-ownerPlanTaskDetail{margin:4px 0 0;white-space:pre-wrap;line-height:1.6}
 .lm-ownerPlanActions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -36,7 +37,7 @@
 .lm-ownerPlanPreviewReport p{margin:0 0 4px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
 .lm-ownerPlanPreviewSummary,.lm-ownerPlanPreviewHint{color:var(--dsw-alias-label-secondary)}
 .lm-ownerPlanPreviewTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.lm-ownerPlanPreviewRow{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanPreviewRow{border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-sm,8px);padding:7px 10px;font-size:12px;overflow-wrap:anywhere;background:var(--dsw-alias-bg-layer-1)}
 .lm-ownerPlanPreviewRow small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}
 .lm-ownerPlanPreviewState{margin-left:6px;color:var(--dsw-alias-label-secondary)}
 .lm-ownerPlanPreviewOk{border-color:var(--dsw-alias-brand-primary)}
