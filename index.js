@@ -21,6 +21,7 @@ import { ROOM_ATTACHMENT_LIMITS, ROOM_ATTACHMENT_WIRE_LIMITS } from './lib/room-
 import { MeshNode } from './lib/service.mjs';
 import { memberKey } from './lib/rooms.mjs';
 import { createPlanLedgerService } from './lib/m6-plan-service.mjs';
+import { createResultReviewLedger } from './lib/m6-review-ledger.mjs';
 import { isOwnerPrincipal } from './lib/m6-host-approval-adapter.mjs';
 import { normalizeStaticPeers } from './lib/static-peers.mjs';
 import { Notifier } from './lib/notify.mjs';
@@ -733,6 +734,175 @@ export function createM6PlanEntry({ node, now = Date.now } = {}) {
   });
 }
 
+/**
+ * M6 Owner human fixed-result review entry (accept / reject).
+ *
+ * This is the only host entry for result-review decisions, mounted next to the
+ * plan entry on the same verified owner-only exact Fetch route: the shared
+ * '/api' handler rejects every non-owner principal BEFORE the route handler
+ * runs and does not forward a request-level principal. The bridge therefore
+ * passes the same explicit owner-admission fact; anything else is refused
+ * before any Room or ledger access. Identity is never read from the body.
+ *
+ * Every authoritative input is re-derived server-side:
+ *  - 'actorKey' is the persisted human member ('nodeId/human'), never a
+ *    caller-supplied 'sessionId'/'actorKey'/'owner'/'leaderKey'.
+ *  - 'roomId' is the canonical id returned by MeshNode#ownerTeamOverview; a
+ *    request may name a Room, but the ledger receives only the canonical id.
+ *  - 'createResultReviewLedger' re-reads Team/Task/Execution from the CURRENT
+ *    ledger inside one transaction, pins the exact executionId + resultHash and
+ *    re-runs the unchanged M1 authorization gate at commit time.
+ *
+ * Owner vs Team Leader: the human's authority is NOT inferred from being the
+ * owner. 'ownerTeamOverview' proves the human is the CURRENT Room leader and a
+ * member, and the ledger admits the decision only when that human is also the
+ * CURRENT Team 'leaderKey' at the CURRENT generation. A changed Room leader,
+ * a different Team leader, a revoked membership or an old generation is
+ * refused by the existing leader rules rather than papered over.
+ *
+ * The entry fixes the decision itself ('accept'/'reject'); the body can only
+ * name the Room, task, requestId and the fixed executionId/resultHash/generation
+ * (plus the mandatory reason for a rejection). Caller-supplied 'checks',
+ * identity fields or a fake decision are never read. Nothing here dispatches,
+ * requeues or rewrites a result; rework still needs a NEW executionId.
+ *
+ * @param {{node: object}} options - 'node': the trusted MeshNode this plugin owns.
+ * @returns {{accept: Function, reject: Function}}
+ */
+export function createM6ResultReviewEntry({ node } = {}) {
+  const HUMAN_SESSION_ID = 'human';
+  const OPERATION = 'review';
+  const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const fail = (code, message = code) => { throw Object.assign(new Error(message), { code }); };
+
+  /** Only the owner-only route's admission fact may enter the review ledger. */
+  function requireOwnerAdmission(admission) {
+    if (!isOwnerPrincipal(admission)) {
+      fail('NOT_OWNER', 'owner admission from the owner-only route is required');
+    }
+  }
+
+  /** Server-derived human member key. A request cannot influence this. */
+  function actorKey() {
+    const nodeId = node?.identity?.nodeId;
+    if (typeof nodeId !== 'string' || nodeId === '') fail('NOT_READY', 'mesh node identity is not ready');
+    return memberKey(nodeId, HUMAN_SESSION_ID);
+  }
+
+  /** The single TeamStore the review ledger writes through. */
+  function store() {
+    const candidate = node?.team?.store;
+    if (!candidate || typeof candidate.transact !== 'function' || typeof candidate.read !== 'function') {
+      fail('NOT_READY', 'Team ledger is not ready');
+    }
+    return candidate;
+  }
+
+  /** Full local view of one Room, or a fail-closed refusal. */
+  async function overviewOf(roomReference) {
+    if (typeof roomReference !== 'string' || roomReference === '') fail('BAD_REQUEST', 'roomId is required');
+    let overview;
+    try {
+      overview = await node.ownerTeamOverview(roomReference);
+    } catch (error) {
+      // Preserve the production path's stable code (UNKNOWN_ROOM, FORBIDDEN, ...).
+      throw Object.assign(new Error(String(error?.message ?? error)), { code: typeof error?.code === 'string' ? error.code : 'FORBIDDEN' });
+    }
+    if (!isObject(overview) || overview.known !== true || overview.scope !== 'local') {
+      fail(overview?.reason ?? 'NOT_READY', 'local Room authority is not verifiable');
+    }
+    const roomId = overview.roomId;
+    if (typeof roomId !== 'string' || roomId === '') fail('MISSING_CANONICAL_ROOM', 'projection did not return a canonical room id');
+    return { ...overview, roomId };
+  }
+
+  /**
+   * Current Room view re-read INSIDE the ledger transaction. The ledger only
+   * needs the current leader and membership; a Room that disappeared becomes
+   * its own ROOM_CHANGED refusal instead of a stale allow.
+   */
+  function currentRoom(roomId) {
+    let view;
+    try { view = node.ownerRoomView(roomId); } catch { return null; }
+    return {
+      deleted: view?.deleted === true,
+      leader: view?.leaderKey ? { key: view.leaderKey } : undefined,
+      members: Array.isArray(view?.memberKeys) ? view.memberKeys.map(key => ({ key })) : [],
+    };
+  }
+
+  /**
+   * Trusted delegate passed to the ledger. It is called INSIDE every review
+   * transaction and re-checks the current local human Room leadership AND the
+   * current Team Leader relationship, so a stale caller snapshot can never
+   * authorize a commit and ownership is never inferred.
+   */
+  async function authorize(context) {
+    if (!isObject(context) || context.operation !== OPERATION) return false;
+    // createResultReviewLedger passes the authorization material under `body`.
+    const request = isObject(context.body) ? context.body : context;
+    let expectedActor;
+    try { expectedActor = actorKey(); } catch { return false; }
+    if (request.actorKey !== expectedActor) return false;
+    let overview;
+    try { overview = await overviewOf(request.roomId); } catch { return false; }
+    if (overview.roomId !== request.roomId) return false;
+    // Verify the relationship from the CURRENT ledger. The Owner human must be
+    // the Team Leader; this is checked, not assumed, and the ledger repeats it.
+    const state = store().read();
+    const team = state.teams?.[request.roomId];
+    if (!isObject(team)) return false;
+    if (team.leaderKey !== expectedActor) return false;
+    if (request.leaderKey !== team.leaderKey) return false;
+    if (overview.generation !== team.generation) return false;
+    return true;
+  }
+
+  function ledger() {
+    return createResultReviewLedger({
+      store: store(),
+      nodeId: node.identity.nodeId,
+      getRoom: currentRoom,
+      authorize,
+    });
+  }
+
+  const body = value => (isObject(value) ? value : {});
+
+  /** Build a fixed intent: decision is never taken from the body. */
+  async function review(payload, admission, decision) {
+    requireOwnerAdmission(admission);
+    const request = body(payload);
+    const room = await overviewOf(request.roomId);
+    return ledger().review({
+      requestId: request.requestId,
+      actorKey: actorKey(),
+      roomId: room.roomId,
+      taskId: request.taskId,
+      intent: {
+        decision,
+        generation: request.generation,
+        reviewedExecutionId: request.executionId,
+        resultHash: request.resultHash,
+        // Only a rejection may carry a reason; an accept never records one.
+        ...(decision === 'rejected' ? { reason: request.reason } : {}),
+      },
+    });
+  }
+
+  return Object.freeze({
+    /** Accept the exact fixed result of one task the human currently leads. */
+    async accept(payload, admission) {
+      return review(payload, admission, 'accepted');
+    },
+
+    /** Reject the exact fixed result, with a mandatory reason, for a redo. */
+    async reject(payload, admission) {
+      return review(payload, admission, 'rejected');
+    },
+  });
+}
+
 export function apply(ctx, rawConfig) {
   const config = resolveConfig(rawConfig);
   const log = (message, detail) => {
@@ -777,13 +947,15 @@ export function apply(ctx, rawConfig) {
     log,
   });
   const registryPanel = createRegistryPanel({ node, directory: meshRootDir(config.port) });
-  // M6 Owner human plan entry: reachable only through the owner-only panel
-  // route below. Identity and Room authority are derived inside the entry.
+  // M6 Owner human plan and result-review entries: reachable only through the
+  // owner-only panel route below. Identity and Room authority are derived
+  // inside each entry.
   const planEntry = createM6PlanEntry({ node });
+  const resultEntry = createM6ResultReviewEntry({ node });
   // The bridge's explicit owner-admission fact: reaching this closure already
   // required the owner-only route, and the public handler exposes no
   // request-level principal to read instead.
-  const planOwnerAdmission = Object.freeze({ kind: 'owner' });
+  const ownerAdmission = Object.freeze({ kind: 'owner' });
   /** Resolve the calling agent id so a wake-up reaches the right session. */
   const callerId = (exec) => (typeof exec?.agent?.id === 'string' ? exec.agent.id : '');
   /**
@@ -1556,7 +1728,27 @@ export function apply(ctx, rawConfig) {
    */
   const handlePlanEndpoint = async (method, request) => {
     try {
-      return { ok: true, value: await planEntry[method](request, planOwnerAdmission) };
+      return { ok: true, value: await planEntry[method](request, ownerAdmission) };
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: typeof error?.code === 'string' ? error.code : 'LAN_MESH_FAILED',
+          message: String(error?.message ?? error),
+          details: {},
+        },
+      };
+    }
+  };
+
+  /**
+   * Run one M6 result-review action. The ledger's own stable codes
+   * (NOT_CURRENT_LEADER, MISSING_REASON, STALE_GENERATION, RESULT_HASH_MISMATCH,
+   * CONFLICT, ...) stay visible to the panel instead of LAN_MESH_FAILED.
+   */
+  const handleResultEndpoint = async (method, request) => {
+    try {
+      return { ok: true, value: await resultEntry[method](request, ownerAdmission) };
     } catch (error) {
       return {
         ok: false,
@@ -1609,6 +1801,10 @@ export function apply(ctx, rawConfig) {
           return handlePlanEndpoint('submit', request);
         case 'planApprove':
           return handlePlanEndpoint('approve', request);
+        case 'resultAccept':
+          return handleResultEndpoint('accept', request);
+        case 'resultReject':
+          return handleResultEndpoint('reject', request);
         case 'agentRegistryCommand':
           return { ok: true, value: await registryPanel.command(request.command, str('requestId')) };
         case 'contextDeliveries':
