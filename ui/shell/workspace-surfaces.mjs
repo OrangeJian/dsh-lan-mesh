@@ -111,5 +111,6 @@ export function OwnerTeamOverview({h,React,call,roomId,selectedResults=[],onSele
         h('button',{type:'button',className:'lm-btn lm-selectTaskResult','aria-pressed':selected,disabled:!selected&&selectedResults.length>=8,onClick:()=>onSelectResult(ref)},selected?'取消引用':'引用成果'));
     }):null,
     value?.known&&value.status!=='absent'&&value.taskCounts&&value.executionCounts?h('div',null,counts('任务状态',value.taskCounts),counts('执行状态',value.executionCounts)):null,
-    value?.known&&value.status!=='absent'&&value.status!=='archived'&&Number.isSafeInteger(value.generation)?h(OwnerPlanPanel,{key:roomId,h,React,call,roomId,model:ownerPlanPanelModel,newRequestId:rpcId}):null);
+    value?.known&&value.status!=='absent'&&value.status!=='archived'&&Number.isSafeInteger(value.generation)?h(OwnerPlanPanel,{key:roomId,h,React,call,roomId,model:ownerPlanPanelModel,newRequestId:rpcId}):null,
+    value?.known&&value.status!=='absent'&&value.status!=='archived'&&Number.isSafeInteger(value.generation)?h(OwnerResultPanel,{key:'result:'+roomId,h,React,call,roomId,model:ownerResultPanelModel,newRequestId:rpcId}):null);
 }
