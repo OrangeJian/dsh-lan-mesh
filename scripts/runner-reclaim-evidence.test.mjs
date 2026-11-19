@@ -1,11 +1,16 @@
 /**
  * Targeted regression for the host-local reclamation evidence adapter.
  *
- * Direct cases exercise the adapter against a read-only durable TeamStore file
- * plus injected live-agent/archive observations. Integration cases bind the
- * adapter to the real `reclaimExecutionWorkspace` on isolated temp Git repos.
- * Nothing is scheduled, dispatched, auto-archived or deleted outside the temp
- * directories created by each case.
+ * The explicit-stop requirement is the point of this batch: an idle/absent
+ * live agent and a durable archive membership are observations, not proof that
+ * the execution and its child processes stopped. The adapter must refuse them
+ * and accept only a fixed-shape attestation bound to executionId, generation,
+ * resource key, result hash and a concrete Host runtime instance.
+ *
+ * Direct cases use a read-only durable TeamStore file plus injected stop and
+ * observation sources. Integration cases call the real reclaim service only
+ * on paths that must refuse before removal; no successful reclamation or
+ * deletion is executed by this file.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,14 +19,12 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openTeamStore } from '../lib/team-store.mjs';
-import {
-  executionResourceKey, inspectExecutionWorkspace, prepareExecutionWorkspace,
-  reclaimExecutionWorkspace,
-} from '../lib/runner-resources.mjs';
+import { executionResourceKey, prepareExecutionWorkspace, reclaimExecutionWorkspace } from '../lib/runner-resources.mjs';
 import { createHostReclaimEvidenceProvider } from '../lib/runner-reclaim-evidence.mjs';
 import { resultHash as hashResult } from '../lib/task-result-context.mjs';
 
 const NODE = 'node-b';
+const HOST_INSTANCE = 'host-runtime-7f3c';
 const SESSION = 'session-evidence-1';
 const EXECUTION = 'exec-evidence';
 const GENERATION = 1;
@@ -30,6 +33,7 @@ const REPO_ID = 'repo-evidence';
 const BASE_COMMIT = 'a'.repeat(40);
 const RESULT = { status: 'succeeded', summary: 'done' };
 const RESULT_HASH = hashResult(RESULT);
+const STOP_SOURCE = 'test-host-stop-attestation:pid+starttime';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 15000, windowsHide: true }).trim();
 const identity = ['-c', 'user.name=Evidence Test', '-c', 'user.email=evidence@example.invalid', '-c', 'commit.gpgsign=false'];
@@ -56,6 +60,15 @@ function mutateEntry(mutate) {
   return entry;
 }
 
+function stopProof(overrides = {}) {
+  return {
+    executionId: EXECUTION, generation: GENERATION, key: KEY,
+    resultHash: RESULT_HASH, hostInstanceId: HOST_INSTANCE,
+    stopped: true, source: STOP_SOURCE,
+    ...overrides,
+  };
+}
+
 async function makeLedger(label, entry = baseEntry()) {
   const dir = await fs.mkdtemp(join(tmpdir(), `r2-evidence-${label}-`));
   const ledgerFile = join(dir, 'team.json');
@@ -67,8 +80,8 @@ function makeProvider(ledgerFile, overrides = {}) {
   return createHostReclaimEvidenceProvider({
     nodeId: NODE,
     ledgerFile,
-    listLiveAgents: () => [],
-    listArchivedSessionIds: () => [SESSION],
+    hostInstanceId: HOST_INSTANCE,
+    readStopProof: () => stopProof(),
     ...overrides,
   });
 }
@@ -79,6 +92,14 @@ function request(overrides = {}) {
     resultHash: RESULT_HASH, repoId: REPO_ID, baseCommit: BASE_COMMIT,
     ...overrides,
   };
+}
+
+async function rejectsWith(promise, code, observed) {
+  await assert.rejects(promise, error => {
+    assert.equal(error.code, code);
+    if (observed !== undefined) assert.equal(error.observed, observed);
+    return true;
+  });
 }
 
 async function removeDir(dir) {
@@ -98,135 +119,183 @@ async function withLedger(label, entry, fn) {
 
 // ---------------------------------------------------------------- adapter ---
 
-test('returns quiescence and durable-retention evidence bound to the exact request', async () => {
+test('returns evidence only from an explicit stop attestation bound to all identities', async () => {
   await withLedger('positive', baseEntry(), async ({ ledgerFile }) => {
     const value = await makeProvider(ledgerFile)(request());
-    assert.deepEqual(value, {
-      quiescence: { stopped: true, source: 'host:live-agent-registry=absent;workspace-archive=yes' },
-      retention: {
-        retained: true,
-        source: 'host:durable-team-ledger',
-        reference: `${ledgerFile}#workerExecutions/${EXECUTION}/result`,
-        resultHash: RESULT_HASH,
-      },
+    assert.equal(value.quiescence.stopped, true);
+    assert.equal(value.quiescence.source, STOP_SOURCE);
+    assert.deepEqual(value.retention, {
+      retained: true,
+      source: 'host:durable-team-ledger',
+      reference: `${ledgerFile}#workerExecutions/${EXECUTION}/result`,
+      resultHash: RESULT_HASH,
     });
   });
 });
 
-test('accepts an exact live idle agent as quiescent and never prefix-resolves', async () => {
-  await withLedger('idle', baseEntry(), async ({ ledgerFile }) => {
-    const value = await makeProvider(ledgerFile, {
-      listLiveAgents: () => [{ id: SESSION, status: 'idle' }, { id: SESSION + '-longer', status: 'running' }],
-    })(request());
-    assert.equal(value.quiescence.source, 'host:live-agent-registry=idle;workspace-archive=yes');
+test('idle or absent plus archived still refuses without an explicit stop attestation', async () => {
+  await withLedger('observations-only', baseEntry(), async ({ ledgerFile }) => {
+    for (const [label, live] of [
+      ['idle', [{ id: SESSION, status: 'idle' }]],
+      ['absent', []],
+    ]) {
+      const provider = makeProvider(ledgerFile, {
+        readStopProof: () => null,
+        listLiveAgents: () => live,
+        listArchivedSessionIds: () => [SESSION],
+      });
+      await rejectsWith(provider(request()), 'QUIESCENCE_UNPROVEN', `${label}+archived`);
+    }
   });
 });
 
-test('refuses a running, unknown or duplicated live agent', async () => {
-  await withLedger('running', baseEntry(), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile, { listLiveAgents: () => [{ id: SESSION, status: 'running' }] })(request()), { code: 'QUIESCENCE_RUNNING' });
-    await assert.rejects(makeProvider(ledgerFile, { listLiveAgents: () => [{ id: SESSION, status: 'starting' }] })(request()), { code: 'QUIESCENCE_RUNNING' });
-    await assert.rejects(makeProvider(ledgerFile, { listLiveAgents: () => [{ id: SESSION }] })(request()), { code: 'QUIESCENCE_RUNNING' });
-    await assert.rejects(makeProvider(ledgerFile, { listLiveAgents: () => [{ id: SESSION, status: 'idle' }, { id: SESSION, status: 'idle' }] })(request()), { code: 'QUIESCENCE_AMBIGUOUS' });
+test('a legacy observation-shaped proof is refused even when idle and archived', async () => {
+  await withLedger('legacy-proof', baseEntry(), async ({ ledgerFile }) => {
+    const provider = makeProvider(ledgerFile, {
+      readStopProof: () => ({ stopped: true, source: 'host:live-agent-registry=idle;workspace-archive=yes' }),
+      listLiveAgents: () => [{ id: SESSION, status: 'idle' }],
+      listArchivedSessionIds: () => [SESSION],
+    });
+    await rejectsWith(provider(request()), 'QUIESCENCE_UNPROVEN', 'idle+archived');
   });
 });
 
-test('refuses when the session is not durably archived', async () => {
-  await withLedger('unarchived', baseEntry(), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile, { listArchivedSessionIds: () => [] })(request()), { code: 'QUIESCENCE_NOT_ARCHIVED' });
+test('refuses an attestation for a different execution, generation, key or hash', async () => {
+  await withLedger('binding', baseEntry(), async ({ ledgerFile }) => {
+    await rejectsWith(makeProvider(ledgerFile, { readStopProof: () => stopProof({ executionId: 'exec-other' }) })(request()), 'QUIESCENCE_BINDING_MISMATCH');
+    await rejectsWith(makeProvider(ledgerFile, { readStopProof: () => stopProof({ generation: 2 }) })(request()), 'QUIESCENCE_BINDING_MISMATCH');
+    await rejectsWith(makeProvider(ledgerFile, { readStopProof: () => stopProof({ key: 'b'.repeat(32) }) })(request()), 'QUIESCENCE_BINDING_MISMATCH');
+    await rejectsWith(makeProvider(ledgerFile, { readStopProof: () => stopProof({ resultHash: 'c'.repeat(64) }) })(request()), 'QUIESCENCE_BINDING_MISMATCH');
   });
 });
 
-test('refuses when the live-agent or archive observation is unavailable', async () => {
-  await withLedger('unavailable', baseEntry(), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile, { listLiveAgents: () => { throw Object.assign(new Error('boom'), { code: 'EIO' }); } })(request()), { code: 'QUIESCENCE_UNAVAILABLE' });
-    await assert.rejects(makeProvider(ledgerFile, { listLiveAgents: () => null })(request()), { code: 'QUIESCENCE_UNAVAILABLE' });
-    await assert.rejects(makeProvider(ledgerFile, { listArchivedSessionIds: () => { throw new Error('boom'); } })(request()), { code: 'QUIESCENCE_UNAVAILABLE' });
-    await assert.rejects(makeProvider(ledgerFile, { listArchivedSessionIds: () => new Set([SESSION]) })(request()), { code: 'QUIESCENCE_UNAVAILABLE' });
+test('refuses an attestation from another Host runtime instance', async () => {
+  await withLedger('host-instance', baseEntry(), async ({ ledgerFile }) => {
+    await rejectsWith(
+      makeProvider(ledgerFile, { readStopProof: () => stopProof({ hostInstanceId: 'host-runtime-other' }) })(request()),
+      'QUIESCENCE_BINDING_MISMATCH',
+    );
+    await rejectsWith(
+      makeProvider(ledgerFile, { hostInstanceId: 'host-runtime-other' })(request()),
+      'QUIESCENCE_BINDING_MISMATCH',
+    );
   });
 });
 
-test('refuses a foreign, malformed or trimmed worker key', async () => {
+test('refuses a malformed, negative or unbound attestation', async () => {
+  await withLedger('malformed-proof', baseEntry(), async ({ ledgerFile }) => {
+    const cases = [
+      null,
+      { stopped: true, source: STOP_SOURCE },
+      { ...stopProof(), extra: true },
+      stopProof({ stopped: false }),
+      stopProof({ source: '' }),
+      stopProof({ source: 'x'.repeat(201) }),
+    ];
+    const missingKey = stopProof();
+    delete missingKey.key;
+    cases.push(missingKey);
+    for (const proof of cases) {
+      await rejectsWith(makeProvider(ledgerFile, { readStopProof: () => proof })(request()), 'QUIESCENCE_UNPROVEN');
+    }
+    // A present but non-integer generation is a binding mismatch, not a
+    // malformed shape.
+    await rejectsWith(
+      makeProvider(ledgerFile, { readStopProof: () => stopProof({ generation: '1' }) })(request()),
+      'QUIESCENCE_BINDING_MISMATCH',
+    );
+  });
+});
+
+test('refuses when the stop source is unavailable', async () => {
+  await withLedger('stop-unavailable', baseEntry(), async ({ ledgerFile }) => {
+    await rejectsWith(
+      makeProvider(ledgerFile, { readStopProof: () => { throw Object.assign(new Error('boom'), { code: 'EIO' }); } })(request()),
+      'QUIESCENCE_UNAVAILABLE',
+    );
+    await rejectsWith(makeProvider(ledgerFile, { readStopProof: async () => { throw new Error('boom'); } })(request()), 'QUIESCENCE_UNAVAILABLE');
+  });
+});
+
+test('refuses a foreign or malformed worker key', async () => {
   await withLedger('remote', mutateEntry(entry => { entry.descriptor.workerKey = `node-x/${SESSION}`; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'QUIESCENCE_REMOTE' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'QUIESCENCE_REMOTE');
   });
   await withLedger('badkey', mutateEntry(entry => { entry.descriptor.workerKey = 'node-b'; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'QUIESCENCE_UNPROVEN' });
-  });
-  await withLedger('trimmed', mutateEntry(entry => { entry.descriptor.workerKey = `${NODE}/${SESSION.slice(0, 8)}`; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'QUIESCENCE_NOT_ARCHIVED' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'QUIESCENCE_UNPROVEN');
   });
 });
 
-test('refuses a wrong node identity, generation or resource binding', async () => {
+test('refuses a wrong request identity or resource binding', async () => {
   await withLedger('identity', baseEntry(), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile, { nodeId: 'node-a' })(request()), { code: 'QUIESCENCE_REMOTE' });
-    await assert.rejects(makeProvider(ledgerFile)(request({ generation: 2, key: executionResourceKey(EXECUTION, 2) })), { code: 'STALE_EXECUTION' });
-    await assert.rejects(makeProvider(ledgerFile)(request({ key: 'b'.repeat(32) })), { code: 'RESOURCE_MISMATCH' });
-    await assert.rejects(makeProvider(ledgerFile)(request({ repoId: 'other-repo' })), { code: 'RESOURCE_MISMATCH' });
-    await assert.rejects(makeProvider(ledgerFile)(request({ baseCommit: 'b'.repeat(40) })), { code: 'RESOURCE_MISMATCH' });
+    await rejectsWith(makeProvider(ledgerFile)(request({ generation: 2, key: executionResourceKey(EXECUTION, 2) })), 'STALE_EXECUTION');
+    await rejectsWith(makeProvider(ledgerFile)(request({ key: 'b'.repeat(32) })), 'RESOURCE_MISMATCH');
+    await rejectsWith(makeProvider(ledgerFile)(request({ repoId: 'other-repo' })), 'RESOURCE_MISMATCH');
+    await rejectsWith(makeProvider(ledgerFile)(request({ baseCommit: 'b'.repeat(40) })), 'RESOURCE_MISMATCH');
   });
 });
 
 test('refuses a missing, unreadable or malformed durable ledger', async () => {
   await withLedger('nofile', baseEntry(), async ({ dir }) => {
-    await assert.rejects(makeProvider(join(dir, 'absent.json'))(request()), { code: 'RETENTION_UNAVAILABLE' });
+    await rejectsWith(makeProvider(join(dir, 'absent.json'))(request()), 'RETENTION_UNAVAILABLE');
     const provider = makeProvider(join(dir, 'absent.json'), {
       io: { readFile: async () => { throw Object.assign(new Error('denied'), { code: 'EACCES' }); } },
     });
-    await assert.rejects(provider(request()), { code: 'RETENTION_UNAVAILABLE' });
+    await rejectsWith(provider(request()), 'RETENTION_UNAVAILABLE');
   });
   await withLedger('badjson', baseEntry(), async ({ ledgerFile }) => {
     await fs.writeFile(ledgerFile, '{not json');
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RETENTION_UNAVAILABLE' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RETENTION_UNAVAILABLE');
   });
   await withLedger('version', baseEntry(), async ({ ledgerFile }) => {
     await fs.writeFile(ledgerFile, JSON.stringify({ version: 2, workerExecutions: { [EXECUTION]: baseEntry() } }));
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RETENTION_UNAVAILABLE' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RETENTION_UNAVAILABLE');
   });
   await withLedger('absent-entry', baseEntry(), async ({ ledgerFile }) => {
     await fs.writeFile(ledgerFile, JSON.stringify({ version: 1, workerExecutions: {} }));
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RETENTION_MISSING' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RETENTION_MISSING');
   });
 });
 
 test('refuses a non-terminal, unstarted or missing fixed result', async () => {
   await withLedger('running-state', mutateEntry(entry => { entry.state = 'running'; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'NOT_STOPPED' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'NOT_STOPPED');
   });
   await withLedger('unstarted', mutateEntry(entry => { entry.started = false; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'NOT_STOPPED' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'NOT_STOPPED');
   });
   await withLedger('noresult', mutateEntry(entry => { entry.result = null; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RESULT_EVIDENCE_MISSING' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RESULT_EVIDENCE_MISSING');
   });
   await withLedger('badresult', mutateEntry(entry => { entry.result = { summary: 'no status' }; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RESULT_EVIDENCE_MISSING' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RESULT_EVIDENCE_MISSING');
   });
 });
 
 test('refuses a retained result whose bytes do not hash to the request', async () => {
   await withLedger('tampered', mutateEntry(entry => { entry.result.summary = 'other'; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'EVIDENCE_BINDING_MISMATCH' });
-    await assert.rejects(makeProvider(ledgerFile)(request({ resultHash: 'c'.repeat(64) })), { code: 'EVIDENCE_BINDING_MISMATCH' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'EVIDENCE_BINDING_MISMATCH');
+    await rejectsWith(makeProvider(ledgerFile)(request({ resultHash: 'c'.repeat(64) })), 'EVIDENCE_BINDING_MISMATCH');
   });
   await withLedger('status-mismatch', mutateEntry(entry => {
     entry.result = { status: 'failed', summary: 'done' };
   }), async ({ ledgerFile }) => {
-    const changedHash = hashResult({ status: 'failed', summary: 'done' });
-    await assert.rejects(makeProvider(ledgerFile)(request({ resultHash: changedHash })), { code: 'EVIDENCE_BINDING_MISMATCH' });
+    await rejectsWith(
+      makeProvider(ledgerFile)(request({ resultHash: hashResult({ status: 'failed', summary: 'done' }) })),
+      'EVIDENCE_BINDING_MISMATCH',
+    );
   });
 });
 
 test('refuses a non-prepared or already-reclaiming resource', async () => {
   await withLedger('noresource', mutateEntry(entry => { delete entry.workspaceResource; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RESOURCE_NOT_PREPARED' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RESOURCE_NOT_PREPARED');
   });
   await withLedger('reserved', mutateEntry(entry => { entry.workspaceResource.phase = 'reserved'; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RESOURCE_NOT_PREPARED' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RESOURCE_NOT_PREPARED');
   });
   await withLedger('reclaiming', mutateEntry(entry => { entry.workspaceResource.reclaim = { phase: 'reserved' }; }), async ({ ledgerFile }) => {
-    await assert.rejects(makeProvider(ledgerFile)(request()), { code: 'RECLAIM_IN_PROGRESS' });
+    await rejectsWith(makeProvider(ledgerFile)(request()), 'RECLAIM_IN_PROGRESS');
   });
 });
 
@@ -234,20 +303,30 @@ test('is read-only: the durable ledger bytes are unchanged by a successful proof
   await withLedger('readonly', baseEntry(), async ({ ledgerFile }) => {
     const before = await fs.readFile(ledgerFile, 'utf8');
     await makeProvider(ledgerFile)(request());
-    const after = await fs.readFile(ledgerFile, 'utf8');
-    assert.equal(after, before);
+    assert.equal(await fs.readFile(ledgerFile, 'utf8'), before);
   });
 });
 
-test('refuses incomplete provider configuration', () => {
-  assert.throws(() => createHostReclaimEvidenceProvider({ nodeId: NODE, ledgerFile: 'relative.json', listLiveAgents: () => [], listArchivedSessionIds: () => [] }), { code: 'BAD_CONFIG' });
-  assert.throws(() => createHostReclaimEvidenceProvider({ nodeId: NODE, ledgerFile: join(tmpdir(), 'x.json'), listLiveAgents: null, listArchivedSessionIds: () => [] }), { code: 'BAD_CONFIG' });
-  assert.throws(() => createHostReclaimEvidenceProvider({ nodeId: NODE, ledgerFile: join(tmpdir(), 'x.json'), listLiveAgents: () => [], listArchivedSessionIds: null }), { code: 'BAD_CONFIG' });
+test('refuses incomplete configuration, including the old observation-only shape', () => {
+  const base = {
+    nodeId: NODE, ledgerFile: join(tmpdir(), 'x.json'), hostInstanceId: HOST_INSTANCE,
+    readStopProof: () => stopProof(),
+  };
+  assert.throws(() => createHostReclaimEvidenceProvider({ ...base, hostInstanceId: undefined }), { code: 'BAD_CONFIG' });
+  assert.throws(() => createHostReclaimEvidenceProvider({ ...base, hostInstanceId: 'not a host instance' }), { code: 'BAD_CONFIG' });
+  assert.throws(() => createHostReclaimEvidenceProvider({ ...base, readStopProof: undefined }), { code: 'BAD_CONFIG' });
+  assert.throws(() => createHostReclaimEvidenceProvider({
+    nodeId: NODE,
+    ledgerFile: join(tmpdir(), 'x.json'),
+    listLiveAgents: () => [{ id: SESSION, status: 'idle' }],
+    listArchivedSessionIds: () => [SESSION],
+  }), { code: 'BAD_CONFIG' });
+  assert.throws(() => createHostReclaimEvidenceProvider({ ...base, ledgerFile: 'relative.json' }), { code: 'BAD_CONFIG' });
 });
 
 // ------------------------------------------------------------ integration ---
 
-async function makeWorkspaceContext(label, { liveAgents = [], archived = [SESSION] } = {}) {
+async function makeWorkspaceContext(label, { liveAgents = [], archived = [SESSION], stopProofSource } = {}) {
   const dir = await fs.mkdtemp(join(tmpdir(), `r2-evidence-int-${label}-`));
   const repo = join(dir, 'source');
   const resourcesRoot = join(dir, 'resources');
@@ -287,7 +366,8 @@ async function makeWorkspaceContext(label, { liveAgents = [], archived = [SESSIO
   });
   const ledgerFile = join(ledgerDirectory, 'team.json');
   const evidenceProvider = createHostReclaimEvidenceProvider({
-    nodeId: NODE, ledgerFile,
+    nodeId: NODE, ledgerFile, hostInstanceId: HOST_INSTANCE,
+    readStopProof: stopProofSource ?? (() => stopProof()),
     listLiveAgents: () => liveAgents,
     listArchivedSessionIds: () => archived,
   });
@@ -310,47 +390,18 @@ async function withWorkspace(label, options, fn) {
   try { await fn(ctx); } finally { await ctx.cleanup(); }
 }
 
-test('integration: the real reclaim service accepts the adapter proof and verifies removal', async () => {
-  await withWorkspace('positive', {}, async ctx => {
-    const report = await reclaimExecutionWorkspace(ctx.options());
-    assert.equal(report.reclaimed, true);
-    assert.equal(report.verification.removed, true);
-    assert.equal(report.resultHash, RESULT_HASH);
-
-    const reclaim = ctx.reclaimOf();
-    assert.equal(reclaim.phase, 'verified');
-    assert.equal(reclaim.evidence.executionId, ctx.executionId);
-    assert.equal(reclaim.evidence.generation, 1);
-    assert.equal(reclaim.evidence.key, ctx.key);
-    assert.equal(reclaim.evidence.resultHash, RESULT_HASH);
-    assert.equal(reclaim.evidence.quiescence.source, 'host:live-agent-registry=absent;workspace-archive=yes');
-    assert.equal(reclaim.evidence.retention.reference, `${ctx.ledgerFile}#workerExecutions/${ctx.executionId}/result`);
-    assert.equal(reclaim.evidence.retention.resultHash, RESULT_HASH);
-
-    const inspection = await inspectExecutionWorkspace(ctx.managed);
-    assert.equal(inspection.status, 'RECLAIMED');
-    assert.deepEqual(inspection.reclamation.completedSteps, ['reserve', 'release', 'verify']);
-    await assert.rejects(fs.stat(ctx.workspace), { code: 'ENOENT' });
-    assert.equal(ctx.registered(), false);
-  });
-});
-
-test('integration: a running worker fails closed and leaves the worktree untouched', async () => {
-  await withWorkspace('running', { liveAgents: [{ id: SESSION, status: 'running' }] }, async ctx => {
+test('integration: idle plus archived without an explicit stop proof fails closed and removes nothing', async () => {
+  await withWorkspace('observations-only', {
+    liveAgents: [{ id: SESSION, status: 'idle' }],
+    archived: [SESSION],
+    stopProofSource: () => null,
+  }, async ctx => {
     const before = await fs.readFile(ctx.ledgerFile, 'utf8');
     await assert.rejects(reclaimExecutionWorkspace(ctx.options()), { code: 'EVIDENCE_UNAVAILABLE' });
     assert.equal(ctx.reclaimOf(), undefined);
     assert.equal(ctx.registered(), true);
     assert.equal((await fs.stat(ctx.workspace)).isDirectory(), true);
     assert.equal(await fs.readFile(ctx.ledgerFile, 'utf8'), before);
-  });
-});
-
-test('integration: a non-archived worker fails closed and leaves the worktree untouched', async () => {
-  await withWorkspace('unarchived', { archived: [] }, async ctx => {
-    await assert.rejects(reclaimExecutionWorkspace(ctx.options()), { code: 'EVIDENCE_UNAVAILABLE' });
-    assert.equal(ctx.reclaimOf(), undefined);
-    assert.equal(ctx.registered(), true);
   });
 });
 
