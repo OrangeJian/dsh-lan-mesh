@@ -28,6 +28,7 @@ export function OwnerPlanPanel(props) {
   const [confirming, setConfirming] = React.useState(null);
   const [notice, setNotice] = React.useState({ text: '', bad: false });
   const [busy, setBusy] = React.useState('');
+  const [preview, setPreview] = React.useState(null);
   const retry = React.useRef(null);
   const page = React.useRef({ room: roomId, teamSeq: 0, listSeq: 0, detailSeq: 0 });
 
@@ -75,6 +76,7 @@ export function OwnerPlanPanel(props) {
     const room = roomId;
     if (page.current.room !== room) return null;
     const token = ++page.current.detailSeq;
+    setPreview(null);
     setSelected(id);
     setConfirming(null);
     setDetail({ status: 'loading', room, plan: null, error: '', code: '' });
@@ -93,6 +95,31 @@ export function OwnerPlanPanel(props) {
       const failed = errorOf(error);
       setDetail({ status: 'error', room, plan: null, error: failed.text, code: failed.code });
       return null;
+    }
+  }
+
+  async function loadPreview(plan) {
+    const room = roomId;
+    const token = page.current.detailSeq;
+    const active = () => page.current.room === room && page.current.detailSeq === token;
+    const version = { room, token };
+    setPreview({ ...version, loading: true });
+    try {
+      const report = await call('planPreview', {
+        roomId: room, planId: plan.planId, expectedGeneration: plan.generation,
+        expectedRevision: plan.revision, fingerprint: plan.fingerprint,
+      });
+      if (!active()) return;
+      const approval = report?.approval;
+      if (report?.bound !== true || approval?.roomId !== room || approval.planId !== plan.planId ||
+          approval.generation !== plan.generation || approval.revision !== plan.revision ||
+          approval.fingerprint !== plan.fingerprint) {
+        setPreview({ ...version, error: '预览版本已变更，请重新打开计划。' });
+        return;
+      }
+      setPreview({ ...version, report });
+    } catch (error) {
+      if (active()) setPreview({ ...version, error: errorOf(error).text });
     }
   }
 
@@ -143,6 +170,7 @@ export function OwnerPlanPanel(props) {
   const generation = Number.isSafeInteger(teamView.overview?.generation) ? teamView.overview.generation : null;
   const denied = [teamView, listView, detailView].some(view => view.status === 'error' && view.code === 'FORBIDDEN');
   const detailPlan = detailView.status === 'ready' ? detailView.plan : null;
+  const planPreview = preview?.room === roomId && preview.token === page.current.detailSeq ? preview : null;
   const trimmedPlanId = planId.trim();
   const expectedRevision = draftBase && draftBase.planId === trimmedPlanId ? draftBase.revision : 0;
 
@@ -357,8 +385,15 @@ export function OwnerPlanPanel(props) {
             task.detail ? h('p', { className: 'lm-ownerPlanTaskDetail' }, task.detail) : null))),
           h('div', { className: 'lm-ownerPlanActions' },
             h('button', { type: 'button', className: 'lm-btn lm-ownerPlanLoadDraft', onClick: () => loadAsDraft(detailPlan) }, '载入为草稿'),
-            detailPlan.approved ? h('span', { className: 'lm-ownerPlanApproved' }, '已批准版本 ' + detailPlan.revision) : null,
+            detailPlan.approved ? h('button', { type: 'button', className: 'lm-btn lm-ownerPlanPreview', disabled: planPreview?.loading, onClick: () => { void loadPreview(detailPlan); } }, planPreview?.loading ? '读取预览中…' : '预览已批准版本 ' + detailPlan.revision) : null,
             !detailPlan.approved && !confirming ? h('button', { type: 'button', className: 'lm-btn lm-btnPrimary lm-ownerPlanApprove', disabled: busy !== '', onClick: beginApprove }, '批准此版本') : null),
+          planPreview?.error ? h('p', { role: 'alert' }, planPreview.error) : null,
+          planPreview?.report ? h('div', { role: 'status' },
+            h('p', null, '依赖顺序：', planPreview.report.dag?.order?.join(' → ') || '无可展示的顺序'),
+            Array.isArray(planPreview.report.dag?.order) ? h('ul', null, ...planPreview.report.dag.order.map(id => {
+              const candidate = planPreview.report.candidates?.[id];
+              return h('li', { key: id }, id, ' · ', candidate?.dependencySatisfied ? '依赖已满足' : '依赖待满足', ' · ', candidate?.recommended?.join(', ') || '候选不可用');
+            })) : null) : null,
           !detailPlan.approved && confirming ? h('div', { className: 'lm-ownerPlanConfirm', role: 'group', 'aria-label': '批准确认' },
             h('p', null, model.approvalPrompt(confirming)),
             h('p', { className: 'lm-muted' }, '确认后服务端会原子绑定计划、版本、代次与指纹；版本变化会使旧批准失效。'),

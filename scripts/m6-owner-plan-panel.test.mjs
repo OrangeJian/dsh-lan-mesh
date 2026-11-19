@@ -83,7 +83,7 @@ async function settle(app) {
 }
 
 function fixtureCall(handlers) {
-  const calls = { teamOverview: [], planList: [], planRead: [], planSubmit: [], planApprove: [] };
+  const calls = { teamOverview: [], planList: [], planRead: [], planSubmit: [], planApprove: [], planPreview: [] };
   const call = async (method, payload) => {
     if (!(method in calls)) throw new Error('unexpected endpoint ' + method);
     calls[method].push(payload);
@@ -122,6 +122,31 @@ function overviewFixture(overrides) {
     executionCounts: {},
   }, overrides);
 }
+
+test('approved plan preview requests the displayed version and ignores a late response after switching rooms', async () => {
+  const approval = { planId: 'plan-1', roomId: ROOM, generation: 3, revision: 2, fingerprint: FP1 };
+  const plan = planFixture({ approval });
+  let respond;
+  const pending = new Promise(resolve => { respond = resolve; });
+  const { call, calls } = fixtureCall({
+    teamOverview: payload => overviewFixture({ roomId: payload.roomId }),
+    planList: payload => payload.roomId === ROOM ? [plan] : [],
+    planRead: plan,
+    planPreview: () => pending,
+  });
+  const app = createApp({ h, call, roomId: ROOM });
+  app.render();
+  await settle(app);
+  withClass(app.tree, 'lm-ownerPlanRow').props.onClick();
+  await settle(app);
+  withClass(app.tree, 'lm-ownerPlanPreview').props.onClick();
+  assert.deepEqual(calls.planPreview, [{ roomId: ROOM, planId: 'plan-1', expectedGeneration: 3, expectedRevision: 2, fingerprint: FP1 }]);
+  app.render({ h, call, roomId: OTHER_ROOM });
+  await settle(app);
+  respond({ bound: true, approval, dag: { order: ['previous-room-task'] } });
+  await settle(app);
+  assert.ok(!text(app.tree).includes('previous-room-task'));
+});
 
 function forbidden() {
   return Object.assign(new Error('forbidden'), { code: 'FORBIDDEN' });

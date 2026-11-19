@@ -709,6 +709,9 @@ export function createM6PlanEntry({ node, now = Date.now } = {}) {
       const room = await overviewOf(request.roomId);
       const ledger = store();
       const plan = await service().readPlan({ roomId: room.roomId, planId: request.planId }, { actorKey: actorKey() });
+      if ((request.expectedGeneration !== undefined && request.expectedGeneration !== plan.generation) ||
+          (request.expectedRevision !== undefined && request.expectedRevision !== plan.revision) ||
+          (request.fingerprint !== undefined && request.fingerprint !== plan.fingerprint)) fail('REVISION_CONFLICT');
       const snapshot = ledger.read();
       const team = snapshot.teams[room.roomId];
       const current = snapshot.plans[plan.planId];
