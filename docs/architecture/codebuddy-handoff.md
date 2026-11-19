@@ -17,10 +17,19 @@
 
 ## 继续开发
 
-1. **M6 候选数据**。先明确架构草案 D6 中本机授权范围和远端 Worker 的关系，再接入宿主管理的能力与当前授权数据。现有 `teamAuthorizations` 的本机 Leader 空会话授权、Worker 侧精确会话授权用途不同。能力声明只用于匹配，容量继续按 M1 单槽规则计算，`uncertain` 占槽。
-2. **M6 派单接入**。在隔离环境先验证 Coordinator 通过同一事务重读批准版本、指纹、代次、依赖、当前授权和容量，再进入既有执行链路。Worker 继续执行本机准入，重放、撤权、重启和重复执行要有回归。真实派单启用和多机验收依照 [M6 接入顺序](m6-integration-sequence.md)。
-3. **R2 宿主停止证明**。接入真实宿主运行实例与进程生命周期的证据，证明本次执行及其子进程均停止，并绑定执行 ID、代次、资源键和结果哈希。当前产品尚无可提供此证明的宿主来源。会话空闲、缺席和归档仅可用于诊断。固定成果留存与原子回收边界沿用现有 R2 服务。
+1. **M6 候选数据**。已完成（见下批交付记录）。D6 裁定与接线见 [M6 候选授权范围](m6-candidate-scope.md)。
+2. **M6 派单接入**。隔离环境验证已完成（`scripts/team-m6-schedule.test.mjs`）；真实派单启用和多机验收依照 [M6 接入顺序](m6-integration-sequence.md) 仍为 `NOT RUN`。
+3. **R2 宿主停止证明**。运行实例身份、唤醒生命周期证据与真实 `readStopProof` 源已接入（`lib/host-stop-evidence.mjs`，wake 路径记录 start/end）；**后代进程确认后端仍缺**，无后端时所有停止证明拒绝（fail closed），回收依旧不会被放行。会话空闲、缺席和归档仍仅可用于诊断。
 4. **集中验收**。开发批次完成后跑全量回归、客户端构建一致性和面板验证。DSH 真机、双机发现与恢复、真实派单与回收继续记为 `NOT RUN`，交付时附设备、步骤和确切提交。
+
+## 本批交付（CodeBuddy，基于 0ab0852）
+
+| 范围 | 交付 | 关键入口 |
+|---|---|---|
+| M6 候选授权 | D6 裁定落地：Leader 空会话授权=本机范围，Worker 精确会话授权仍为派单准入；能力声明仅匹配 | `lib/m6-candidate-authority.mjs`、`index.js`（preview 接线、`teamPlanScheduling`/`teamCapabilities` 配置） |
+| M6 派单接入 | Coordinator 单事务重读批准版本/指纹/代次/依赖/授权/容量后进入既有执行链路；reducer 支持 dependsOn 与 `DEPENDENCY_NOT_ACCEPTED`；`lan_mesh_team_schedule` opt-in 工具 | `lib/team-coordinator.mjs` `dispatchPlanTask`、`lib/team-state.mjs`、`lib/team-store.mjs`、`lib/team-tools.mjs` |
+| R2 停止证明 | 进程级运行实例身份 + 唤醒生命周期记录 + 真实 stop-proof 源；后代进程确认留 Owner 后端（缺失即拒绝） | `lib/host-stop-evidence.mjs`、`lib/service.mjs`（`hostInstance`、`teamStopEvidence`、wake 记录） |
+| 回归 | 新增 34 项测试；全量 `npm test` 799/799、panel 286/286、schema 82/82、composer 兼容、twin transport、Team HTTP smoke、client build 一致性均通过 | `scripts/m6-candidate-authority.test.mjs`、`scripts/team-state-deps.test.mjs`、`scripts/team-m6-schedule.test.mjs`、`scripts/host-stop-evidence.test.mjs` |
 
 ## 验证
 

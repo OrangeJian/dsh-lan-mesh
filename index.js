@@ -24,6 +24,7 @@ import { createPlanLedgerService } from './lib/m6-plan-service.mjs';
 import { previewPlanOrchestration } from './lib/m6-plan-preview.mjs';
 import { createResultReviewLedger } from './lib/m6-review-ledger.mjs';
 import { isOwnerPrincipal } from './lib/m6-host-approval-adapter.mjs';
+import { deriveCandidateAuthority } from './lib/m6-candidate-authority.mjs';
 import { normalizeStaticPeers } from './lib/static-peers.mjs';
 import { Notifier } from './lib/notify.mjs';
 import { teamToolDefinitions } from './lib/team-tools.mjs';
@@ -116,6 +117,20 @@ function resolveConfig(raw) {
     teamHeartbeatMs: value.teamHeartbeatMs ?? 20000,
     teamRequestWindowMs: value.teamRequestWindowMs ?? 120000,
     teamAuthorizations: Array.isArray(value.teamAuthorizations) ? value.teamAuthorizations.filter(row => row && typeof row === 'object').map(row => ({ roomId: row.roomId, leaderKey: row.leaderKey, workerSessionId: row.workerSessionId, workspaceRoot: row.workspaceRoot })) : [],
+    // M6 (opt-in): schedule tasks from an approved plan through the existing
+    // dispatch chain. Default off keeps M1 behavior exactly.
+    teamPlanScheduling: value.teamPlanScheduling === true,
+    // Host-managed capability declarations used for MATCHING ONLY (never
+    // authorization): { roomId, memberKey, capabilities: string[] }.
+    teamCapabilities: Array.isArray(value.teamCapabilities)
+      ? value.teamCapabilities.filter(row => row && typeof row === 'object').map(row => ({
+          roomId: row.roomId,
+          memberKey: row.memberKey,
+          capabilities: Array.isArray(row.capabilities)
+            ? row.capabilities.filter(item => typeof item === 'string' && item !== '')
+            : [],
+        }))
+      : [],
     trustedPeers: Array.isArray(value.trustedPeers)
       ? value.trustedPeers.filter((item) => typeof item === 'string' && item !== '')
       : DEFAULTS.trustedPeers,
@@ -718,12 +733,33 @@ export function createM6PlanEntry({ node, now = Date.now } = {}) {
       if (!team || team.generation !== plan.generation || team.leaderKey !== actorKey()) fail('ROOM_CHANGED');
       if (!current || current.revision !== plan.revision || current.fingerprint !== plan.fingerprint ||
           current.approval?.requestId !== plan.approval?.requestId) fail('REVISION_CONFLICT');
+      // Trusted candidate data, derived from CURRENT host-managed inputs only:
+      // the Leader-side room grant defines the local authorized scope (D6),
+      // Worker-side precise session grants are never enumerated here, and
+      // capability declarations are matching-only. A derivation failure fails
+      // closed: the preview then shows every candidate excluded UNAUTHORIZED.
+      let candidateAuthority;
+      try {
+        candidateAuthority = deriveCandidateAuthority({
+          roomId: room.roomId,
+          leaderKey: team.leaderKey,
+          nodeId: node?.identity?.nodeId ?? '',
+          trustedPeers: node?.config?.trustedPeers ?? [],
+          teamAuthorizations: node?.config?.teamAuthorizations ?? [],
+          teamCapabilities: node?.config?.teamCapabilities ?? [],
+          roomMembers: node?.roomsDoc?.rooms?.[room.roomId]?.members ?? [],
+        });
+      } catch {
+        candidateAuthority = { leaderScope: false, authorizations: [], profiles: [] };
+      }
       return previewPlanOrchestration(plan, {
         roomId: room.roomId,
         generation: team.generation,
         approvedPlan: plan.approval,
         knownTasks: snapshot.tasks,
         executions: snapshot.executions,
+        authorizations: candidateAuthority.authorizations,
+        profiles: candidateAuthority.profiles,
       });
     },
 
@@ -1704,7 +1740,7 @@ export function apply(ctx, rawConfig) {
         }),
       ];
         for (const definition of sharedDocumentTools(node, callerId)) disposers.push(registerTool(definition));
-        if (config.teamEnabled) for (const definition of teamToolDefinitions(node)) disposers.push(registerTool(definition));
+        if (config.teamEnabled) for (const definition of teamToolDefinitions(node, { planScheduling: config.teamPlanScheduling === true })) disposers.push(registerTool(definition));
         return () => {
           for (const dispose of disposers) dispose?.();
         };

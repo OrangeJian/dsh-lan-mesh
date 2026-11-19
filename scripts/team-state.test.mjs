@@ -50,14 +50,19 @@ test('lease expiry keeps capacity until explicit reconciliation', () => {
   assert.equal(f.state().executions['exec-2'].attempt, 2);
 });
 
-test('commands preserve input and reject dependency claims in M1', () => {
+test('commands preserve input; M6 dependencies are accepted but stay gated', () => {
   const f = fixture();
   const original = structuredClone(f.state());
-  assert.throws(() => f.run('create-task', { taskId: 'task-2', title: 'Dependent', workerKey: 'node-b/worker', dependsOn: ['task-1'] }), { code: 'UNSUPPORTED' });
-  assert.deepEqual(f.state(), original);
+  // M6: the former UNSUPPORTED rejection is replaced by validated dependsOn.
+  // task-1 is not accepted yet, so the dependent task starts `planned` and
+  // cannot be queued (DEPENDENCY_NOT_ACCEPTED) — see team-state-deps tests.
+  const created = f.run('create-task', { taskId: 'task-2', title: 'Dependent', workerKey: 'node-b/worker', dependsOn: ['task-1'] });
+  assert.deepEqual(created.dependsOn, ['task-1']);
+  assert.equal(created.status, 'planned');
+  assert.throws(() => f.run('queue', { taskId: 'task-2', executionId: 'exec-2' }), { code: 'DEPENDENCY_NOT_ACCEPTED' });
   const result = applyTeamCommand(f.state(), { type: 'pause', roomId: 'room-team', actorKey: 'node-a/leader', generation: 1 }, { now: 1000 });
   assert.equal(result.state.teams['room-team'].paused, true);
-  assert.deepEqual(f.state(), original);
+  assert.equal(f.state().teams['room-team'].paused, false, 'the input snapshot is never mutated');
 });
 
 test('out-of-order and late progress cannot overwrite a terminal result', () => {
