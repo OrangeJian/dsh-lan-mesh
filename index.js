@@ -21,6 +21,7 @@ import { ROOM_ATTACHMENT_LIMITS, ROOM_ATTACHMENT_WIRE_LIMITS } from './lib/room-
 import { MeshNode } from './lib/service.mjs';
 import { memberKey } from './lib/rooms.mjs';
 import { createPlanLedgerService } from './lib/m6-plan-service.mjs';
+import { previewPlanOrchestration } from './lib/m6-plan-preview.mjs';
 import { createResultReviewLedger } from './lib/m6-review-ledger.mjs';
 import { isOwnerPrincipal } from './lib/m6-host-approval-adapter.mjs';
 import { normalizeStaticPeers } from './lib/static-peers.mjs';
@@ -700,6 +701,27 @@ export function createM6PlanEntry({ node, now = Date.now } = {}) {
       const request = body(payload);
       const room = await overviewOf(request.roomId);
       return service().readPlan({ roomId: room.roomId, planId: request.planId }, { actorKey: actorKey() });
+    },
+
+    async preview(payload, admission) {
+      requireOwnerAdmission(admission);
+      const request = body(payload);
+      const room = await overviewOf(request.roomId);
+      const ledger = store();
+      const plan = await service().readPlan({ roomId: room.roomId, planId: request.planId }, { actorKey: actorKey() });
+      const snapshot = ledger.read();
+      const team = snapshot.teams[room.roomId];
+      const current = snapshot.plans[plan.planId];
+      if (!team || team.generation !== plan.generation || team.leaderKey !== actorKey()) fail('ROOM_CHANGED');
+      if (!current || current.revision !== plan.revision || current.fingerprint !== plan.fingerprint ||
+          current.approval?.requestId !== plan.approval?.requestId) fail('REVISION_CONFLICT');
+      return previewPlanOrchestration(plan, {
+        roomId: room.roomId,
+        generation: team.generation,
+        approvedPlan: plan.approval,
+        knownTasks: snapshot.tasks,
+        executions: snapshot.executions,
+      });
     },
 
     /** Create or version-bump a plan draft. Body identity fields are ignored. */
@@ -1797,6 +1819,8 @@ export function apply(ctx, rawConfig) {
           return handlePlanEndpoint('list', request);
         case 'planRead':
           return handlePlanEndpoint('read', request);
+        case 'planPreview':
+          return handlePlanEndpoint('preview', request);
         case 'planSubmit':
           return handlePlanEndpoint('submit', request);
         case 'planApprove':

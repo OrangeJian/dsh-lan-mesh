@@ -35,6 +35,19 @@ const TASKS_V2 = [
 ];
 const FP = planFingerprint(TASKS);
 
+test('owner preview reads the approved ledger version and ignores untrusted candidate inputs', async t => {
+  const { raw, entry } = await setup(t);
+  await entry.submit(submit());
+  await entry.approve({ roomId: ROOM, planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP, requestId: 'approve-preview' });
+  const payload = { roomId: ROOM, planId: 'plan-1', tasks: [], authorizations: ['node-evil/agent'] };
+  await assert.rejects(raw.preview(payload, { kind: 'agent' }), { code: 'NOT_OWNER' });
+  const report = await raw.preview(payload, OWNER);
+  assert.equal(report.bound, true);
+  assert.deepEqual(report.dag.order, ['A', 'B']);
+  assert.deepEqual(report.candidates.A.recommended, []);
+  assert.equal(report.candidates.A.dispatchable, false);
+});
+
 function roomOf(id, leaderKey, name = 'Owner Room') {
   return {
     id, name,
