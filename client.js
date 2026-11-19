@@ -1382,16 +1382,42 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-roomTab{font:inherit;font-size:12px;padding:6px 14px;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;background:none;color:var(--dsw-alias-label-secondary);cursor:pointer;transition:var(--lmr-raise)}
 .lm-roomTab:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
 .lm-roomTabActive{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l1);font-weight:600;box-shadow:inset 0 2px 0 var(--dsw-alias-brand-primary)}
-.lm-docsPane{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;padding:12px 16px;overflow:auto}
-.lm-docListHead{display:flex;align-items:center;gap:8px}
+.lm-docsPane{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;padding:16px 20px;overflow:hidden}
+.lm-docsHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.lm-docsHeaderText{display:flex;flex-direction:column;gap:3px;min-width:0}
+.lm-docsTitle{margin:0;font-size:16px;font-weight:600;letter-spacing:.01em}
+.lm-docsSubtitle{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
+.lm-docsActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lm-docImportBtn{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.lm-docImportBusy{opacity:.5;cursor:default}
+.lm-docImportInput{display:none}
+.lm-docsToolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-md,10px);background:var(--dsw-alias-bg-layer-1)}
+.lm-docsOffline{font-size:12px;line-height:1.5}
+.lm-docsBody{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);gap:14px;flex:1;min-height:0}
+.lm-docsSidebar{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;padding-right:2px}
+.lm-docsSidebar .lm-card{padding:12px}
+.lm-docsMain{display:flex;flex-direction:column;min-height:0;overflow:auto;padding:16px 18px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-lg,14px);background:var(--dsw-alias-bg-layer-1);box-shadow:var(--lmr-shadow-card)}
+.lm-docListHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .lm-docListTitle{flex:1 1 auto}
-.lm-docList{display:flex;flex-direction:column;gap:6px}
-.lm-docRow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-sm,8px);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);cursor:pointer;transition:var(--lmr-raise)}
-.lm-docRow:hover{border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 45%,var(--dsw-alias-border-l1));box-shadow:var(--lmr-shadow-card)}
-.lm-docRowActive{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
-.lm-docRowTitle{font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm-docList{display:flex;flex-direction:column;gap:8px}
+.lm-docRow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;width:100%;box-sizing:border-box;text-align:left;font:inherit;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-md,10px);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);cursor:pointer;transition:var(--lmr-raise)}
+.lm-docRow:hover{border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 45%,var(--dsw-alias-border-l1));background:var(--dsw-alias-bg-layer-1);box-shadow:var(--lmr-shadow-card)}
+.lm-docRowActive{border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 55%,transparent);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 7%,var(--dsw-alias-bg-layer-1));box-shadow:inset 3px 0 0 var(--dsw-alias-brand-primary)}
+.lm-docRowTitle{font-weight:600;font-size:13px;flex:1 1 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lm-docRowHead{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .lm-docRowAuthor{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.lm-docListState{padding:20px 14px;text-align:center;border:1px dashed var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-md,10px);background:var(--dsw-alias-bg-base);font-size:12px;line-height:1.7}
+.lm-docsEmptyState{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;flex:1;min-height:260px;text-align:center;padding:24px}
+.lm-docsEmptyIcon{width:52px;height:62px;border:2px solid var(--dsw-alias-border-l2);border-radius:8px;position:relative;background:var(--dsw-alias-bg-base)}
+.lm-docsEmptyIcon::before{content:'';position:absolute;right:-2px;top:-2px;width:14px;height:14px;border-left:2px solid var(--dsw-alias-border-l2);border-bottom:2px solid var(--dsw-alias-border-l2);border-bottom-left-radius:6px;background:var(--dsw-alias-bg-layer-1)}
+.lm-docsEmptyIcon::after{content:'';position:absolute;left:10px;right:10px;top:18px;height:2px;background:var(--dsw-alias-border-l1);box-shadow:0 9px 0 var(--dsw-alias-border-l1),0 18px 0 var(--dsw-alias-border-l1)}
+.lm-docsEmptyState h3{margin:0;font-size:15px;font-weight:600}
+.lm-docsEmptyState p{margin:0;max-width:360px;font-size:12px;line-height:1.75;color:var(--dsw-alias-label-secondary)}
+.lm-contextDeliveries{margin-top:4px;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--lmr-radius-md,10px);background:var(--dsw-alias-bg-base);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.lm-contextDeliveries article{padding:6px 0;border-top:1px solid var(--dsw-alias-border-l1)}
+.lm-docsMain .lm-docBody{max-height:none}
+@media(max-width:1100px){.lm-docsBody{grid-template-columns:minmax(180px,220px) minmax(0,1fr)}}
+@media(max-width:900px){.lm-docsPane{overflow:auto}.lm-docsBody{grid-template-columns:minmax(0,1fr)}.lm-docsSidebar{max-height:38vh}.lm-docsMain{min-height:48vh}}
 .lm-docConflicts{font-size:11px;border-radius:999px;padding:1px 8px;white-space:nowrap;background:var(--dsw-alias-state-warn-primary);color:var(--dsw-alias-label-primary-foreground)}
 .lm-docRowTask{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .lm-docDetail{display:flex;flex-direction:column;gap:10px;min-height:0;padding-top:4px}
@@ -3218,52 +3244,126 @@ function MessageBody(props) {
         );
       }
 
-      return h(
-        'div',
-        { className: 'lm-docsPane' },
-        h(
-          'div',
-          { className: 'lm-docListHead' },
-          h('span', { className: 'lm-docListTitle lm-sectionHead' }, COPY.docList),
-          h('button',{type:'button',className:'lm-contextDeliveriesToggle','aria-expanded':deliveriesOpen,onClick:()=>deliveriesOpen?setDeliveriesOpen(false):loadDeliveries()},'上下文投递记录'),
+      // Two-pane workspace: a compact scrollable document list and a reading
+      // surface. All endpoints, labels and control classes stay unchanged;
+      // only their grouping/layout changes (see .lm-docs* styles).
+      const importControl = canCreate === true
+        ? h('label', { className: 'lm-btn lm-btnSmall lm-docImportBtn' + (busy ? ' lm-docImportBusy' : '') },
+            h('span', null, '导入 Markdown'),
+            h('input', {
+              type: 'file',
+              className: 'lm-docImportInput',
+              accept: '.md,.markdown,text/plain,text/markdown',
+              'aria-label': '导入 Markdown',
+              disabled: !!busy,
+              onChange: async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                event.target.value = '';
+                setBusy('import');
+                try {
+                  if (file.size > 256 * 1024) throw new Error('文档超过 256 KiB');
+                  const content = await file.text();
+                  const fingerprint = JSON.stringify([roomId, file.name, content]);
+                  if (importRetry.current?.fingerprint !== fingerprint) importRetry.current = { fingerprint, requestId: crypto.randomUUID() };
+                  const value = await call('documentImport', { roomId, content, name: file.name, title: file.name, requestId: importRetry.current.requestId });
+                  if (!docAccepted(value)) throw new Error(value?.reason || '导入不可用');
+                  importRetry.current = null;
+                  await loadList();
+                } catch (error) { flash(errorText(error), true); }
+                finally { setBusy(''); }
+              },
+            }))
+        : null;
 
-          canCreate ? h('input',{type:'file',accept:'.md,.markdown,text/plain,text/markdown','aria-label':'导入 Markdown',disabled:!!busy,onChange:async(event)=>{
-            const file=event.target.files?.[0];if(!file)return;event.target.value='';setBusy('import');
-            try{if(file.size>256*1024)throw new Error('文档超过 256 KiB');const content=await file.text();const fingerprint=JSON.stringify([roomId,file.name,content]);if(importRetry.current?.fingerprint!==fingerprint)importRetry.current={fingerprint,requestId:crypto.randomUUID()};const value=await call('documentImport',{roomId,content,name:file.name,title:file.name,requestId:importRetry.current.requestId});if(!docAccepted(value))throw new Error(value?.reason||'导入不可用');importRetry.current=null;await loadList();}catch(error){flash(errorText(error),true);}finally{setBusy('');}
-          }}) : null,
-          view.offline?h('div',{className:'lm-muted lm-note'},'当前显示本机缓存，恢复连接后同步。'):null,
-          view.status==='ready' ? h('button',{type:'button',onClick:async()=>{try{const value=await call('documentExport',{documentId:view.document.documentId,revisionId:view.revision?.revisionId});if(!docAccepted(value)||typeof value.content!=='string')throw new Error(value?.reason||'导出不可用');const url=URL.createObjectURL(new Blob([value.content],{type:'text/markdown;charset=utf-8'}));const link=globalThis.document.createElement('a');link.href=url;link.download=value.name||'document.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){flash(errorText(error),true);}}},'下载 Markdown') : null,
-          view.status==='ready' ? h('button',{type:'button',disabled:!view.document.contentHash,onClick:()=>props.onContextSelect?.({documentId:view.document.documentId,revisionId:view.revision?.revisionId??view.document.headRevisionId,contentHash:view.document.contentHash,title:view.document.title})},(props.contextDocuments??[]).some(r=>r.documentId===view.document.documentId)?'取消上下文文档':'选择此版本为上下文') : null,
-
+      const headerBlock = h('header', { className: 'lm-docsHeader' },
+        h('div', { className: 'lm-docsHeaderText' },
+          h('h2', { className: 'lm-docsTitle' }, COPY.docList),
+          h('p', { className: 'lm-docsSubtitle' }, '房间内共享的 Markdown 文档 · 版本、提案与历史由服务端账本确认')),
+        h('div', { className: 'lm-docsActions' }, importControl,
           canCreate === true
-            ? h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'lm-btn lm-btnSmall lm-docNewBtn',
-                  'aria-pressed': createOpen === true,
-                  onClick: () => setCreateOpen((open) => open !== true),
-                },
-                createOpen === true ? COPY.collapse : COPY.docNew,
-              )
-            : null,
-        ),
-        notice === '' ? null : h('div', { className: noticeBad ? 'lm-error lm-note' : 'lm-ok lm-note' }, notice),
-        deliveriesOpen ? h('section',{className:'lm-contextDeliveries','aria-label':'上下文投递记录'},
-          deliveries.status==='loading'?h('div',{role:'status'},'正在加载投递记录…'):null,
-          deliveries.status==='error'?h('div',{role:'alert'},deliveries.reason||'投递记录不可用'):null,
-          h('button',{type:'button',className:'lm-contextDeliveriesRetry',disabled:deliveries.status==='loading',onClick:loadDeliveries},'刷新 / 重试'),
-          deliveries.status==='ready'&&deliveries.rows.length===0?h('div',{},'暂无投递记录'):null,
-          ...deliveries.rows.map(row=>h('article',{key:row.deliveryId},
-            h('div',{},'Agent: '+String(row.recipient??'')+' · '+String(row.status??'')),
-            ...(row.packet?.selectedDocumentVersions??[]).map((ref,index)=>h('div',{key:String(ref.documentId??index)},String(ref.title??ref.documentId??'')+' · '+String(ref.revisionId??'')+' · '+String(ref.contentHash??''))),
-            ...(row.packet?.taskResultRefs??[]).map(ref=>h('div',{key:'result:'+ref.executionId},
-              '成果 · '+ref.executionId+' · '+ref.resultHash+' · '+({review:'待审查',accepted:'已验收',failed:'失败',blocked:'受阻',cancelled:'已取消',unverified:'未经核验'}[ref.reviewStatus]??'未知状态')))
-          ))) : null,
+            ? h('button', {
+                type: 'button',
+                className: 'lm-btn lm-docNewBtn' + (createOpen === true ? '' : ' lm-btnPrimary'),
+                'aria-pressed': createOpen === true,
+                onClick: () => setCreateOpen((open) => open !== true),
+              }, createOpen === true ? COPY.collapse : COPY.docNew)
+            : null));
+
+      const deliveriesToggle = h('button', {
+        type: 'button',
+        className: 'lm-btn lm-btnSmall lm-contextDeliveriesToggle',
+        'aria-expanded': deliveriesOpen,
+        onClick: () => deliveriesOpen ? setDeliveriesOpen(false) : loadDeliveries(),
+      }, '上下文投递记录');
+
+      const downloadButton = view.status === 'ready'
+        ? h('button', { type: 'button', className: 'lm-btn lm-btnSmall', onClick: async () => {
+            try {
+              const value = await call('documentExport', { documentId: view.document.documentId, revisionId: view.revision?.revisionId });
+              if (!docAccepted(value) || typeof value.content !== 'string') throw new Error(value?.reason || '导出不可用');
+              const url = URL.createObjectURL(new Blob([value.content], { type: 'text/markdown;charset=utf-8' }));
+              const link = globalThis.document.createElement('a');
+              link.href = url;
+              link.download = value.name || 'document.md';
+              link.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch (error) { flash(errorText(error), true); }
+          } }, '下载 Markdown')
+        : null;
+
+      const contextButton = view.status === 'ready'
+        ? h('button', {
+            type: 'button',
+            className: 'lm-btn lm-btnSmall',
+            disabled: !view.document.contentHash,
+            onClick: () => props.onContextSelect?.({ documentId: view.document.documentId, revisionId: view.revision?.revisionId ?? view.document.headRevisionId, contentHash: view.document.contentHash, title: view.document.title }),
+          }, (props.contextDocuments ?? []).some(r => r.documentId === view.document.documentId) ? '取消上下文文档' : '选择此版本为上下文')
+        : null;
+
+      const toolbarBlock = h('div', { className: 'lm-docsToolbar' },
+        deliveriesToggle,
+        view.offline ? h('span', { className: 'lm-muted lm-note lm-docsOffline' }, '当前显示本机缓存，恢复连接后同步。') : null,
+        downloadButton,
+        contextButton);
+
+      const deliveriesBlock = deliveriesOpen
+        ? h('section', { className: 'lm-contextDeliveries', 'aria-label': '上下文投递记录' },
+            deliveries.status === 'loading' ? h('div', { role: 'status' }, '正在加载投递记录…') : null,
+            deliveries.status === 'error' ? h('div', { role: 'alert' }, deliveries.reason || '投递记录不可用') : null,
+            h('button', { type: 'button', className: 'lm-contextDeliveriesRetry', disabled: deliveries.status === 'loading', onClick: loadDeliveries }, '刷新 / 重试'),
+            deliveries.status === 'ready' && deliveries.rows.length === 0 ? h('div', {}, '暂无投递记录') : null,
+            ...deliveries.rows.map(row => h('article', { key: row.deliveryId },
+              h('div', {}, 'Agent: ' + String(row.recipient ?? '') + ' · ' + String(row.status ?? '')),
+              ...(row.packet?.selectedDocumentVersions ?? []).map((ref, index) => h('div', { key: String(ref.documentId ?? index) }, String(ref.title ?? ref.documentId ?? '') + ' · ' + String(ref.revisionId ?? '') + ' · ' + String(ref.contentHash ?? ''))),
+              ...(row.packet?.taskResultRefs ?? []).map(ref => h('div', { key: 'result:' + ref.executionId },
+                '成果 · ' + ref.executionId + ' · ' + ref.resultHash + ' · ' + ({ review: '待审查', accepted: '已验收', failed: '失败', blocked: '受阻', cancelled: '已取消', unverified: '未经核验' }[ref.reviewStatus] ?? '未知状态')))
+            )))
+        : null;
+
+      const sidebarBlock = h('aside', { className: 'lm-docsSidebar', 'aria-label': '文档列表' },
         createOpen === true ? createForm : null,
         listBlock,
-        detailBlock,
-      );
+        deliveriesBlock);
+
+      const hasList = stateLine === null && list.documents.length > 0;
+      const emptyDetailBlock = h('div', { className: 'lm-docsEmptyState' },
+        h('div', { className: 'lm-docsEmptyIcon', 'aria-hidden': 'true' }),
+        h('h3', null, hasList ? '选择一份文档开始阅读' : COPY.docEmpty),
+        h('p', null, hasList
+          ? '左侧是房间内的共享文档。选中后可阅读当前版本、提交修改提案、查看历史，或把当前版本设为对话上下文。'
+          : '新建或导入一份 Markdown；提案经 Leader 确认后才会成为房间的共享版本。'),
+        canCreate === true && createOpen === false
+          ? h('button', { type: 'button', className: 'lm-btn lm-btnPrimary', onClick: () => setCreateOpen(true) }, COPY.docNew)
+          : null);
+
+      const mainBlock = h('section', { className: 'lm-docsMain' }, detailBlock === null ? emptyDetailBlock : detailBlock);
+
+      return h('div', { className: 'lm-docsPane' },
+        headerBlock,
+        notice === '' ? null : h('div', { className: noticeBad ? 'lm-error lm-note' : 'lm-ok lm-note' }, notice),
+        toolbarBlock,
+        h('div', { className: 'lm-docsBody' }, sidebarBlock, mainBlock));
     }
 
     /* @ux-shell:room-tabs:start */
