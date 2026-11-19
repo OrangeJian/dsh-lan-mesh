@@ -872,6 +872,9 @@ lastNodes.find(entry=>hasClass(entry,'lm-pref-muted')).props.onChange({target:{c
 await settleRail();
 checks.push(['room mute saves through Host and refreshes its indicator', asked.includes('roomPreferences') && count('lm-pref-muted')===2 && lastText.includes('静音')]);
 await clickRail('lm-archiveRoom');
+// The first click must only ask: the room stays active until the explicit confirm.
+checks.push(['archive asks before changing lifecycle',count('lm-roomRow')===2&&count('lm-archiveRoomConfirm')===1]);
+await clickRail('lm-archiveRoomConfirm');
 checks.push(['archive hides active row and archived history is collapsed by default',count('lm-roomRow')===1&&count('lm-archivedRoom')===0]);
 await clickRail('lm-archivedToggle');
 checks.push(['archived entry offers history and Leader restore',count('lm-archivedRoom')===1&&count('lm-restoreRoom')===1]);

@@ -861,6 +861,10 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-projectEntry .lm-roomPreferences>summary:focus-visible,.lm-discoverPanel:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .lm-projectMenu{position:absolute;right:0;top:100%;width:238px;max-width:calc(100vw - 32px);padding:10px;display:flex;flex-direction:column;gap:10px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;z-index:4;box-sizing:border-box;box-shadow:0 4px 16px #0002}
 .lm-projectMenu .lm-row{align-items:flex-start;font-size:12px;gap:7px}.lm-projectMenu input{flex:none}
+.lm-archiveConfirm{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.lm-archiveConfirmText{color:var(--dsw-alias-label-secondary);line-height:1.5;overflow-wrap:anywhere}
+.lm-archiveConfirmActions{display:flex;gap:6px}
+.lm-archiveRoom{align-self:flex-start;min-height:30px}
 @media(max-width:1100px){.lm-discoverPanel{left:16px;right:16px;top:56px;bottom:16px;width:auto;max-width:720px;margin-left:auto}}
 @media(max-width:600px){.lm-discoverPanel{left:8px;right:8px;top:48px;bottom:8px;padding:14px}.lm-discoverProject{gap:10px}.lm-discoverHead h2{font-size:16px}}
     /* @ux-shell:project-styles:end */
@@ -1110,6 +1114,10 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-panel ::-webkit-scrollbar-track{background:transparent}
 .lm-panel ::-webkit-scrollbar-corner{background:transparent}
 @media(prefers-reduced-motion:reduce){.lm-panel *,.lm-panel *::before,.lm-panel *::after{transition:none!important;animation-duration:0s!important}}
+/* Keyboard focus fallback: :where keeps specificity at zero, so components
+   that draw their own focus ring (tabs, inputs) keep winning. */
+.lm-panel :where(button:focus-visible){outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.lm-panel :where([aria-busy='true']){cursor:progress}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
    html[data-agent-team-mode='team']: those two address the profile rather
@@ -4551,6 +4559,9 @@ function RoomTabs(props) {
       const visibleRooms=filterJoinedProjects(rooms,projectQuery);
       const [showDiscover,setShowDiscover]=React.useState(false);
       const [discoverQuery,setDiscoverQuery]=React.useState('');
+      // Archiving is a lifecycle change a misclick should not make: the menu
+      // button first asks, and only the explicit confirm row calls lifecycle.
+      const [archiveConfirmRoom,setArchiveConfirmRoom]=React.useState('');
       const discoverRef=React.useRef(null),discoverTriggerRef=React.useRef(null),discoverCycle=React.useRef(0);
       const closeDiscover=()=>{discoverCycle.current++;setShowDiscover(false);discoverTriggerRef.current?.focus?.();};
       React.useEffect(()=>{if(showDiscover)discoverRef.current?.focus?.();},[showDiscover]);
@@ -4748,10 +4759,16 @@ function RoomTabs(props) {
                     room.localPreferences?.muted ? h('span',{className:'lm-badge'},'静音') : null,
                     room.isLeader === true ? h('span', { className: 'lm-badge lm-badgeLeader' }, COPY.roleLeader) : null,
                     unreadOf(room.id) > 0 ? h('span', { className: 'lm-roomUnread' }, String(unreadOf(room.id))) : null,
-                  ), h('details',{className:'lm-roomPreferences',onToggle:event=>{if(event.currentTarget.open)event.currentTarget.querySelector?.('.lm-projectMenu')?.scrollIntoView?.({block:'nearest'});},onKeyDown:event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector?.('summary')?.focus?.();}}},
+                  ),                   h('details',{className:'lm-roomPreferences',onToggle:event=>{if(event.currentTarget.open)event.currentTarget.querySelector?.('.lm-projectMenu')?.scrollIntoView?.({block:'nearest'});else setArchiveConfirmRoom('');},onKeyDown:event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector?.('summary')?.focus?.();}}},
                     h('summary',{'aria-label':COPY.projectActions+' · '+(room.name||room.id),title:COPY.projectActions},'…'),
                     h('div',{className:'lm-projectMenu'},
-                    room.isLeader ? h('button',{type:'button',className:'lm-archiveRoom',disabled:!!props.preferenceBusy,onClick:()=>props.onLifecycle?.(room,'archived')},'归档房间') : null,
+                    room.isLeader ? (archiveConfirmRoom===room.id
+                      ? h('div',{className:'lm-archiveConfirm'},
+                          h('span',{className:'lm-archiveConfirmText'},'归档后房间移入历史，可从「已归档」恢复。'),
+                          h('div',{className:'lm-archiveConfirmActions'},
+                            h('button',{type:'button',className:'lm-btn lm-btnSmall lm-archiveRoomConfirm',disabled:!!props.preferenceBusy,onClick:()=>{setArchiveConfirmRoom('');props.onLifecycle?.(room,'archived');}},'确认归档'),
+                            h('button',{type:'button',className:'lm-btn lm-btnSmall',disabled:!!props.preferenceBusy,onClick:()=>setArchiveConfirmRoom('')},'取消')))
+                      : h('button',{type:'button',className:'lm-archiveRoom',disabled:!!props.preferenceBusy,onClick:()=>setArchiveConfirmRoom(room.id)},'归档房间')) : null,
                     ...[['pinned','置顶'],['muted','静音'],['muteAtException','静音时被 @ 仍提醒']].map(([field,label])=>h('label',{key:field,className:'lm-row'},
                       h('input',{type:'checkbox',className:`lm-pref-${field}`,checked:room.localPreferences?.[field] ?? (field==='muteAtException'),disabled:!!props.preferenceBusy,onChange:event=>props.onPreferences?.(room.id,{[field]:event.target.checked})}),label)),
                     props.preferenceBusy===room.id ? h('span',{role:'status'},'正在保存…') : null,
@@ -5297,7 +5314,7 @@ function roomTaskBoardView({rooms,self,query='',status='all',assignee='all'}={})
 function RoomTaskBoard(props){
  const {h,React}=props;const [query,setQuery]=React.useState(''),[status,setStatus]=React.useState('all'),[assignee,setAssignee]=React.useState('all');
  const model=props.modelOf({rooms:props.rooms,self:props.self,query,status,assignee});const labels={all:'全部状态',open:'待开始',doing:'进行中',blocked:'受阻',done:'已完成',unknown:'未知状态'};
- return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',onClick:props.onRefresh},'刷新'):null),h('p',{className:'lm-taskBoardScope'},'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),model.groups.length?model.groups.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),...group.rows.map(row=>h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null)))):h('p',{className:'lm-muted'},model.counts.all?'没有匹配的房间任务':'当前没有房间任务'));
+ return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',disabled:props.refreshing===true,'aria-busy':props.refreshing===true?'true':undefined,onClick:props.onRefresh},props.refreshing===true?'刷新中…':'刷新'):null),h('p',{className:'lm-taskBoardScope'},'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),model.groups.length?model.groups.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),...group.rows.map(row=>h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null)))):h('p',{className:'lm-muted'},model.counts.all?'没有匹配的房间任务':'当前没有房间任务'));
 }
     /* @ux-shell:task-board-component:end */
     /* @ux-shell:owner-plan-model:start */
@@ -6829,6 +6846,10 @@ function OwnerResultPanel(props) {
       // no matter which nav view is showing.
       const [expandedMessages, setExpandedMessages] = React.useState({});
       const [navigationNotice,setNavigationNotice]=React.useState('');
+      // Refresh surfaces (network overview, task board) share one busy state;
+      // refreshAll itself is single-flight, so repeated clicks never double-fire.
+      const [refreshing, setRefreshing] = React.useState(false);
+      const refreshPending = React.useRef(false);
 
       const call = React.useCallback(async (endpoint, payload) => panelCall(endpoint, payload), []);
 
@@ -6919,9 +6940,14 @@ function OwnerResultPanel(props) {
         };
       }, [refresh]);
 
-      const refreshAll = () => {
-        refresh();
-        loadAgents();
+      // Single-flight: repeated clicks during a refresh only re-enter after the
+      // current round settles, and the surfaces show the busy state meanwhile.
+      const refreshAll = async () => {
+        if(refreshPending.current)return;
+        refreshPending.current = true;
+        setRefreshing(true);
+        try { await Promise.all([refresh(), loadAgents()]); }
+        finally { refreshPending.current = false; setRefreshing(false); }
       };
 
       const bringInAgent = async (row) => {
@@ -7135,6 +7161,7 @@ function OwnerResultPanel(props) {
                 onMarkRead: markRead,
                 onMarkMessageRead: markMessageRead,
                 onRefresh: refreshAll,
+                refreshing,
                 onImport: bringInAgent,
                 onDial: dialAgent,
                 onCreateAgent: createAgent,
