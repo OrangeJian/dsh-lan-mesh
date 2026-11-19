@@ -263,6 +263,22 @@ test('revocation at canRelease blocks Git removal and records the failed step', 
   });
 });
 
+test('reclamation retains the workspace when the stop proof is withdrawn after reservation', async () => {
+  await withContext('withdrawn-proof', async ctx => {
+    await ctx.complete();
+    const provide = validProvider(ctx);
+    let observed = false;
+    const evidenceProvider = async request => {
+      if (observed) throw new Error('stop proof withdrawn');
+      observed = true;
+      return provide(request);
+    };
+    await assert.rejects(reclaimExecutionWorkspace(ctx.options({ evidenceProvider })), { code: 'RELEASE_NOT_AUTHORIZED' });
+    assert.equal(ctx.registered(), true);
+    assert.equal((await fs.lstat(ctx.workspace)).isDirectory(), true);
+  });
+});
+
 test('canRelease refuses a changed reservation identity, not just a changed phase', async () => {
   await withContext('identity-swap', async ctx => {
     await ctx.complete();

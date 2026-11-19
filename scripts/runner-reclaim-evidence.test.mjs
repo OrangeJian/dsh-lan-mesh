@@ -405,6 +405,18 @@ test('integration: idle plus archived without an explicit stop proof fails close
   });
 });
 
+test('integration: matching host proof is checked again against the durable reservation', async () => {
+  let observations = 0;
+  await withWorkspace('verified-release', {
+    stopProofSource: identity => { observations++; return stopProof(identity); },
+  }, async ctx => {
+    await reclaimExecutionWorkspace(ctx.options());
+    assert.equal(observations, 2);
+    assert.equal(ctx.reclaimOf().phase, 'verified');
+    assert.equal(ctx.registered(), false);
+  });
+});
+
 test('integration: a tampered durable result fails closed before any removal', async () => {
   await withWorkspace('tampered', {}, async ctx => {
     const state = JSON.parse(await fs.readFile(ctx.ledgerFile, 'utf8'));
