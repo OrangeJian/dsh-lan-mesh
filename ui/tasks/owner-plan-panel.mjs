@@ -12,6 +12,44 @@
  *    write retry;
  *  - switching Rooms discards in-flight answers from the previous Room.
  */
+/**
+ * Render the bound preview report: per-task state, exclusion reasons (with
+ * Chinese labels) and the Host's explanations. Presentation only: every value
+ * comes from the report the Host returned.
+ */
+function planPreviewView(h, model, report) {
+  const view = model.previewRows(report);
+  const lines = model.explanationLines(report.explanations);
+  const orderLine = h('p', null, '依赖顺序：', report.dag?.order?.join(' → ') || '无可展示的顺序');
+  const summary = view.rows.length
+    ? h('p', { className: 'lm-ownerPlanPreviewSummary' },
+        `可派发 ${view.summary.dispatchable} · 等待依赖 ${view.summary.blocked} · 无可用候选 ${view.summary.noCandidate}`
+        + (view.summary.unknown ? ` · 无候选数据 ${view.summary.unknown}` : ''))
+    : null;
+  const taskRows = view.rows.length
+    ? h('ul', { className: 'lm-ownerPlanPreviewTasks' }, ...view.rows.map(row => planPreviewRow(h, row)))
+    : null;
+  const explanationRows = lines.length
+    ? h('ul', { className: 'lm-ownerPlanExplanations', 'aria-label': '候选说明' },
+        ...lines.map((line, index) => h('li', { key: String(index) }, line)))
+    : null;
+  return h('div', { className: 'lm-ownerPlanPreviewReport', role: 'status' }, orderLine, summary, taskRows, explanationRows);
+}
+
+function planPreviewRow(h, row) {
+  const className = 'lm-ownerPlanPreviewRow'
+    + (row.state === 'dispatchable' ? ' lm-ownerPlanPreviewOk' : '')
+    + (row.state === 'noCandidate' ? ' lm-ownerPlanPreviewWarn' : '');
+  const children = [
+    h('strong', null, row.taskId),
+    h('span', { className: 'lm-ownerPlanPreviewState' }, row.stateLabel),
+    row.recommended.length ? h('small', null, '候选 ' + row.recommended.join('、')) : null,
+    ...row.excluded.map(entry => h('small', { key: entry.memberKey + '|' + entry.reason },
+      `${entry.memberKey}：${entry.text || entry.reason}`)),
+  ];
+  return h('li', { key: row.taskId, className }, ...children);
+}
+
 export function OwnerPlanPanel(props) {
   const { h, React, call, roomId } = props;
   const model = props.model ?? ownerPlanPanelModel;
@@ -346,11 +384,13 @@ export function OwnerPlanPanel(props) {
 
   const rows = listView.rows;
   const tasks = detailPlan ? model.taskRows(detailPlan.tasks) : [];
+  const teamCounts = model.teamCountLine(teamView.overview);
   return h('section', { className: 'lm-task lm-ownerPlanPanel', 'aria-label': 'M6 计划草稿与批准' },
     h('div', { className: 'lm-ownerPlanHead' },
       h('div', null,
         h('h3', null, '计划草稿与批准 · 本机'),
-        h('p', { className: 'lm-muted' }, '服务端账本校验版本、代次与指纹。批准只绑定下面展示的确切版本。')),
+        h('p', { className: 'lm-muted' }, '服务端账本校验版本、代次与指纹。批准只绑定下面展示的确切版本。'),
+        teamCounts !== '' ? h('p', { className: 'lm-ownerPlanCounts' }, teamCounts) : null),
       h('button', { type: 'button', className: 'lm-btn lm-ownerPlanRefresh', disabled: busy !== '', onClick: () => { void refreshAll(); } }, '刷新计划')),
     teamView.status === 'error' ? h('p', { className: 'lm-ownerPlanNotice lm-ownerPlanNoticeBad', role: 'alert' }, teamView.error) : null,
     h('p', { className: 'lm-ownerPlanNotice' + (notice.bad ? ' lm-ownerPlanNoticeBad' : ''), role: notice.bad ? 'alert' : 'status' }, notice.text || (busy !== '' ? '处理中…' : '')),
@@ -388,12 +428,7 @@ export function OwnerPlanPanel(props) {
             detailPlan.approved ? h('button', { type: 'button', className: 'lm-btn lm-ownerPlanPreview', disabled: planPreview?.loading, onClick: () => { void loadPreview(detailPlan); } }, planPreview?.loading ? '读取预览中…' : '预览已批准版本 ' + detailPlan.revision) : null,
             !detailPlan.approved && !confirming ? h('button', { type: 'button', className: 'lm-btn lm-btnPrimary lm-ownerPlanApprove', disabled: busy !== '', onClick: beginApprove }, '批准此版本') : null),
           planPreview?.error ? h('p', { role: 'alert' }, planPreview.error) : null,
-          planPreview?.report ? h('div', { role: 'status' },
-            h('p', null, '依赖顺序：', planPreview.report.dag?.order?.join(' → ') || '无可展示的顺序'),
-            Array.isArray(planPreview.report.dag?.order) ? h('ul', null, ...planPreview.report.dag.order.map(id => {
-              const candidate = planPreview.report.candidates?.[id];
-              return h('li', { key: id }, id, ' · ', candidate?.dependencySatisfied ? '依赖已满足' : '依赖待满足', ' · ', candidate?.recommended?.join(', ') || '候选不可用');
-            })) : null) : null,
+          planPreview?.report ? planPreviewView(h, model, planPreview.report) : null,
           !detailPlan.approved && confirming ? h('div', { className: 'lm-ownerPlanConfirm', role: 'group', 'aria-label': '批准确认' },
             h('p', null, model.approvalPrompt(confirming)),
             h('p', { className: 'lm-muted' }, '确认后服务端会原子绑定计划、版本、代次与指纹；版本变化会使旧批准失效。'),

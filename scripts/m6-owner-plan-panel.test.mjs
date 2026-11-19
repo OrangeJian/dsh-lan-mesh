@@ -11,6 +11,10 @@ import {
   ownerPlanApprovalPrompt,
   ownerPlanErrorText,
   ownerPlanFingerprintShort,
+  ownerPlanCandidateReasonText,
+  ownerPlanPreviewRows,
+  ownerPlanExplanationLines,
+  ownerTeamCountLine,
   parseOwnerPlanTasks,
 } from '../ui/models/owner-plan-panel.mjs';
 
@@ -438,4 +442,126 @@ test('switching rooms discards the previous room plan list and its late response
   assert.ok(text(app.tree).includes('plan-b'));
   assert.deepEqual(calls.planList.map(payload => payload.roomId), [ROOM, OTHER_ROOM]);
   assert.equal(calls.planRead.length, 0);
+});
+
+// ------------------------------------ candidate / overview display helpers ----
+
+test('candidate exclusion reasons render stable Chinese labels and keep unknown codes verbatim', () => {
+  assert.equal(ownerPlanCandidateReasonText('UNAUTHORIZED'), '不在本机授权范围');
+  assert.equal(ownerPlanCandidateReasonText('NO_PROFILE'), '无能力声明');
+  assert.equal(ownerPlanCandidateReasonText('CAPABILITY_MISMATCH'), '能力不匹配');
+  assert.equal(ownerPlanCandidateReasonText('CAPACITY_FULL'), '执行槽已占用（uncertain 占槽）');
+  assert.equal(ownerPlanCandidateReasonText('SOMETHING_NEW'), 'SOMETHING_NEW');
+  assert.equal(ownerPlanCandidateReasonText(undefined), '');
+});
+
+test('preview rows derive the three-way state only from server fields', () => {
+  const report = {
+    dag: { order: ['a', 'b', 'c'] },
+    candidates: {
+      a: { dependencySatisfied: true, candidateAvailable: true, dispatchable: true, recommended: ['node-b/w1'], excluded: [{ memberKey: 'node-c/w2', reason: 'CAPACITY_FULL' }] },
+      b: { dependencySatisfied: false, candidateAvailable: false, dispatchable: false, recommended: [], excluded: [] },
+      c: { dependencySatisfied: true, candidateAvailable: false, dispatchable: false, recommended: [], excluded: [{ memberKey: 'node-b/w1', reason: 'CAPABILITY_MISMATCH' }] },
+    },
+  };
+  const view = ownerPlanPreviewRows(report);
+  assert.deepEqual(view.summary, { dispatchable: 1, blocked: 1, noCandidate: 1, unknown: 0 });
+  assert.deepEqual(view.rows[0].state, 'dispatchable');
+  assert.deepEqual(view.rows[0].excluded.map(entry => entry.text), ['执行槽已占用（uncertain 占槽）']);
+  assert.deepEqual(view.rows[1].stateLabel, '等待依赖验收');
+  assert.deepEqual(view.rows[2].stateLabel, '无可用候选');
+  // A report without dag.order falls back to the candidate keys; unknown
+  // candidates render as '无候选数据' instead of invented states.
+  const fallback = ownerPlanPreviewRows({ candidates: { z: null } });
+  assert.deepEqual(fallback.rows[0].stateLabel, '无候选数据');
+});
+
+test('explanation lines translate known codes and skip unknown ones', () => {
+  const lines = ownerPlanExplanationLines([
+    { code: 'DEPENDENCY_NOT_ACCEPTED', taskId: 'b' },
+    { code: 'EXCLUDED_CANDIDATE', taskId: 'a', detail: 'node-b/w1:CAPACITY_FULL' },
+    { code: 'NO_CANDIDATE', taskId: 'c' },
+    { code: 'SOMETHING_FUTURE' },
+    'garbage',
+  ]);
+  assert.deepEqual(lines, ['依赖尚未验收，等待 Owner 在成果评审中接受（b）', '没有可派发的候选 Worker（c）']);
+});
+
+test('team count line summarizes only the counts the overview returned', () => {
+  assert.equal(ownerTeamCountLine(null), '');
+  assert.equal(ownerTeamCountLine({ known: false }), '');
+  assert.equal(ownerTeamCountLine({ known: true, status: 'absent' }), '');
+  assert.equal(ownerTeamCountLine({ known: true, status: 'active' }), '');
+  const line = ownerTeamCountLine({
+    known: true, status: 'active',
+    taskCounts: { planned: 1, ready: 2, review: 1, accepted: 3, blocked: 0 },
+    executionCounts: { uncertain: 1, queued: 2 },
+  });
+  assert.equal(line, '任务 待依赖 1 · 待派发 2 · 待评审 1 · 已验收 3；执行 已排队 2 · 不确定（占槽） 1');
+});
+
+test('the panel renders the team count line from the overview response', async () => {
+  const plan = planFixture({});
+  const { call } = fixtureCall({
+    teamOverview: overviewFixture({ taskCounts: { ready: 2, accepted: 1 }, executionCounts: { uncertain: 1 } }),
+    planList: [plan],
+    planRead: plan,
+  });
+  const app = createApp({ h, call, roomId: ROOM });
+  app.render();
+  await settle(app);
+  const counts = withClass(app.tree, 'lm-ownerPlanCounts');
+  assert.ok(counts, 'the overview counts line is shown');
+  assert.ok(text(counts).includes('待派发 2'));
+  assert.ok(text(counts).includes('不确定（占槽） 1'));
+});
+
+test('the panel preview shows per-task state, exclusion reasons and server explanations', async () => {
+  const approval = { planId: 'plan-1', roomId: ROOM, generation: 3, revision: 2, fingerprint: FP1 };
+  const plan = planFixture({
+    approval,
+    tasks: [
+      { taskId: 'A', roomId: ROOM, dependsOn: [], requiredCapabilities: ['build'], title: 'A', detail: '' },
+      { taskId: 'B', roomId: ROOM, dependsOn: ['A'], requiredCapabilities: [], title: 'B', detail: '' },
+    ],
+  });
+  const report = {
+    bound: true,
+    approval,
+    dag: { order: ['A', 'B'], dispatchable: ['A'] },
+    candidates: {
+      A: { dependencySatisfied: true, candidateAvailable: true, dispatchable: true, recommended: ['node-b/w1'], excluded: [{ memberKey: 'node-c/w2', reason: 'UNAUTHORIZED' }] },
+      B: { dependencySatisfied: false, candidateAvailable: false, dispatchable: false, recommended: [], excluded: [] },
+    },
+    explanations: [{ code: 'DEPENDENCY_NOT_ACCEPTED', taskId: 'B' }],
+  };
+  const { call } = fixtureCall({
+    teamOverview: overviewFixture({}),
+    planList: [plan],
+    planRead: plan,
+    planPreview: report,
+  });
+  const app = createApp({ h, call, roomId: ROOM });
+  app.render();
+  await settle(app);
+  withClass(app.tree, 'lm-ownerPlanRow').props.onClick();
+  await settle(app);
+  withClass(app.tree, 'lm-ownerPlanPreview').props.onClick();
+  await settle(app);
+
+  const preview = withClass(app.tree, 'lm-ownerPlanPreviewReport');
+  assert.ok(preview, 'the preview block renders');
+  const previewText = text(preview);
+  assert.ok(previewText.includes('可派发 1 · 等待依赖 1 · 无可用候选 0'));
+  assert.ok(previewText.includes('等待依赖验收'), 'task B shows the blocked state');
+  assert.ok(previewText.includes('node-c/w2：不在本机授权范围'));
+  assert.ok(previewText.includes('依赖尚未验收，等待 Owner 在成果评审中接受（B）'));
+  assert.ok(withClass(preview, 'lm-ownerPlanPreviewOk'), 'dispatchable task A is highlighted');
+});
+
+test('new schedule error codes have stable Chinese text', () => {
+  assert.ok(ownerPlanErrorText('DEPENDENCY_NOT_ACCEPTED').includes('依赖'));
+  assert.ok(ownerPlanErrorText('NO_DISPATCHABLE_CANDIDATE').includes('候选'));
+  assert.ok(ownerPlanErrorText('CANDIDATES_UNAVAILABLE').includes('拒绝'));
+  assert.ok(ownerPlanErrorText('UNRESOLVED_EXECUTION').includes('未决执行'));
 });

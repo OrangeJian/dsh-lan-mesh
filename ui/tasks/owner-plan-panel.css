@@ -32,4 +32,15 @@
 .lm-ownerPlanForm textarea{resize:vertical;min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
 .lm-ownerPlanForm .lm-muted{margin:0;font-size:11px}
 .lm-ownerPlanPanel button:focus-visible,.lm-ownerPlanPanel input:focus-visible,.lm-ownerPlanPanel textarea:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.lm-ownerPlanCounts{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanPreviewReport p{margin:0 0 4px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.lm-ownerPlanPreviewSummary{color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.lm-ownerPlanPreviewRow{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanPreviewRow small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewState{margin-left:6px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewOk{border-color:var(--dsw-alias-brand-primary)}
+.lm-ownerPlanPreviewWarn{border-color:var(--dsw-alias-state-warn)}
+.lm-ownerPlanExplanations{list-style:none;margin:4px 0 0;padding:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanExplanations li{margin-top:2px}
 @media(max-width:700px){.lm-ownerPlanBody{grid-template-columns:minmax(0,1fr)}}

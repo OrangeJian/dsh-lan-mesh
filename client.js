@@ -1050,6 +1050,17 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-ownerPlanForm textarea{resize:vertical;min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
 .lm-ownerPlanForm .lm-muted{margin:0;font-size:11px}
 .lm-ownerPlanPanel button:focus-visible,.lm-ownerPlanPanel input:focus-visible,.lm-ownerPlanPanel textarea:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.lm-ownerPlanCounts{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanPreviewReport p{margin:0 0 4px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.lm-ownerPlanPreviewSummary{color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.lm-ownerPlanPreviewRow{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanPreviewRow small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewState{margin-left:6px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewOk{border-color:var(--dsw-alias-brand-primary)}
+.lm-ownerPlanPreviewWarn{border-color:var(--dsw-alias-state-warn)}
+.lm-ownerPlanExplanations{list-style:none;margin:4px 0 0;padding:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanExplanations li{margin-top:2px}
 @media(max-width:700px){.lm-ownerPlanBody{grid-template-columns:minmax(0,1fr)}}
     /* @ux-shell:owner-plan-styles:end */
 /* @ux-shell:owner-result-styles:start */
@@ -5281,6 +5292,115 @@ function stringList(value) {
   return Array.isArray(value) ? value.filter(entry => typeof entry === 'string') : [];
 }
 
+/**
+ * Chinese label for one candidate exclusion reason. The reasons come from the
+ * Host's candidate filter (lib/m6-worker-candidates.mjs); unknown codes render
+ * verbatim instead of being hidden.
+ */
+function ownerPlanCandidateReasonText(reason) {
+  const labels = {
+    UNAUTHORIZED: '不在本机授权范围',
+    NO_PROFILE: '无能力声明',
+    CAPABILITY_MISMATCH: '能力不匹配',
+    CAPACITY_FULL: '执行槽已占用（uncertain 占槽）',
+  };
+  return typeof reason === 'string' && reason !== '' ? (labels[reason] ?? reason) : '';
+}
+
+/**
+ * Per-task preview rows + a three-way summary from a bound preview report.
+ * State is derived ONLY from the fields the Host returned: dispatchable needs
+ * BOTH dependencySatisfied and candidateAvailable (the server sends all three
+ * separately; neither implies the other).
+ */
+function ownerPlanPreviewRows(report) {
+  const reportView = report && typeof report === 'object' ? report : {};
+  const candidates = reportView.candidates && typeof reportView.candidates === 'object' ? reportView.candidates : {};
+  const ids = Array.isArray(reportView.dag?.order) && reportView.dag.order.length > 0
+    ? reportView.dag.order
+    : Object.keys(candidates);
+  const rows = ids.map(taskId => {
+    const candidate = candidates && typeof candidates[taskId] === 'object' && candidates[taskId] !== null ? candidates[taskId] : null;
+    const recommended = stringList(candidate?.recommended);
+    const excluded = (Array.isArray(candidate?.excluded) ? candidate.excluded : [])
+      .filter(entry => entry && typeof entry === 'object' && typeof entry.memberKey === 'string' && entry.memberKey !== '')
+      .map(entry => ({ memberKey: entry.memberKey, reason: typeof entry.reason === 'string' ? entry.reason : '', text: ownerPlanCandidateReasonText(entry.reason) }));
+    const state = candidate === null ? 'unknown'
+      : candidate.dispatchable === true ? 'dispatchable'
+      : candidate.dependencySatisfied === true ? 'noCandidate'
+      : 'blocked';
+    const labels = { dispatchable: '可派发', blocked: '等待依赖验收', noCandidate: '无可用候选', unknown: '无候选数据' };
+    return {
+      taskId: String(taskId),
+      state,
+      stateLabel: labels[state],
+      dependencySatisfied: candidate?.dependencySatisfied === true,
+      candidateAvailable: candidate?.candidateAvailable === true,
+      dispatchable: candidate?.dispatchable === true,
+      recommended,
+      excluded,
+    };
+  });
+  return {
+    rows,
+    summary: {
+      dispatchable: rows.filter(row => row.state === 'dispatchable').length,
+      blocked: rows.filter(row => row.state === 'blocked').length,
+      noCandidate: rows.filter(row => row.state === 'noCandidate').length,
+      unknown: rows.filter(row => row.state === 'unknown').length,
+    },
+  };
+}
+
+/**
+ * Chinese lines for the report-level explanations. Unknown codes are skipped:
+ * the panel never invents an explanation the Host did not send.
+ */
+function ownerPlanExplanationLines(explanations) {
+  const labels = {
+    DEPENDENCY_NOT_ACCEPTED: '依赖尚未验收，等待 Owner 在成果评审中接受',
+    NO_CANDIDATE: '没有可派发的候选 Worker',
+    CANDIDATE_FILTER_FAILED: '候选过滤失败',
+    INVALID_PLAN: '计划内容不合法',
+    MISSING_PLAN_TASKS: '缺少任务清单',
+    INVALID_APPROVAL_CONTEXT: '批准上下文不完整',
+    APPROVAL_TEAM_MISMATCH: '批准与当前 Room 不一致',
+    APPROVAL_GENERATION_MISMATCH: '批准与当前 Team 代次不一致',
+  };
+  return (Array.isArray(explanations) ? explanations : [])
+    .map(entry => {
+      if (!entry || typeof entry !== 'object' || typeof entry.code !== 'string') return null;
+      const label = labels[entry.code];
+      if (label === undefined) return null;
+      const where = typeof entry.taskId === 'string' && entry.taskId !== '' ? `（${entry.taskId}）` : '';
+      const detail = typeof entry.detail === 'string' && entry.detail !== '' ? `：${entry.detail}` : '';
+      return `${label}${where}${detail}`;
+    })
+    .filter(Boolean);
+}
+
+/**
+ * One line summarizing the Team's task/execution states from the owner
+ * overview counts the Host already returns (no invented fields; a missing or
+ * empty overview renders as an empty string so the panel hides the line).
+ */
+function ownerTeamCountLine(overview) {
+  if (!overview || typeof overview !== 'object' || overview.known !== true || overview.status === 'absent') return '';
+  const taskLabels = { planned: '待依赖', ready: '待派发', active: '执行中', review: '待评审', accepted: '已验收', blocked: '受阻', failed: '失败', cancelled: '已取消' };
+  const executionLabels = { queued: '已排队', acknowledged: '已确认', running: '运行中', uncertain: '不确定（占槽）' };
+  const part = (counts, labels) => {
+    if (!counts || typeof counts !== 'object') return '';
+    const line = Object.entries(labels)
+      .filter(([status]) => Number.isSafeInteger(counts[status]) && counts[status] > 0)
+      .map(([status, label]) => `${label} ${counts[status]}`)
+      .join(' · ');
+    return line === '' ? '' : line;
+  };
+  const tasks = part(overview.taskCounts, taskLabels);
+  const executions = part(overview.executionCounts, executionLabels);
+  return [tasks && `任务 ${tasks}`, executions && `执行 ${executions}`].filter(Boolean).join('；');
+}
+
 /** A failed write that changed the version underneath the user, not a bad input. */
 function ownerPlanConflict(code) {
   return CONFLICT_CODES.includes(code);
@@ -5304,6 +5424,14 @@ function ownerPlanErrorText(code, fallback = '') {
     PLAN_ID_CONFLICT: '该计划 ID 已属于其他 Room。',
     REQUEST_CONFLICT: '同一请求对应了不同内容，请刷新后重试。',
     BAD_REQUEST: '请求内容不合法，请检查计划 ID 与任务清单。',
+    ROOM_CHANGED: 'Room 或 Team 状态已变化，请刷新后重试。',
+    PAUSED: 'Team 已暂停，请恢复后再操作。',
+    PLAN_NOT_APPROVED: '该计划尚未批准，请先批准确切版本。',
+    DEPENDENCY_NOT_ACCEPTED: '依赖任务尚未验收，暂不能派发。',
+    NO_DISPATCHABLE_CANDIDATE: '没有满足授权、能力与容量的候选 Worker。',
+    CANDIDATES_UNAVAILABLE: '候选授权数据不可用，已按安全策略拒绝。',
+    CAPACITY: '目标 Worker 的执行槽已占用（含 uncertain）。',
+    UNRESOLVED_EXECUTION: '该任务仍有未决执行（含 uncertain），需人工核对后再继续。',
     LAN_MESH_FAILED: '请求失败，请稍后重试。',
   };
   return messages[code] ?? (fallback || '操作失败，请稍后重试。');
@@ -5393,6 +5521,10 @@ const ownerPlanPanelModel = Object.freeze({
   detail: ownerPlanDetail,
   taskRows: ownerPlanTaskRows,
   approvalPrompt: ownerPlanApprovalPrompt,
+  candidateReasonText: ownerPlanCandidateReasonText,
+  previewRows: ownerPlanPreviewRows,
+  explanationLines: ownerPlanExplanationLines,
+  teamCountLine: ownerTeamCountLine,
 });
     /* @ux-shell:owner-plan-model:end */
     /* @ux-shell:owner-plan-component:start */
@@ -5410,6 +5542,44 @@ const ownerPlanPanelModel = Object.freeze({
  *    write retry;
  *  - switching Rooms discards in-flight answers from the previous Room.
  */
+/**
+ * Render the bound preview report: per-task state, exclusion reasons (with
+ * Chinese labels) and the Host's explanations. Presentation only: every value
+ * comes from the report the Host returned.
+ */
+function planPreviewView(h, model, report) {
+  const view = model.previewRows(report);
+  const lines = model.explanationLines(report.explanations);
+  const orderLine = h('p', null, '依赖顺序：', report.dag?.order?.join(' → ') || '无可展示的顺序');
+  const summary = view.rows.length
+    ? h('p', { className: 'lm-ownerPlanPreviewSummary' },
+        `可派发 ${view.summary.dispatchable} · 等待依赖 ${view.summary.blocked} · 无可用候选 ${view.summary.noCandidate}`
+        + (view.summary.unknown ? ` · 无候选数据 ${view.summary.unknown}` : ''))
+    : null;
+  const taskRows = view.rows.length
+    ? h('ul', { className: 'lm-ownerPlanPreviewTasks' }, ...view.rows.map(row => planPreviewRow(h, row)))
+    : null;
+  const explanationRows = lines.length
+    ? h('ul', { className: 'lm-ownerPlanExplanations', 'aria-label': '候选说明' },
+        ...lines.map((line, index) => h('li', { key: String(index) }, line)))
+    : null;
+  return h('div', { className: 'lm-ownerPlanPreviewReport', role: 'status' }, orderLine, summary, taskRows, explanationRows);
+}
+
+function planPreviewRow(h, row) {
+  const className = 'lm-ownerPlanPreviewRow'
+    + (row.state === 'dispatchable' ? ' lm-ownerPlanPreviewOk' : '')
+    + (row.state === 'noCandidate' ? ' lm-ownerPlanPreviewWarn' : '');
+  const children = [
+    h('strong', null, row.taskId),
+    h('span', { className: 'lm-ownerPlanPreviewState' }, row.stateLabel),
+    row.recommended.length ? h('small', null, '候选 ' + row.recommended.join('、')) : null,
+    ...row.excluded.map(entry => h('small', { key: entry.memberKey + '|' + entry.reason },
+      `${entry.memberKey}：${entry.text || entry.reason}`)),
+  ];
+  return h('li', { key: row.taskId, className }, ...children);
+}
+
 function OwnerPlanPanel(props) {
   const { h, React, call, roomId } = props;
   const model = props.model ?? ownerPlanPanelModel;
@@ -5744,11 +5914,13 @@ function OwnerPlanPanel(props) {
 
   const rows = listView.rows;
   const tasks = detailPlan ? model.taskRows(detailPlan.tasks) : [];
+  const teamCounts = model.teamCountLine(teamView.overview);
   return h('section', { className: 'lm-task lm-ownerPlanPanel', 'aria-label': 'M6 计划草稿与批准' },
     h('div', { className: 'lm-ownerPlanHead' },
       h('div', null,
         h('h3', null, '计划草稿与批准 · 本机'),
-        h('p', { className: 'lm-muted' }, '服务端账本校验版本、代次与指纹。批准只绑定下面展示的确切版本。')),
+        h('p', { className: 'lm-muted' }, '服务端账本校验版本、代次与指纹。批准只绑定下面展示的确切版本。'),
+        teamCounts !== '' ? h('p', { className: 'lm-ownerPlanCounts' }, teamCounts) : null),
       h('button', { type: 'button', className: 'lm-btn lm-ownerPlanRefresh', disabled: busy !== '', onClick: () => { void refreshAll(); } }, '刷新计划')),
     teamView.status === 'error' ? h('p', { className: 'lm-ownerPlanNotice lm-ownerPlanNoticeBad', role: 'alert' }, teamView.error) : null,
     h('p', { className: 'lm-ownerPlanNotice' + (notice.bad ? ' lm-ownerPlanNoticeBad' : ''), role: notice.bad ? 'alert' : 'status' }, notice.text || (busy !== '' ? '处理中…' : '')),
@@ -5786,12 +5958,7 @@ function OwnerPlanPanel(props) {
             detailPlan.approved ? h('button', { type: 'button', className: 'lm-btn lm-ownerPlanPreview', disabled: planPreview?.loading, onClick: () => { void loadPreview(detailPlan); } }, planPreview?.loading ? '读取预览中…' : '预览已批准版本 ' + detailPlan.revision) : null,
             !detailPlan.approved && !confirming ? h('button', { type: 'button', className: 'lm-btn lm-btnPrimary lm-ownerPlanApprove', disabled: busy !== '', onClick: beginApprove }, '批准此版本') : null),
           planPreview?.error ? h('p', { role: 'alert' }, planPreview.error) : null,
-          planPreview?.report ? h('div', { role: 'status' },
-            h('p', null, '依赖顺序：', planPreview.report.dag?.order?.join(' → ') || '无可展示的顺序'),
-            Array.isArray(planPreview.report.dag?.order) ? h('ul', null, ...planPreview.report.dag.order.map(id => {
-              const candidate = planPreview.report.candidates?.[id];
-              return h('li', { key: id }, id, ' · ', candidate?.dependencySatisfied ? '依赖已满足' : '依赖待满足', ' · ', candidate?.recommended?.join(', ') || '候选不可用');
-            })) : null) : null,
+          planPreview?.report ? planPreviewView(h, model, planPreview.report) : null,
           !detailPlan.approved && confirming ? h('div', { className: 'lm-ownerPlanConfirm', role: 'group', 'aria-label': '批准确认' },
             h('p', null, model.approvalPrompt(confirming)),
             h('p', { className: 'lm-muted' }, '确认后服务端会原子绑定计划、版本、代次与指纹；版本变化会使旧批准失效。'),
