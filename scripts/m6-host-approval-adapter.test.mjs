@@ -127,3 +127,48 @@ test('authorized decision produces no execution and fails closed on an unknown l
     error => error instanceof ApprovalDenied && error.code === 'NOT_READY',
   );
 });
+
+test('missing or non-true known fails closed; the real ownerTeamOverview always carries known', async () => {
+  for (const overview of [
+    { scope: 'local', roomId: 'room-a' },                      // missing known
+    { scope: 'local', roomId: 'room-a', known: undefined },    // undefined
+    { scope: 'local', roomId: 'room-a', known: 1 },            // truthy, not true
+    { scope: 'local', roomId: 'room-a', known: 'true' },       // string
+  ]) {
+    const { node } = stubNode(overview);
+    await assert.rejects(
+      authorizeM6HumanApproval(node, { capability: 'teamOverview', roomId: 'room-a' }, OWNER),
+      error => error instanceof ApprovalDenied && error.code === 'NOT_READY',
+    );
+  }
+
+  // Verify the actual production shape the adapter depends on.
+  const { node, room } = realNode();
+  const present = await node.ownerTeamOverview(room.id);
+  assert.equal(present.known, true);
+  assert.equal(present.scope, 'local');
+  assert.equal(present.roomId, room.id);
+
+  node.team = { store: { read: () => ({ teams: {}, tasks: {}, executions: {} }) } };
+  const absent = await node.ownerTeamOverview(room.id);
+  assert.equal(absent.known, true);      // explicit success even when the Team is absent
+  assert.equal(absent.status, 'absent');
+  assert.equal(absent.roomId, room.id);  // canonical id, not the request string
+});
+
+test('canonical room id from the projection is authoritative; request room string is not a fallback', async () => {
+  const canonical = { scope: 'local', known: true, roomId: 'room-canonical', status: 'active' };
+  const { node } = stubNode(canonical);
+  const decision = await authorizeM6HumanApproval(
+    node, { capability: 'teamOverview', roomId: 'Some Room Name' }, OWNER,
+  );
+  assert.equal(decision.roomId, 'room-canonical');
+
+  // A projection without a canonical id must not silently fall back to the request.
+  const missing = { scope: 'local', known: true, status: 'active' };
+  const { node: node2 } = stubNode(missing);
+  await assert.rejects(
+    authorizeM6HumanApproval(node2, { capability: 'teamOverview', roomId: 'Some Room Name' }, OWNER),
+    error => error instanceof ApprovalDenied && error.code === 'MISSING_CANONICAL_ROOM',
+  );
+});
