@@ -32,6 +32,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | 本文件 | 安装、配置、工具清单、架构、排障 |
+| [docs/plugin-guide.md](docs/plugin-guide.md) | **产品使用文档**：架构设计（分层/通道/信任模型/Team 状态机）+ 六层功能场景用法 + Team 端到端流程 + 排障与验收边界 |
 | [docs/usage.md](docs/usage.md) | **使用说明**：三个场景的完整操作走查、面板每个区块怎么用、工具参数逐项说明、安全怎么想 |
 | [docs/development.md](docs/development.md) | **开发过程**：选型理由、真机验证抓到的 19 个 bug、协议取舍、验证体系、事故复盘 |
 | [docs/rooms-contract.md](docs/rooms-contract.md) | 房间层的冻结契约（各模块签名、RPC 端点表、合并语义） |

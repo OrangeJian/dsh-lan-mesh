@@ -34,7 +34,7 @@
 .lm-ownerPlanPanel button:focus-visible,.lm-ownerPlanPanel input:focus-visible,.lm-ownerPlanPanel textarea:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .lm-ownerPlanCounts{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
 .lm-ownerPlanPreviewReport p{margin:0 0 4px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
-.lm-ownerPlanPreviewSummary{color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewSummary,.lm-ownerPlanPreviewHint{color:var(--dsw-alias-label-secondary)}
 .lm-ownerPlanPreviewTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .lm-ownerPlanPreviewRow{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
 .lm-ownerPlanPreviewRow small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}

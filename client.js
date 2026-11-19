@@ -1052,7 +1052,7 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-ownerPlanPanel button:focus-visible,.lm-ownerPlanPanel input:focus-visible,.lm-ownerPlanPanel textarea:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .lm-ownerPlanCounts{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
 .lm-ownerPlanPreviewReport p{margin:0 0 4px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
-.lm-ownerPlanPreviewSummary{color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanPreviewSummary,.lm-ownerPlanPreviewHint{color:var(--dsw-alias-label-secondary)}
 .lm-ownerPlanPreviewTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .lm-ownerPlanPreviewRow{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
 .lm-ownerPlanPreviewRow small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}
@@ -5556,6 +5556,12 @@ function planPreviewView(h, model, report) {
         `可派发 ${view.summary.dispatchable} · 等待依赖 ${view.summary.blocked} · 无可用候选 ${view.summary.noCandidate}`
         + (view.summary.unknown ? ` · 无候选数据 ${view.summary.unknown}` : ''))
     : null;
+  // Purely informational: scheduling itself stays a chat-tool action (opt-in),
+  // the panel never becomes a dispatch write surface.
+  const hint = view.summary.dispatchable > 0
+    ? h('p', { className: 'lm-ownerPlanPreviewHint' },
+        `有 ${view.summary.dispatchable} 项满足依赖、授权、能力与容量，可进入派单；派单由 Leader Agent 会话通过调度工具发起。`)
+    : null;
   const taskRows = view.rows.length
     ? h('ul', { className: 'lm-ownerPlanPreviewTasks' }, ...view.rows.map(row => planPreviewRow(h, row)))
     : null;
@@ -5563,7 +5569,7 @@ function planPreviewView(h, model, report) {
     ? h('ul', { className: 'lm-ownerPlanExplanations', 'aria-label': '候选说明' },
         ...lines.map((line, index) => h('li', { key: String(index) }, line)))
     : null;
-  return h('div', { className: 'lm-ownerPlanPreviewReport', role: 'status' }, orderLine, summary, taskRows, explanationRows);
+  return h('div', { className: 'lm-ownerPlanPreviewReport', role: 'status' }, orderLine, summary, hint, taskRows, explanationRows);
 }
 
 function planPreviewRow(h, row) {

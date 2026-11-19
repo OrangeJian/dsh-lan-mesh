@@ -553,6 +553,7 @@ test('the panel preview shows per-task state, exclusion reasons and server expla
   assert.ok(preview, 'the preview block renders');
   const previewText = text(preview);
   assert.ok(previewText.includes('可派发 1 · 等待依赖 1 · 无可用候选 0'));
+  assert.ok(previewText.includes('可进入派单'), 'dispatchable tasks get a scheduling hint');
   assert.ok(previewText.includes('等待依赖验收'), 'task B shows the blocked state');
   assert.ok(previewText.includes('node-c/w2：不在本机授权范围'));
   assert.ok(previewText.includes('依赖尚未验收，等待 Owner 在成果评审中接受（B）'));

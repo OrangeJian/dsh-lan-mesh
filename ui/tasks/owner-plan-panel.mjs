@@ -26,6 +26,12 @@ function planPreviewView(h, model, report) {
         `可派发 ${view.summary.dispatchable} · 等待依赖 ${view.summary.blocked} · 无可用候选 ${view.summary.noCandidate}`
         + (view.summary.unknown ? ` · 无候选数据 ${view.summary.unknown}` : ''))
     : null;
+  // Purely informational: scheduling itself stays a chat-tool action (opt-in),
+  // the panel never becomes a dispatch write surface.
+  const hint = view.summary.dispatchable > 0
+    ? h('p', { className: 'lm-ownerPlanPreviewHint' },
+        `有 ${view.summary.dispatchable} 项满足依赖、授权、能力与容量，可进入派单；派单由 Leader Agent 会话通过调度工具发起。`)
+    : null;
   const taskRows = view.rows.length
     ? h('ul', { className: 'lm-ownerPlanPreviewTasks' }, ...view.rows.map(row => planPreviewRow(h, row)))
     : null;
@@ -33,7 +39,7 @@ function planPreviewView(h, model, report) {
     ? h('ul', { className: 'lm-ownerPlanExplanations', 'aria-label': '候选说明' },
         ...lines.map((line, index) => h('li', { key: String(index) }, line)))
     : null;
-  return h('div', { className: 'lm-ownerPlanPreviewReport', role: 'status' }, orderLine, summary, taskRows, explanationRows);
+  return h('div', { className: 'lm-ownerPlanPreviewReport', role: 'status' }, orderLine, summary, hint, taskRows, explanationRows);
 }
 
 function planPreviewRow(h, row) {
