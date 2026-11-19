@@ -19,6 +19,9 @@ import { sharedDocumentTools } from './lib/shared-doc-tools.mjs';
 import { CONTEXT_SELECTION_SCHEMA } from './lib/room-context-protocol.mjs';
 import { ROOM_ATTACHMENT_LIMITS, ROOM_ATTACHMENT_WIRE_LIMITS } from './lib/room-message.mjs';
 import { MeshNode } from './lib/service.mjs';
+import { memberKey } from './lib/rooms.mjs';
+import { createPlanLedgerService } from './lib/m6-plan-service.mjs';
+import { isOwnerPrincipal } from './lib/m6-host-approval-adapter.mjs';
 import { normalizeStaticPeers } from './lib/static-peers.mjs';
 import { Notifier } from './lib/notify.mjs';
 import { teamToolDefinitions } from './lib/team-tools.mjs';
@@ -577,6 +580,159 @@ async function fetchPanelRequest(httpRequest, handleEndpoint, log) {
   return reply(rpcId, await handleEndpoint(envelope.method, envelope.payload));
 }
 
+/**
+ * M6 Owner human plan entry (read / submit / approve).
+ *
+ * This is the only host entry for plan-ledger actions. It is reachable solely
+ * through the owner-only exact Fetch route registered in `apply` below: the
+ * shared `/api` handler rejects every non-owner principal BEFORE the route
+ * handler runs, and the admitted principal is not forwarded into the handler.
+ * Because no request-level principal exists, the bridge passes an explicit
+ * owner-admission fact (the same `kind:'owner'` shape the identity batch
+ * verified); anything else is refused before any Room or ledger access. The
+ * entry never reads identity from the request body.
+ *
+ * Identity and Room authority are derived server-side:
+ *  - `actorKey` is the node's persisted human member (`nodeId/human`), never a
+ *    caller-supplied `sessionId`/`actorKey`/`owner`/`leaderKey`.
+ *  - `roomId` is the canonical id returned by `MeshNode#ownerTeamOverview`; a
+ *    request may name a Room, but the ledger receives only the canonical id.
+ *  - `ownerTeamOverview` also requires the local human to be the CURRENT Room
+ *    leader and member, so a leader change revokes access on the next call.
+ *
+ * The plan service re-consults the same boundary INSIDE its ledger transaction
+ * (`authorize`), so a revocation that lands while a write is queued still
+ * rejects at commit. This entry never dispatches, accepts or transitions a
+ * result, and it changes no existing Team semantics.
+ *
+ * @param {{node: object, now?: () => number}} options
+ *   `node`: the trusted MeshNode this plugin owns. `now`: injectable audit clock.
+ * @returns {{list: Function, read: Function, submit: Function, approve: Function}}
+ */
+export function createM6PlanEntry({ node, now = Date.now } = {}) {
+  const HUMAN_SESSION_ID = 'human';
+  const OPERATIONS = ['read', 'submit', 'approve'];
+  const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const fail = (code, message = code) => { throw Object.assign(new Error(message), { code }); };
+
+  /** Only the owner-only route's admission fact may enter the plan ledger. */
+  function requireOwnerAdmission(admission) {
+    if (!isOwnerPrincipal(admission)) {
+      fail('NOT_OWNER', 'owner admission from the owner-only route is required');
+    }
+  }
+
+  /** Server-derived human member key. A request cannot influence this. */
+  function actorKey() {
+    const nodeId = node?.identity?.nodeId;
+    if (typeof nodeId !== 'string' || nodeId === '') fail('NOT_READY', 'mesh node identity is not ready');
+    return memberKey(nodeId, HUMAN_SESSION_ID);
+  }
+
+  /** The single TeamStore the plan ledger writes through. */
+  function store() {
+    const candidate = node?.team?.store;
+    if (!candidate || typeof candidate.transact !== 'function' || typeof candidate.read !== 'function') {
+      fail('NOT_READY', 'Team ledger is not ready');
+    }
+    return candidate;
+  }
+
+  /** Full local view of one Room, or a fail-closed refusal. */
+  async function overviewOf(roomReference) {
+    if (typeof roomReference !== 'string' || roomReference === '') fail('BAD_REQUEST', 'roomId is required');
+    let overview;
+    try {
+      overview = await node.ownerTeamOverview(roomReference);
+    } catch (error) {
+      // Preserve the production path's stable code (UNKNOWN_ROOM, FORBIDDEN, ...).
+      throw Object.assign(new Error(String(error?.message ?? error)), { code: typeof error?.code === 'string' ? error.code : 'FORBIDDEN' });
+    }
+    if (!isObject(overview) || overview.known !== true || overview.scope !== 'local') {
+      fail(overview?.reason ?? 'NOT_READY', 'local Room authority is not verifiable');
+    }
+    const roomId = overview.roomId;
+    if (typeof roomId !== 'string' || roomId === '') fail('MISSING_CANONICAL_ROOM', 'projection did not return a canonical room id');
+    return { ...overview, roomId };
+  }
+
+  /**
+   * Trusted delegate passed to the ledger service. It is called INSIDE every
+   * read/write transaction and re-checks the current local human Room
+   * leadership, so a stale caller snapshot can never authorize a commit.
+   */
+  async function authorize(context) {
+    if (!isObject(context) || !OPERATIONS.includes(context.operation)) return false;
+    let expectedActor;
+    try { expectedActor = actorKey(); } catch { return false; }
+    if (context.actorKey !== expectedActor) return false;
+    let overview;
+    try { overview = await overviewOf(context.roomId); } catch { return false; }
+    if (overview.roomId !== context.roomId) return false;
+    // Defense in depth: the authoritative generation must still agree when the
+    // projection exposes one (a Team exists). Absent Teams cannot submit.
+    if (Number.isSafeInteger(overview.generation) && Number.isSafeInteger(context.generation)
+      && overview.generation !== context.generation) {
+      return false;
+    }
+    return true;
+  }
+
+  function service() {
+    return createPlanLedgerService({ store: store(), authorize, now });
+  }
+
+  const body = value => (value !== null && typeof value === 'object' ? value : {});
+
+  return Object.freeze({
+    /** List plan drafts in one Room the local human currently leads. */
+    async list(payload, admission) {
+      requireOwnerAdmission(admission);
+      const request = body(payload);
+      const room = await overviewOf(request.roomId);
+      return service().listPlans({ roomId: room.roomId }, { actorKey: actorKey() });
+    },
+
+    /** Read one exact plan version in one Room the local human currently leads. */
+    async read(payload, admission) {
+      requireOwnerAdmission(admission);
+      const request = body(payload);
+      const room = await overviewOf(request.roomId);
+      return service().readPlan({ roomId: room.roomId, planId: request.planId }, { actorKey: actorKey() });
+    },
+
+    /** Create or version-bump a plan draft. Body identity fields are ignored. */
+    async submit(payload, admission) {
+      requireOwnerAdmission(admission);
+      const request = body(payload);
+      const room = await overviewOf(request.roomId);
+      return service().submitPlan({
+        requestId: request.requestId,
+        roomId: room.roomId,
+        planId: request.planId,
+        expectedRevision: request.expectedRevision,
+        expectedGeneration: request.expectedGeneration,
+        tasks: request.tasks,
+      }, { actorKey: actorKey() });
+    },
+
+    /** Approve one exact plan version. Body identity fields are ignored. */
+    async approve(payload, admission) {
+      requireOwnerAdmission(admission);
+      const request = body(payload);
+      const room = await overviewOf(request.roomId);
+      return service().approvePlan({
+        requestId: request.requestId,
+        roomId: room.roomId,
+        planId: request.planId,
+        expectedRevision: request.expectedRevision,
+        expectedGeneration: request.expectedGeneration,
+        fingerprint: request.fingerprint,
+      }, { actorKey: actorKey() });
+    },
+  });
+}
+
 export function apply(ctx, rawConfig) {
   const config = resolveConfig(rawConfig);
   const log = (message, detail) => {
@@ -621,6 +777,13 @@ export function apply(ctx, rawConfig) {
     log,
   });
   const registryPanel = createRegistryPanel({ node, directory: meshRootDir(config.port) });
+  // M6 Owner human plan entry: reachable only through the owner-only panel
+  // route below. Identity and Room authority are derived inside the entry.
+  const planEntry = createM6PlanEntry({ node });
+  // The bridge's explicit owner-admission fact: reaching this closure already
+  // required the owner-only route, and the public handler exposes no
+  // request-level principal to read instead.
+  const planOwnerAdmission = Object.freeze({ kind: 'owner' });
   /** Resolve the calling agent id so a wake-up reaches the right session. */
   const callerId = (exec) => (typeof exec?.agent?.id === 'string' ? exec.agent.id : '');
   /**
@@ -1387,6 +1550,26 @@ export function apply(ctx, rawConfig) {
   }
 
   /**
+   * Run one M6 plan entry action and keep its stable failure code visible to the
+   * panel (REVISION_CONFLICT, STALE_GENERATION, FORBIDDEN, ...), rather than
+   * collapsing every failure into LAN_MESH_FAILED.
+   */
+  const handlePlanEndpoint = async (method, request) => {
+    try {
+      return { ok: true, value: await planEntry[method](request, planOwnerAdmission) };
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: typeof error?.code === 'string' ? error.code : 'LAN_MESH_FAILED',
+          message: String(error?.message ?? error),
+          details: {},
+        },
+      };
+    }
+  };
+
+  /**
    * Answer one panel endpoint.
    *
    * Endpoints stay plain names (`snapshot`, `roomJoin`, …) rather than paths: the
@@ -1418,6 +1601,14 @@ export function apply(ctx, rawConfig) {
           return { ok: true, value: { agents: await registryPanel.list() } };
         case 'teamOverview':
           return { ok: true, value: await node.ownerTeamOverview(str('roomId')) };
+        case 'planList':
+          return handlePlanEndpoint('list', request);
+        case 'planRead':
+          return handlePlanEndpoint('read', request);
+        case 'planSubmit':
+          return handlePlanEndpoint('submit', request);
+        case 'planApprove':
+          return handlePlanEndpoint('approve', request);
         case 'agentRegistryCommand':
           return { ok: true, value: await registryPanel.command(request.command, str('requestId')) };
         case 'contextDeliveries':
