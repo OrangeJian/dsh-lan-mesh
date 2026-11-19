@@ -250,3 +250,12 @@ test('old M1 ledger (no plans bucket) opens and plan service works; corrupt plan
   await writeFile(join(bad, 'team.json'), JSON.stringify(state));
   await assert.rejects(openTeamStore({ directory: bad }), e => e.code === 'TEAM_STORAGE');
 });
+
+test('TeamStore rejects a structurally valid plan with altered tasks on reopen', async t => {
+  const { directory, store, service, reopen } = await setup(t);
+  await service.submitPlan(submit(), trusted());
+  const state = store.read();
+  state.plans['plan-1'].tasks[0].detail = 'altered after persistence';
+  await writeFile(join(directory, 'team.json'), JSON.stringify(state));
+  await assert.rejects(reopen(), { code: 'TEAM_STORAGE' });
+});
