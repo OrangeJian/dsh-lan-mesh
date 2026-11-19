@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { createHash } from 'node:crypto';
@@ -209,4 +209,49 @@ test('durable metadata access outlives inbox paging without marking messages rea
  a.messages=[];
  assert.deepEqual(await a.describeRoomAttachment({room:room.id,sessionId:'human',blobId:ref.blobId}),ref);
  await assert.rejects(a.describeRoomAttachment({room:room.id,sessionId:'outsider',blobId:ref.blobId}),/member/);
+});
+
+// Windows rename-over is a single atomic replace, but an antivirus/indexer (or
+// any handle without FILE_SHARE_DELETE) can make it fail transiently with
+// EPERM. The fix retries ONLY that replace, reusing the finished temp file, so
+// a reader never sees a partial ledger and a stuck holder still fails loudly.
+async function renameLedger(t) {
+ const dir=await mkdtemp(join(process.cwd(),'.attachment-rename-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const scopeA=JSON.stringify(['room-rename','human','a'.repeat(64),'one.txt','text/plain']);
+ const scopeB=JSON.stringify(['room-rename','human','b'.repeat(64),'two.txt','text/plain']);
+ const refA={blobId:'a'.repeat(64),name:'one.txt',mediaType:'text/plain',size:1,ownerNodeId:'node-a'};
+ const refB={blobId:'b'.repeat(64),name:'two.txt',mediaType:'text/plain',size:1,ownerNodeId:'node-a'};
+ const ledger=await RoomAttachmentLedger.open(dir);
+ await ledger.run(()=>ledger.save(d=>{d.uploads[scopeA]=refA;}));
+ const saveB=()=>ledger.run(()=>ledger.save(d=>{d.uploads[scopeB]=refB;}));
+ return {dir,ledger,scopeA,scopeB,refA,refB,saveB};
+}
+test('transient rename sharing violation is retried without exposing a partial ledger',async t=>{
+ const {dir,ledger,scopeA,scopeB,saveB}=await renameLedger(t);
+ const renameFile=ledger.renameFile;let attempts=0;
+ ledger.renameFile=async(temp,file)=>{attempts+=1;if(attempts<=2)throw Object.assign(new Error('sharing violation'),{code:'EPERM'});return renameFile(temp,file);};
+ await saveB();
+ assert.equal(attempts,3);
+ assert.deepEqual(Object.keys(ledger.data.uploads).sort(),[scopeA,scopeB].sort());
+ const reopened=await RoomAttachmentLedger.open(dir);
+ assert.deepEqual(Object.keys(reopened.data.uploads).sort(),[scopeA,scopeB].sort());
+ assert.deepEqual(await readdir(dir),['attachments.json']);
+});
+test('persistent rename sharing violation stays a permanent failure and keeps the previous ledger',async t=>{
+ const {dir,ledger,scopeA,saveB}=await renameLedger(t);
+ let attempts=0;
+ ledger.renameFile=async()=>{attempts+=1;throw Object.assign(new Error('locked by scanner'),{code:'EPERM'});};
+ await assert.rejects(saveB(),/locked by scanner/);
+ assert.equal(attempts,6);
+ assert.deepEqual(Object.keys(ledger.data.uploads),[scopeA]);
+ assert.deepEqual(await readdir(dir),['attachments.json']);
+ const reopened=await RoomAttachmentLedger.open(dir);
+ assert.deepEqual(Object.keys(reopened.data.uploads),[scopeA]);
+});
+test('non-sharing rename errors are never retried',async t=>{
+ const {ledger,saveB}=await renameLedger(t);
+ let attempts=0;
+ ledger.renameFile=async()=>{attempts+=1;throw Object.assign(new Error('cross-device replace'),{code:'EXDEV'});};
+ await assert.rejects(saveB(),/cross-device replace/);
+ assert.equal(attempts,1);
 });
