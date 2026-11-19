@@ -1,7 +1,8 @@
 // Regression tests for the local transactional plan-ledger service.
 // Scope: local service layer only. No HTTP, tools, real dispatch, result state
-// transitions or M6 enablement. Identity/authorization come from a trusted
-// context; generation and leader come from the authoritative Team ledger.
+// transitions or M6 enablement. Caller identity comes from the host-resolved
+// trusted context; authorization is decided by a trusted host delegate that is
+// consulted INSIDE the transaction; generation/leader come from the ledger.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -23,7 +24,7 @@ const TASKS_V2 = [
 const FP = planFingerprint(TASKS);
 const FP2 = planFingerprint(TASKS_V2);
 
-const trusted = (overrides = {}) => ({ actorKey: 'node-a/leader', authorizations: ['node-a/leader'], ...overrides });
+const trusted = (overrides = {}) => ({ actorKey: 'node-a/leader', ...overrides });
 
 async function setup(t, opts = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'm6-plan-service-'));
@@ -41,11 +42,20 @@ async function setup(t, opts = {}) {
       return { state: seeded };
     });
   }
-  const service = createPlanLedgerService({ store, now: () => 1_700_000_000_000 });
-  return { directory, store, service, reopen: async () => {
-    store = await openTeamStore({ directory });
-    return createPlanLedgerService({ store, now: () => 1_700_000_000_000 });
-  } };
+  // Trusted host delegate: current Room/operation authorization, evaluated at
+  // call time by the service. Mutable so tests can revoke while a write queues.
+  const auth = { allowed: true, deniedOps: new Set(), calls: [] };
+  const authorize = context => {
+    auth.calls.push(context);
+    if (!auth.allowed) return false;
+    if (auth.deniedOps.has(context.operation)) return false;
+    return context.actorKey === 'node-a/leader';
+  };
+  const make = () => createPlanLedgerService({ store, now: () => 1_700_000_000_000, authorize: opts.noDelegate ? undefined : authorize });
+  return {
+    directory, store, auth, service: make(),
+    reopen: async () => { store = await openTeamStore({ directory }); return make(); },
+  };
 }
 
 function submit(overrides = {}) {
@@ -67,12 +77,27 @@ test('submit persists a versioned plan draft with fingerprint and no approval, t
   assert.equal(plan.fingerprint, FP);
   assert.equal(plan.approval, null);
   assert.equal(plan.tasks.length, 2);
-  // Nothing outside the plans bucket changed.
   assert.deepEqual(store.read().tasks, before.tasks);
   assert.deepEqual(store.read().executions, before.executions);
   assert.deepEqual(store.read().workerExecutions, before.workerExecutions);
   assert.deepEqual(store.read().outbox, before.outbox);
   assert.deepEqual(store.read().teams, before.teams);
+});
+
+test('TOCTOU: submit binds one pre-queued snapshot; caller mutation while queued cannot change persisted content', async t => {
+  const { store, service } = await setup(t);
+  const request = submit();
+  const pending = service.submitPlan(request, trusted()); // snapshot captured synchronously
+  // Mutate AFTER the call but BEFORE the queued transaction runs.
+  request.tasks[0].detail = 'MUTATED';
+  request.tasks.push({ taskId: 'C', roomId: 'room-1', dependsOn: [], title: 'C', detail: 'injected' });
+  const result = await pending;
+  assert.equal(result.fingerprint, FP, 'result must bind the pre-queued snapshot');
+  const plan = store.read().plans['plan-1'];
+  assert.equal(plan.fingerprint, FP);
+  assert.equal(plan.tasks[0].detail, 'a', 'mutated detail must not be persisted');
+  assert.equal(plan.tasks.length, 2, 'injected task must not be persisted');
+  assert.equal(planFingerprint(plan.tasks), FP, 'persisted content must match the bound fingerprint');
 });
 
 test('requestId idempotency: replay returns same result without version bump; reused id with new content conflicts', async t => {
@@ -93,21 +118,16 @@ test('a revision bump changes content, requires expectedRevision and clears the 
   await service.submitPlan(submit(), trusted());
   await service.approvePlan({ requestId: 'req-approve-1', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP }, trusted());
   assert.notEqual(store.read().plans['plan-1'].approval, null);
-
-  // stale expectedRevision is rejected
   await assert.rejects(
     service.submitPlan(submit({ requestId: 'req-submit-2', expectedRevision: 0, tasks: structuredClone(TASKS_V2) }), trusted()),
     e => e.code === 'REVISION_CONFLICT',
   );
-
   const bumped = await service.submitPlan(submit({ requestId: 'req-submit-3', expectedRevision: 1, tasks: structuredClone(TASKS_V2) }), trusted());
   assert.equal(bumped.revision, 2);
   assert.equal(bumped.fingerprint, FP2);
   const plan = store.read().plans['plan-1'];
   assert.equal(plan.revision, 2);
   assert.equal(plan.approval, null, 'modifying the plan must invalidate the old approval');
-
-  // Approving the old version now fails: the binding no longer matches.
   await assert.rejects(
     service.approvePlan({ requestId: 'req-approve-old', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP }, trusted()),
     e => e.code === 'APPROVAL_BINDING_MISMATCH',
@@ -125,7 +145,6 @@ test('approval atomically binds planId/roomId/generation/revision/fingerprint an
   });
   assert.deepEqual(store.read().plans['plan-1'].approval, approved);
   assert.deepEqual(await service.approvePlan(req, trusted()), approved, 'approve replay is idempotent');
-
   await assert.rejects(
     service.approvePlan({ ...req, requestId: 'req-approve-wrong-rev', expectedRevision: 2 }, trusted()),
     e => e.code === 'APPROVAL_BINDING_MISMATCH',
@@ -140,21 +159,80 @@ test('approval atomically binds planId/roomId/generation/revision/fingerprint an
   );
 });
 
-test('trusted identity/authorization and Team generation are enforced', async t => {
-  const { store, service } = await setup(t);
+test('caller identity is independently trusted; the host delegate is consulted per room/operation', async t => {
+  const { store, service, auth } = await setup(t);
   await service.submitPlan(submit(), trusted());
+  const call = auth.calls.find(c => c.operation === 'submit');
+  assert.ok(call, 'delegate must be consulted on submit');
+  assert.equal(call.roomId, 'room-1');
+  assert.equal(call.actorKey, 'node-a/leader');
+  assert.equal(call.generation, 1);
 
-  // Non-leader and revoked callers cannot submit or approve.
-  await assert.rejects(service.submitPlan(submit({ requestId: 'x1' }), trusted({ actorKey: 'node-b/worker', authorizations: ['node-b/worker'] })), e => e.code === 'FORBIDDEN');
-  await assert.rejects(service.approvePlan({ requestId: 'x2', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP }, trusted({ authorizations: [] })), e => e.code === 'FORBIDDEN');
+  // A non-leader is rejected even if it claims to be trusted.
+  await assert.rejects(service.submitPlan(submit({ requestId: 'x1' }), trusted({ actorKey: 'node-b/worker' })), e => e.code === 'FORBIDDEN');
+  // Missing identity is a malformed request, never inferred.
+  await assert.rejects(service.submitPlan(submit({ requestId: 'x1b' }), {}), e => e.code === 'BAD_REQUEST');
+  // Delegate can deny a specific operation for the room.
+  auth.deniedOps.add('approve');
+  await assert.rejects(
+    service.approvePlan({ requestId: 'x2', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP }, trusted()),
+    e => e.code === 'FORBIDDEN',
+  );
+  auth.deniedOps.delete('approve');
+  assert.equal(store.read().plans['plan-1'].approval, null);
 
   // Generation fence: caller must pin the authoritative generation.
   await assert.rejects(service.submitPlan(submit({ requestId: 'x3', expectedGeneration: 2 }), trusted()), e => e.code === 'STALE_GENERATION');
   await assert.rejects(service.approvePlan({ requestId: 'x4', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 2, fingerprint: FP }, trusted()), e => e.code === 'STALE_GENERATION');
-
-  // A plan anchored to an old generation cannot be approved after generation moves on.
   await store.transact(state => { state.teams['room-1'].generation = 2; return { state }; });
   await assert.rejects(service.approvePlan({ requestId: 'x5', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 2, fingerprint: FP }, trusted()), e => e.code === 'STALE_GENERATION');
+});
+
+test('revocation while queued rejects the write: authorization is evaluated inside the transaction', async t => {
+  const { store, service, auth } = await setup(t);
+  const pending = service.submitPlan(submit(), trusted());
+  auth.allowed = false; // revoked before the queued transaction runs
+  await assert.rejects(pending, e => e.code === 'FORBIDDEN');
+  assert.equal(Object.keys(store.read().plans).length, 0, 'a revoked write must not persist');
+});
+
+test('revocation blocks approval even when the plan was submitted while authorized', async t => {
+  const { store, service, auth } = await setup(t);
+  await service.submitPlan(submit(), trusted());
+  auth.allowed = false;
+  await assert.rejects(
+    service.approvePlan({ requestId: 'req-approve-1', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP }, trusted()),
+    e => e.code === 'FORBIDDEN',
+  );
+  assert.equal(store.read().plans['plan-1'].approval, null);
+});
+
+test('a service without a trusted host authorizer fails closed for writes and reads', async t => {
+  const { service } = await setup(t, { noDelegate: true });
+  await assert.rejects(service.submitPlan(submit(), trusted()), e => e.code === 'AUTHORIZATION_UNAVAILABLE');
+  await assert.rejects(service.readPlan({ roomId: 'room-1', planId: 'plan-1' }, trusted()), e => e.code === 'AUTHORIZATION_UNAVAILABLE');
+  await assert.rejects(service.listPlans({ roomId: 'room-1' }, trusted()), e => e.code === 'AUTHORIZATION_UNAVAILABLE');
+});
+
+test('read/list are internal-only and enforce the same trusted authorization boundary', async t => {
+  const { store, service, auth } = await setup(t);
+  await service.submitPlan(submit(), trusted());
+  await service.approvePlan({ requestId: 'req-approve-1', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP }, trusted());
+  const before = store.read();
+  const view = await service.readPlan({ roomId: 'room-1', planId: 'plan-1' }, trusted());
+  assert.equal(view.approval.revision, 1);
+  assert.equal((await service.listPlans({ roomId: 'room-1' }, trusted())).length, 1);
+  assert.equal((await service.listPlans({ roomId: 'other' }, trusted())).length, 0);
+  assert.deepEqual(store.read(), before, 'reads must not mutate the ledger');
+  const returned = await service.readPlan({ roomId: 'room-1', planId: 'plan-1' }, trusted());
+  returned.tasks[0].detail = 'mutated copy';
+  assert.notEqual(store.read().plans['plan-1'].tasks[0].detail, 'mutated copy');
+  // An unauthorized caller cannot read; missing context is rejected.
+  auth.allowed = false;
+  await assert.rejects(service.readPlan({ roomId: 'room-1', planId: 'plan-1' }, trusted()), e => e.code === 'FORBIDDEN');
+  await assert.rejects(service.listPlans({ roomId: 'room-1' }, trusted()), e => e.code === 'FORBIDDEN');
+  auth.allowed = true;
+  await assert.rejects(service.readPlan({ roomId: 'room-1', planId: 'plan-1' }), e => e.code === 'BAD_REQUEST');
 });
 
 test('old M1 ledger (no plans bucket) opens and plan service works; corrupt plans fail closed', async t => {
@@ -163,7 +241,7 @@ test('old M1 ledger (no plans bucket) opens and plan service works; corrupt plan
   const result = await service.submitPlan(submit(), trusted());
   assert.equal(result.revision, 1);
   const reopened = await reopen();
-  assert.equal((await reopened.readPlan({ roomId: 'room-1', planId: 'plan-1' })).revision, 1);
+  assert.equal((await reopened.readPlan({ roomId: 'room-1', planId: 'plan-1' }, trusted())).revision, 1);
 
   const bad = await mkdtemp(join(tmpdir(), 'm6-plan-bad-'));
   t.after(() => rm(bad, { recursive: true, force: true }));
@@ -171,19 +249,4 @@ test('old M1 ledger (no plans bucket) opens and plan service works; corrupt plan
   state.plans = { 'plan-x': { planId: 'plan-x' } }; // structurally invalid
   await writeFile(join(bad, 'team.json'), JSON.stringify(state));
   await assert.rejects(openTeamStore({ directory: bad }), e => e.code === 'TEAM_STORAGE');
-});
-
-test('readPlan/listPlans verify integrity and never mutate state', async t => {
-  const { store, service } = await setup(t);
-  await service.submitPlan(submit(), trusted());
-  await service.approvePlan({ requestId: 'req-approve-1', roomId: 'room-1', planId: 'plan-1', expectedRevision: 1, expectedGeneration: 1, fingerprint: FP }, trusted());
-  const before = store.read();
-  const view = await service.readPlan({ roomId: 'room-1', planId: 'plan-1' });
-  assert.equal(view.approval.revision, 1);
-  assert.equal((await service.listPlans({ roomId: 'room-1' })).length, 1);
-  assert.equal((await service.listPlans({ roomId: 'other' })).length, 0);
-  assert.deepEqual(store.read(), before, 'reads must not mutate the ledger');
-  const returned = await service.readPlan({ roomId: 'room-1', planId: 'plan-1' });
-  returned.tasks[0].detail = 'mutated copy';
-  assert.notEqual(store.read().plans['plan-1'].tasks[0].detail, 'mutated copy');
 });
