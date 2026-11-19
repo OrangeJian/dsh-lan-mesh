@@ -1,0 +1,35 @@
+.lm-ownerPlanPanel{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}
+.lm-ownerPlanHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.lm-ownerPlanHead h3{margin:0;font-size:14px}
+.lm-ownerPlanHead p{margin:4px 0 0;font-size:12px;line-height:1.6}
+.lm-ownerPlanNotice{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanNoticeBad{color:var(--dsw-alias-state-warn)}
+.lm-ownerPlanDenied{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-state-warn)}
+.lm-ownerPlanBody{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:12px;min-width:0}
+.lm-ownerPlanList{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lm-ownerPlanListHint{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanRow{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;cursor:pointer}
+.lm-ownerPlanRow strong,.lm-ownerPlanRow span{overflow-wrap:anywhere}
+.lm-ownerPlanRow small{font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanRowActive{border-color:var(--dsw-alias-brand-primary)}
+.lm-ownerPlanDetail{min-width:0;display:flex;flex-direction:column;gap:8px}
+.lm-ownerPlanMeta p{margin:0 0 4px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanFingerprint{display:flex;gap:8px;align-items:flex-start}
+.lm-ownerPlanFingerprint code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;overflow-wrap:anywhere;user-select:text}
+.lm-ownerPlanTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.lm-ownerPlanTasks li{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanTasks small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanTaskDetail{margin:4px 0 0;white-space:pre-wrap;line-height:1.6}
+.lm-ownerPlanActions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lm-ownerPlanApproved{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanConfirm{border:1px solid var(--dsw-alias-state-warn);border-radius:8px;padding:10px;font-size:12px}
+.lm-ownerPlanConfirm p{margin:0 0 6px;line-height:1.6;overflow-wrap:anywhere}
+.lm-ownerPlanConfirmActions{display:flex;flex-wrap:wrap;gap:8px}
+.lm-ownerPlanForm{display:flex;flex-direction:column;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l1)}
+.lm-ownerPlanForm h4{margin:0;font-size:13px}
+.lm-ownerPlanForm label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanForm input,.lm-ownerPlanForm textarea{font:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:7px;max-width:100%}
+.lm-ownerPlanForm textarea{resize:vertical;min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+.lm-ownerPlanForm .lm-muted{margin:0;font-size:11px}
+.lm-ownerPlanPanel button:focus-visible,.lm-ownerPlanPanel input:focus-visible,.lm-ownerPlanPanel textarea:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+@media(max-width:700px){.lm-ownerPlanBody{grid-template-columns:minmax(0,1fr)}}

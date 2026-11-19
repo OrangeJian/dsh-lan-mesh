@@ -740,7 +740,8 @@ function OwnerTeamOverview({h,React,call,roomId,selectedResults=[],onSelectResul
         h('span',null,ref.executionId+' · '+(labels[ref.reviewStatus]??ref.reviewStatus)+' · '+ref.resultHash.slice(0,12)+' '),
         h('button',{type:'button',className:'lm-btn lm-selectTaskResult','aria-pressed':selected,disabled:!selected&&selectedResults.length>=8,onClick:()=>onSelectResult(ref)},selected?'取消引用':'引用成果'));
     }):null,
-    value?.known&&value.status!=='absent'&&value.taskCounts&&value.executionCounts?h('div',null,counts('任务状态',value.taskCounts),counts('执行状态',value.executionCounts)):null);
+    value?.known&&value.status!=='absent'&&value.taskCounts&&value.executionCounts?h('div',null,counts('任务状态',value.taskCounts),counts('执行状态',value.executionCounts)):null,
+    value?.known&&value.status!=='absent'&&value.status!=='archived'&&Number.isSafeInteger(value.generation)?h(OwnerPlanPanel,{key:roomId,h,React,call,roomId,model:ownerPlanPanelModel,newRequestId:rpcId}):null);
 }
     /* @ux-shell:workspace-components:end */
     /* @ux-shell:workspace-nav-model:start */
@@ -1013,6 +1014,43 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 @media(max-width:650px){.lm-roomTaskBoard{padding:16px}}
 @container lm-task-board (max-width:650px){.lm-roomTaskBoard .lm-taskBoardFilters>*{width:100%}.lm-roomTaskBoard .lm-taskBoardRowHead{align-items:flex-start;flex-wrap:wrap}}
     /* @ux-shell:task-board-styles:end */
+/* @ux-shell:owner-plan-styles:start */
+.lm-ownerPlanPanel{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}
+.lm-ownerPlanHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.lm-ownerPlanHead h3{margin:0;font-size:14px}
+.lm-ownerPlanHead p{margin:4px 0 0;font-size:12px;line-height:1.6}
+.lm-ownerPlanNotice{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanNoticeBad{color:var(--dsw-alias-state-warn)}
+.lm-ownerPlanDenied{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-state-warn)}
+.lm-ownerPlanBody{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:12px;min-width:0}
+.lm-ownerPlanList{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lm-ownerPlanListHint{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanRow{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;cursor:pointer}
+.lm-ownerPlanRow strong,.lm-ownerPlanRow span{overflow-wrap:anywhere}
+.lm-ownerPlanRow small{font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.lm-ownerPlanRowActive{border-color:var(--dsw-alias-brand-primary)}
+.lm-ownerPlanDetail{min-width:0;display:flex;flex-direction:column;gap:8px}
+.lm-ownerPlanMeta p{margin:0 0 4px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanFingerprint{display:flex;gap:8px;align-items:flex-start}
+.lm-ownerPlanFingerprint code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;overflow-wrap:anywhere;user-select:text}
+.lm-ownerPlanTasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.lm-ownerPlanTasks li{border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;font-size:12px;overflow-wrap:anywhere}
+.lm-ownerPlanTasks small{display:block;margin-top:2px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanTaskDetail{margin:4px 0 0;white-space:pre-wrap;line-height:1.6}
+.lm-ownerPlanActions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lm-ownerPlanApproved{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanConfirm{border:1px solid var(--dsw-alias-state-warn);border-radius:8px;padding:10px;font-size:12px}
+.lm-ownerPlanConfirm p{margin:0 0 6px;line-height:1.6;overflow-wrap:anywhere}
+.lm-ownerPlanConfirmActions{display:flex;flex-wrap:wrap;gap:8px}
+.lm-ownerPlanForm{display:flex;flex-direction:column;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l1)}
+.lm-ownerPlanForm h4{margin:0;font-size:13px}
+.lm-ownerPlanForm label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.lm-ownerPlanForm input,.lm-ownerPlanForm textarea{font:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:7px;max-width:100%}
+.lm-ownerPlanForm textarea{resize:vertical;min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+.lm-ownerPlanForm .lm-muted{margin:0;font-size:11px}
+.lm-ownerPlanPanel button:focus-visible,.lm-ownerPlanPanel input:focus-visible,.lm-ownerPlanPanel textarea:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+@media(max-width:700px){.lm-ownerPlanBody{grid-template-columns:minmax(0,1fr)}}
+    /* @ux-shell:owner-plan-styles:end */
 .lm-panel{display:flex;width:100%;height:100%;min-height:0;min-width:0;overflow:hidden;box-sizing:border-box;color:var(--dsw-alias-label-primary);font-size:13px;background:var(--dsw-alias-bg-base)}
 /* lanmesh mode takes the shell's New Session button and global panel rail off
    the left column, the same contract dsh-agent-team uses with
@@ -5198,6 +5236,513 @@ function RoomTaskBoard(props){
  return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',onClick:props.onRefresh},'刷新'):null),h('p',{className:'lm-taskBoardScope'},'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),model.groups.length?model.groups.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),...group.rows.map(row=>h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null)))):h('p',{className:'lm-muted'},model.counts.all?'没有匹配的房间任务':'当前没有房间任务'));
 }
     /* @ux-shell:task-board-component:end */
+    /* @ux-shell:owner-plan-model:start */
+/**
+ * M6 Owner plan panel view model.
+ *
+ * Pure presentation helpers: no network, no storage, no authority. The Host
+ * ledger is the only source of plan revision, generation, fingerprint and
+ * approval state; this module only formats what the server returned.
+ */
+
+const CONFLICT_CODES = ['REVISION_CONFLICT', 'STALE_GENERATION', 'APPROVAL_BINDING_MISMATCH'];
+
+function stringList(value) {
+  return Array.isArray(value) ? value.filter(entry => typeof entry === 'string') : [];
+}
+
+/** A failed write that changed the version underneath the user, not a bad input. */
+function ownerPlanConflict(code) {
+  return CONFLICT_CODES.includes(code);
+}
+
+/** Stable Chinese text for the codes the plan entry can return. */
+function ownerPlanErrorText(code, fallback = '') {
+  const messages = {
+    FORBIDDEN: '当前无权执行该计划操作；团队权限由服务端判定。',
+    NOT_OWNER: '仅本机 Owner 可执行该计划操作。',
+    NOT_READY: '本机 Team 账本尚未就绪，请稍后刷新。',
+    UNKNOWN_ROOM: '找不到该 Room，可能已被移除。',
+    MISSING_CANONICAL_ROOM: '无法确认该 Room 的权威标识。',
+    NOT_FOUND: '该计划不存在，或不属于当前 Room。',
+    REVISION_CONFLICT: '计划版本已变化，已重新读取，请核对后再次提交。',
+    STALE_GENERATION: 'Team 代次已变化，已重新读取，请核对后再操作。',
+    APPROVAL_BINDING_MISMATCH: '批准绑定的版本或指纹与服务端不一致，已重新读取。',
+    INVALID_PLAN_GRAPH: '计划依赖不合法：不能有循环或跨 Room 依赖。',
+    INVALID_PLAN: '计划内容不合法，请检查任务字段。',
+    PLAN_TAMPER: '计划记录校验失败，已停止操作。',
+    PLAN_ID_CONFLICT: '该计划 ID 已属于其他 Room。',
+    REQUEST_CONFLICT: '同一请求对应了不同内容，请刷新后重试。',
+    BAD_REQUEST: '请求内容不合法，请检查计划 ID 与任务清单。',
+    LAN_MESH_FAILED: '请求失败，请稍后重试。',
+  };
+  return messages[code] ?? (fallback || '操作失败，请稍后重试。');
+}
+
+/** Parse the draft task textarea; structural checks only, the Host validates the plan. */
+function parseOwnerPlanTasks(text) {
+  let value;
+  try {
+    value = JSON.parse(String(text ?? ''));
+  } catch {
+    throw Object.assign(new Error('tasks must be JSON'), { code: 'BAD_REQUEST' });
+  }
+  if (!Array.isArray(value) || value.some(item => item === null || typeof item !== 'object' || Array.isArray(item))) {
+    throw Object.assign(new Error('tasks must be a JSON array of objects'), { code: 'BAD_REQUEST' });
+  }
+  return value;
+}
+
+/** Short fingerprint for dense rows; detail views always show the full value. */
+function ownerPlanFingerprintShort(fingerprint) {
+  return typeof fingerprint === 'string' && fingerprint.length > 12 ? `${fingerprint.slice(0, 12)}…` : String(fingerprint ?? '');
+}
+
+/** Room list rows, newest first, with no invented fields. */
+function ownerPlanRows(plans) {
+  return (Array.isArray(plans) ? plans : [])
+    .filter(plan => plan && typeof plan === 'object' && typeof plan.planId === 'string' && plan.planId !== '')
+    .map(plan => ({
+      planId: plan.planId,
+      roomId: typeof plan.roomId === 'string' ? plan.roomId : '',
+      revision: plan.revision,
+      generation: plan.generation,
+      fingerprint: typeof plan.fingerprint === 'string' ? plan.fingerprint : '',
+      approved: plan.approval !== null && plan.approval !== undefined,
+      taskCount: Array.isArray(plan.tasks) ? plan.tasks.length : 0,
+      updatedAt: typeof plan.updatedAt === 'string' ? plan.updatedAt : '',
+    }))
+    .sort((left, right) => (right.updatedAt || '').localeCompare(left.updatedAt || '') || left.planId.localeCompare(right.planId));
+}
+
+/** Exact stored version; task objects are kept as returned so a bump resubmits the same content. */
+function ownerPlanDetail(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  return {
+    planId: plan.planId,
+    roomId: plan.roomId,
+    revision: plan.revision,
+    generation: plan.generation,
+    fingerprint: typeof plan.fingerprint === 'string' ? plan.fingerprint : '',
+    approved: plan.approval !== null && plan.approval !== undefined,
+    approval: plan.approval && typeof plan.approval === 'object' ? { ...plan.approval } : null,
+    tasks: Array.isArray(plan.tasks) ? plan.tasks.filter(task => task && typeof task === 'object' && !Array.isArray(task)).map(task => ({ ...task })) : [],
+    createdAt: typeof plan.createdAt === 'string' ? plan.createdAt : '',
+    updatedAt: typeof plan.updatedAt === 'string' ? plan.updatedAt : '',
+  };
+}
+
+/** Display rows for the exact version's tasks. */
+function ownerPlanTaskRows(tasks) {
+  return (Array.isArray(tasks) ? tasks : []).map((task, index) => ({
+    key: `${String(task.taskId ?? 'task')}-${index}`,
+    taskId: String(task.taskId ?? ''),
+    title: typeof task.title === 'string' && task.title !== '' ? task.title : String(task.taskId ?? ''),
+    detail: typeof task.detail === 'string' ? task.detail : '',
+    dependsOn: stringList(task.dependsOn),
+    requiredCapabilities: stringList(task.requiredCapabilities),
+  }));
+}
+
+/** The exact sentence a person must confirm before an approval is sent. */
+function ownerPlanApprovalPrompt(plan) {
+  return `确认批准计划 ${plan.planId} 的版本 ${plan.revision}，指纹 ${plan.fingerprint}。`;
+}
+
+
+/**
+ * Helpers the panel needs, passed explicitly like every other UI fragment so
+ * the same component can be rendered in isolation by its own tests.
+ */
+const ownerPlanPanelModel = Object.freeze({
+  conflict: ownerPlanConflict,
+  errorText: ownerPlanErrorText,
+  parseTasks: parseOwnerPlanTasks,
+  fingerprintShort: ownerPlanFingerprintShort,
+  rows: ownerPlanRows,
+  detail: ownerPlanDetail,
+  taskRows: ownerPlanTaskRows,
+  approvalPrompt: ownerPlanApprovalPrompt,
+});
+    /* @ux-shell:owner-plan-model:end */
+    /* @ux-shell:owner-plan-component:start */
+/**
+ * M6 Owner plan panel.
+ *
+ * Shown only inside the existing local Owner Team surface (Room tasks tab, the
+ * local human session that currently leads the Room). It lists plan drafts,
+ * reads one exact version, submits a draft and requires an explicit
+ * confirmation of the version + fingerprint on screen before approving.
+ *
+ * Server authority is never inferred here:
+ *  - every revision/fingerprint/approval shown comes from a Host response;
+ *  - a version conflict triggers a READ of the current version, never a silent
+ *    write retry;
+ *  - switching Rooms discards in-flight answers from the previous Room.
+ */
+function OwnerPlanPanel(props) {
+  const { h, React, call, roomId } = props;
+  const model = props.model ?? ownerPlanPanelModel;
+  // `randomUUID` is secure-context only; the panel's Host route is often plain
+  // HTTP on a LAN, so the caller can supply the same fallback `rpcId` uses.
+  const newRequestId = typeof props.newRequestId === 'function' ? props.newRequestId : () => crypto.randomUUID();
+  const [team, setTeam] = React.useState(() => ({ status: 'loading', room: roomId, overview: null, error: '', code: '' }));
+  const [list, setList] = React.useState(() => ({ status: 'loading', room: roomId, rows: [], error: '', code: '' }));
+  const [selected, setSelected] = React.useState('');
+  const [detail, setDetail] = React.useState(() => ({ status: 'idle', room: roomId, plan: null, error: '', code: '' }));
+  const [planId, setPlanId] = React.useState('');
+  const [tasksText, setTasksText] = React.useState('');
+  const [draftBase, setDraftBase] = React.useState(null);
+  const [confirming, setConfirming] = React.useState(null);
+  const [notice, setNotice] = React.useState({ text: '', bad: false });
+  const [busy, setBusy] = React.useState('');
+  const retry = React.useRef(null);
+  const page = React.useRef({ room: roomId, teamSeq: 0, listSeq: 0, detailSeq: 0 });
+
+  function errorOf(error, fallback) {
+    const code = typeof error?.code === 'string' ? error.code : '';
+    const message = fallback ?? String(error?.message ?? error ?? '');
+    return { code, text: model.errorText(code, message) };
+  }
+
+  async function reloadTeam() {
+    const room = roomId;
+    if (page.current.room !== room) return null;
+    const token = ++page.current.teamSeq;
+    try {
+      const value = await call('teamOverview', { roomId });
+      if (page.current.room !== room || page.current.teamSeq !== token) return null;
+      setTeam({ status: 'ready', room, overview: value, error: '', code: '' });
+      return value;
+    } catch (error) {
+      if (page.current.room !== room || page.current.teamSeq !== token) return null;
+      const failed = errorOf(error);
+      setTeam({ status: 'error', room, overview: null, error: failed.text, code: failed.code });
+      return null;
+    }
+  }
+
+  async function reloadList() {
+    const room = roomId;
+    if (page.current.room !== room) return null;
+    const token = ++page.current.listSeq;
+    try {
+      const value = await call('planList', { roomId });
+      if (page.current.room !== room || page.current.listSeq !== token) return null;
+      setList({ status: 'ready', room, rows: model.rows(value), error: '', code: '' });
+      return value;
+    } catch (error) {
+      if (page.current.room !== room || page.current.listSeq !== token) return null;
+      const failed = errorOf(error);
+      setList({ status: 'error', room, rows: [], error: failed.text, code: failed.code });
+      return null;
+    }
+  }
+
+  async function loadDetail(id) {
+    const room = roomId;
+    if (page.current.room !== room) return null;
+    const token = ++page.current.detailSeq;
+    setSelected(id);
+    setConfirming(null);
+    setDetail({ status: 'loading', room, plan: null, error: '', code: '' });
+    try {
+      const value = await call('planRead', { roomId, planId: id });
+      if (page.current.room !== room || page.current.detailSeq !== token) return null;
+      const plan = model.detail(value);
+      if (!plan || plan.planId !== id || plan.roomId !== room) {
+        setDetail({ status: 'error', room, plan: null, error: '服务端返回的版本与请求或当前 Room 不一致，请刷新核对。', code: 'MISMATCH' });
+        return null;
+      }
+      setDetail({ status: 'ready', room, plan, error: '', code: '' });
+      return plan;
+    } catch (error) {
+      if (page.current.room !== room || page.current.detailSeq !== token) return null;
+      const failed = errorOf(error);
+      setDetail({ status: 'error', room, plan: null, error: failed.text, code: failed.code });
+      return null;
+    }
+  }
+
+  React.useEffect(() => {
+    const room = roomId;
+    const current = page.current;
+    current.room = room;
+    const teamToken = ++current.teamSeq;
+    const listToken = ++current.listSeq;
+    ++current.detailSeq;
+    setSelected('');
+    setConfirming(null);
+    setPlanId('');
+    setTasksText('');
+    setDraftBase(null);
+    setNotice({ text: '', bad: false });
+    retry.current = null;
+    setTeam({ status: 'loading', room, overview: null, error: '', code: '' });
+    setList({ status: 'loading', room, rows: [], error: '', code: '' });
+    setDetail({ status: 'idle', room, plan: null, error: '', code: '' });
+    Promise.resolve().then(() => call('teamOverview', { roomId })).then(
+      value => {
+        if (current.room !== room || current.teamSeq !== teamToken) return;
+        setTeam({ status: 'ready', room, overview: value, error: '', code: '' });
+      },
+      error => {
+        if (current.room !== room || current.teamSeq !== teamToken) return;
+        const failed = errorOf(error);
+        setTeam({ status: 'error', room, overview: null, error: failed.text, code: failed.code });
+      },
+    );
+    Promise.resolve().then(() => call('planList', { roomId })).then(
+      value => {
+        if (current.room !== room || current.listSeq !== listToken) return;
+        setList({ status: 'ready', room, rows: model.rows(value), error: '', code: '' });
+      },
+      error => {
+        if (current.room !== room || current.listSeq !== listToken) return;
+        const failed = errorOf(error);
+        setList({ status: 'error', room, rows: [], error: failed.text, code: failed.code });
+      },
+    );
+  }, [call, roomId]);
+
+  const teamView = team.room === roomId ? team : { status: 'loading', room: roomId, overview: null, error: '', code: '' };
+  const listView = list.room === roomId ? list : { status: 'loading', room: roomId, rows: [], error: '', code: '' };
+  const detailView = detail.room === roomId ? detail : { status: 'idle', room: roomId, plan: null, error: '', code: '' };
+  const generation = Number.isSafeInteger(teamView.overview?.generation) ? teamView.overview.generation : null;
+  const denied = [teamView, listView, detailView].some(view => view.status === 'error' && view.code === 'FORBIDDEN');
+  const detailPlan = detailView.status === 'ready' ? detailView.plan : null;
+  const trimmedPlanId = planId.trim();
+  const expectedRevision = draftBase && draftBase.planId === trimmedPlanId ? draftBase.revision : 0;
+
+  async function refreshAll() {
+    const room = roomId;
+    await Promise.all([reloadTeam(), reloadList()]);
+    if (page.current.room !== room) return;
+    if (selected) await loadDetail(selected);
+  }
+
+  async function submitDraft() {
+    if (busy !== '') return;
+    const room = roomId;
+    const id = planId.trim();
+    if (id === '') {
+      setNotice({ text: '请填写计划 ID。', bad: true });
+      return;
+    }
+    if (generation === null) {
+      setNotice({ text: 'Team 代次未知，请刷新后再提交。', bad: true });
+      return;
+    }
+    let tasks;
+    try {
+      tasks = model.parseTasks(tasksText);
+    } catch {
+      setNotice({ text: '任务清单必须是 JSON 数组，且每一项都是对象。', bad: true });
+      return;
+    }
+    const intent = JSON.stringify({ roomId, planId: id, expectedRevision, expectedGeneration: generation, tasks });
+    if (retry.current?.key !== intent) retry.current = { key: intent, requestId: newRequestId() };
+    const requestId = retry.current.requestId;
+    setBusy('submit');
+    setConfirming(null);
+    setNotice({ text: '', bad: false });
+    try {
+      const result = await call('planSubmit', { requestId, roomId, planId: id, expectedRevision, expectedGeneration: generation, tasks });
+      if (page.current.room !== room) return;
+      retry.current = null;
+      setDraftBase({ planId: id, revision: result.revision });
+      await reloadList();
+      if (page.current.room !== room) return;
+      const fresh = await loadDetail(id);
+      if (page.current.room !== room) return;
+      if (!fresh) {
+        setNotice({ text: '服务端已保存草稿：版本 ' + result.revision + ' · 指纹 ' + result.fingerprint + '；但重新读取详情失败，请手动刷新核对。', bad: true });
+      } else if (fresh.revision !== result.revision || fresh.fingerprint !== result.fingerprint) {
+        setNotice({ text: '服务端已保存版本 ' + result.revision + '，但重新读取得到版本 ' + fresh.revision + '；内容已被再次修改，请核对。', bad: true });
+      } else {
+        setNotice({ text: '服务端已保存草稿：版本 ' + result.revision + ' · 指纹 ' + result.fingerprint, bad: false });
+      }
+    } catch (error) {
+      if (page.current.room !== room) return;
+      const code = typeof error?.code === 'string' ? error.code : '';
+      if (model.conflict(code)) {
+        if (code === 'STALE_GENERATION') await reloadTeam();
+        if (page.current.room !== room) return;
+        const fresh = await loadDetail(id);
+        if (page.current.room !== room) return;
+        if (fresh) setDraftBase({ planId: id, revision: fresh.revision });
+        setNotice({
+          text: fresh
+            ? '服务端版本已变化，已重新读取：版本 ' + fresh.revision + ' · 指纹 ' + fresh.fingerprint + '。请核对后再次提交，不会自动重试。'
+            : '服务端版本已变化，但重新读取失败，请刷新后核对。',
+          bad: true,
+        });
+      } else {
+        setNotice({ text: model.errorText(code, String(error?.message ?? error)), bad: true });
+        if (code === 'FORBIDDEN') {
+          retry.current = null;
+          await refreshAll();
+        }
+      }
+    } finally {
+      if (page.current.room === room) setBusy('');
+    }
+  }
+
+  function beginApprove() {
+    if (!detailPlan || busy !== '') return;
+    setConfirming({
+      planId: detailPlan.planId,
+      revision: detailPlan.revision,
+      generation: detailPlan.generation,
+      fingerprint: detailPlan.fingerprint,
+    });
+    setNotice({ text: '', bad: false });
+  }
+
+  async function approveConfirmed() {
+    if (!confirming || busy !== '') return;
+    const room = roomId;
+    const target = confirming;
+    const shown = detailView.status === 'ready' ? detailView.plan : null;
+    if (!shown || shown.planId !== target.planId || shown.revision !== target.revision || shown.fingerprint !== target.fingerprint) {
+      setConfirming(null);
+      setNotice({ text: '已展示的版本与确认内容不一致，请重新选择版本后再批准。', bad: true });
+      return;
+    }
+    if (!Number.isSafeInteger(target.generation)) {
+      setConfirming(null);
+      setNotice({ text: '该版本的 Team 代次未知，请重新读取后再批准。', bad: true });
+      return;
+    }
+    const intent = JSON.stringify(target);
+    if (retry.current?.key !== intent) retry.current = { key: intent, requestId: newRequestId() };
+    const requestId = retry.current.requestId;
+    setBusy('approve');
+    try {
+      const result = await call('planApprove', {
+        requestId,
+        roomId,
+        planId: target.planId,
+        expectedRevision: target.revision,
+        expectedGeneration: target.generation,
+        fingerprint: target.fingerprint,
+      });
+      if (page.current.room !== room) return;
+      retry.current = null;
+      if (result.revision !== target.revision || result.fingerprint !== target.fingerprint) {
+        setConfirming(null);
+        setNotice({ text: '批准响应与确认的版本或指纹不一致，已重新读取，请核对。', bad: true });
+        await loadDetail(target.planId);
+        return;
+      }
+      setConfirming(null);
+      const fresh = await loadDetail(target.planId);
+      if (page.current.room !== room) return;
+      setNotice({
+        text: '已批准版本 ' + result.revision + ' · 指纹 ' + result.fingerprint + (fresh ? '' : '（详情刷新失败，请手动刷新核对）'),
+        bad: false,
+      });
+      await reloadList();
+    } catch (error) {
+      if (page.current.room !== room) return;
+      const code = typeof error?.code === 'string' ? error.code : '';
+      setConfirming(null);
+      if (model.conflict(code)) {
+        if (code === 'STALE_GENERATION') await reloadTeam();
+        if (page.current.room !== room) return;
+        const fresh = await loadDetail(target.planId);
+        if (page.current.room !== room) return;
+        setNotice({
+          text: fresh
+            ? '版本已变化，已重新读取：版本 ' + fresh.revision + ' · 指纹 ' + fresh.fingerprint + '。原确认已失效，请核对后重新批准。'
+            : '版本已变化，重新读取失败，请刷新后核对。',
+          bad: true,
+        });
+      } else {
+        setNotice({ text: model.errorText(code, String(error?.message ?? error)), bad: true });
+        if (code === 'FORBIDDEN') {
+          retry.current = null;
+          await refreshAll();
+        }
+      }
+    } finally {
+      if (page.current.room === room) setBusy('');
+    }
+  }
+
+  function loadAsDraft(plan) {
+    setDraftBase({ planId: plan.planId, revision: plan.revision });
+    setPlanId(plan.planId);
+    setTasksText(JSON.stringify(plan.tasks, null, 2));
+    setNotice({ text: '已载入版本 ' + plan.revision + ' 的任务清单；提交草稿会基于该版本创建新版本。', bad: false });
+  }
+
+  if (denied) {
+    return h('section', { className: 'lm-task lm-ownerPlanPanel', 'aria-label': 'M6 计划草稿与批准' },
+      h('div', { className: 'lm-ownerPlanHead' }, h('h3', null, '计划草稿与批准 · 本机')),
+      h('p', { className: 'lm-ownerPlanDenied', role: 'alert' }, '当前无权查看或变更该 Room 的计划；团队权限由服务端判定。'));
+  }
+
+  const rows = listView.rows;
+  const tasks = detailPlan ? model.taskRows(detailPlan.tasks) : [];
+  return h('section', { className: 'lm-task lm-ownerPlanPanel', 'aria-label': 'M6 计划草稿与批准' },
+    h('div', { className: 'lm-ownerPlanHead' },
+      h('div', null,
+        h('h3', null, '计划草稿与批准 · 本机'),
+        h('p', { className: 'lm-muted' }, '服务端账本校验版本、代次与指纹。批准只绑定下面展示的确切版本。')),
+      h('button', { type: 'button', className: 'lm-btn lm-ownerPlanRefresh', disabled: busy !== '', onClick: () => { void refreshAll(); } }, '刷新计划')),
+    teamView.status === 'error' ? h('p', { className: 'lm-ownerPlanNotice lm-ownerPlanNoticeBad', role: 'alert' }, teamView.error) : null,
+    h('p', { className: 'lm-ownerPlanNotice' + (notice.bad ? ' lm-ownerPlanNoticeBad' : ''), role: notice.bad ? 'alert' : 'status' }, notice.text || (busy !== '' ? '处理中…' : '')),
+    h('div', { className: 'lm-ownerPlanBody' },
+      h('div', { className: 'lm-ownerPlanList', role: 'group', 'aria-label': '计划列表' },
+        h('p', { className: 'lm-ownerPlanListHint' }, listView.status === 'loading' ? '正在读取计划…' : (listView.error || (rows.length === 0 ? '当前 Room 还没有计划草稿' : '选择一个计划查看确切版本'))),
+        ...rows.map(row => h('button', {
+          key: row.planId,
+          type: 'button',
+          className: 'lm-ownerPlanRow' + (row.planId === selected ? ' lm-ownerPlanRowActive' : ''),
+          'aria-pressed': row.planId === selected,
+          onClick: () => { void loadDetail(row.planId); },
+        },
+          h('strong', null, row.planId),
+          h('span', null, '版本 ' + row.revision + ' · ' + (row.approved ? '已批准' : '未批准')),
+          h('small', null, '指纹 ' + model.fingerprintShort(row.fingerprint) + ' · ' + row.taskCount + ' 项任务')))),
+      h('div', { className: 'lm-ownerPlanDetail' },
+        detailView.status === 'idle' ? h('p', { className: 'lm-muted' }, '选择左侧计划查看服务端保存的确切版本与指纹。') : null,
+        detailView.status === 'loading' ? h('p', { className: 'lm-muted' }, '正在读取版本…') : null,
+        detailView.status === 'error' ? h('p', { className: 'lm-ownerPlanNotice lm-ownerPlanNoticeBad', role: 'alert' }, detailView.error) : null,
+        detailPlan ? h('div', null,
+          h('div', { className: 'lm-ownerPlanMeta' },
+            h('p', null, h('strong', null, detailPlan.planId), ' · 版本 ', String(detailPlan.revision), ' · 代次 ', String(detailPlan.generation)),
+            h('p', { className: 'lm-ownerPlanFingerprint' }, h('span', null, '指纹'), h('code', null, detailPlan.fingerprint)),
+            h('p', null, detailPlan.approved
+              ? '已批准' + (detailPlan.approval?.approvedAt ? ' · ' + detailPlan.approval.approvedAt : '')
+              : '未批准')),
+          h('ul', { className: 'lm-ownerPlanTasks' }, ...tasks.map(task => h('li', { key: task.key },
+            h('strong', null, task.title), h('span', { className: 'lm-muted' }, ' · ' + task.taskId),
+            task.dependsOn.length ? h('small', null, '依赖 ' + task.dependsOn.join('、')) : null,
+            task.requiredCapabilities.length ? h('small', null, '能力 ' + task.requiredCapabilities.join('、')) : null,
+            task.detail ? h('p', { className: 'lm-ownerPlanTaskDetail' }, task.detail) : null))),
+          h('div', { className: 'lm-ownerPlanActions' },
+            h('button', { type: 'button', className: 'lm-btn lm-ownerPlanLoadDraft', onClick: () => loadAsDraft(detailPlan) }, '载入为草稿'),
+            detailPlan.approved ? h('span', { className: 'lm-ownerPlanApproved' }, '已批准版本 ' + detailPlan.revision) : null,
+            !detailPlan.approved && !confirming ? h('button', { type: 'button', className: 'lm-btn lm-btnPrimary lm-ownerPlanApprove', disabled: busy !== '', onClick: beginApprove }, '批准此版本') : null),
+          !detailPlan.approved && confirming ? h('div', { className: 'lm-ownerPlanConfirm', role: 'group', 'aria-label': '批准确认' },
+            h('p', null, model.approvalPrompt(confirming)),
+            h('p', { className: 'lm-muted' }, '确认后服务端会原子绑定计划、版本、代次与指纹；版本变化会使旧批准失效。'),
+            h('div', { className: 'lm-ownerPlanConfirmActions' },
+              h('button', { type: 'button', className: 'lm-btn lm-btnPrimary lm-ownerPlanConfirmBtn', disabled: busy !== '', onClick: () => { void approveConfirmed(); } }, busy === 'approve' ? '批准中…' : '确认批准版本 ' + confirming.revision),
+              h('button', { type: 'button', className: 'lm-btn lm-ownerPlanCancel', disabled: busy !== '', onClick: () => setConfirming(null) }, '取消'))) : null) : null,
+        h('form', { className: 'lm-ownerPlanForm', onSubmit: event => { event.preventDefault(); void submitDraft(); } },
+          h('h4', null, '提交计划草稿'),
+          h('label', null, '计划 ID',
+            h('input', { className: 'lm-ownerPlanPlanId', value: planId, maxLength: 120, disabled: busy !== '', onChange: event => setPlanId(event.target.value) })),
+          h('label', null, '任务清单（JSON 数组）',
+            h('textarea', { className: 'lm-ownerPlanTasksInput', value: tasksText, rows: 10, disabled: busy !== '', spellCheck: false, onChange: event => setTasksText(event.target.value) })),
+          h('p', { className: 'lm-muted' }, '期望版本 ' + expectedRevision + ' · Team 代次 ' + (generation === null ? '未知' : generation)),
+          h('button', { type: 'submit', className: 'lm-btn lm-btnPrimary lm-ownerPlanSubmit', disabled: busy !== '' || generation === null }, busy === 'submit' ? '提交中…' : '提交草稿')))));
+}
+    /* @ux-shell:owner-plan-component:end */
     function BoardPane(props) {return h(RoomTaskBoard,{...props,h,React,modelOf:roomTaskBoardView});}
 
     /** Exact Host route the panel posts to; the Host mounts it under `/api`. */
