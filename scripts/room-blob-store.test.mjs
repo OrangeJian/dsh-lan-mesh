@@ -22,6 +22,27 @@ async function contents(store, id) {
 }
 const put = (store, bytes, extra) => store.put(Readable.from([Buffer.from(bytes)]), ref(bytes, extra));
 
+test('metadata replacement retries a transient sharing violation', async t => {
+  const renameFile = fsPromises.rename;
+  let failures = 0;
+  fsPromises.rename = async (source, destination) => {
+    if (destination.endsWith('metadata.json') && failures < 2) {
+      failures++;
+      throw Object.assign(new Error('sharing violation'), { code: 'EPERM' });
+    }
+    return renameFile(source, destination);
+  };
+  syncBuiltinESMExports();
+  try {
+    const { dir } = await fixture(t);
+    assert.equal(failures, 2);
+    assert.deepEqual(JSON.parse(await readFile(join(dir, 'metadata.json'), 'utf8')), { version: 1, blobs: {} });
+  } finally {
+    fsPromises.rename = renameFile;
+    syncBuiltinESMExports();
+  }
+});
+
 test('put/read/restart preserves immutable refs and deduplicates display names', async t => {
   const { dir, store } = await fixture(t);
   const first = await put(store, 'hello');
