@@ -54,7 +54,7 @@ export function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
       setMessage('已保存');
     });
   }
-  const button=(label,onClick,disabled=false)=>h('button',{type:'button',className:'lm-btn',onClick,disabled:busy||disabled},label);
+  const button=(label,onClick,disabled=false,extra)=>h('button',{type:'button',className:'lm-btn',onClick,disabled:busy||disabled,...(extra||{})},label);
   const nameInput=h('input',{value:name,maxLength:120,disabled:busy,'aria-label':'Agent 名称',placeholder:'Agent 名称',onChange:event=>setName(event.target.value)});
   return h('section',{className:'lm-workspacePage','aria-label':'本机 Agent 身份'},
     h('header',{className:'lm-workspacePageHead'},h('h2',null,'本机 Agent 身份'),button('刷新',()=>void run(refresh))),
@@ -64,8 +64,9 @@ export function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
       h('select',{value:selected,disabled:busy,'aria-label':'选择 Agent',onChange:event=>{setSelected(event.target.value);setName('');setSession('');}},
         h('option',{value:''},'新建 Agent'),...rows.map(row=>h('option',{key:row.agentId,value:row.agentId},row.name+' · '+row.agentId))),
       nameInput,
+      h('p',{className:'lm-muted lm-agentNameHint'},'请先输入名称，再创建 Agent。'),
       current?button('重命名',()=>submit({type:'rename',agentId:current.agentId,expectedRevision:current.revision,name:name.trim()}),!name.trim()):
-        button('创建',()=>submit({type:'define',agentId:retry.current?.createName===name.trim()?retry.current.agentId:prepareAgentId(name.trim()),name:name.trim()}),!name.trim()),
+        button('创建',()=>submit({type:'define',agentId:retry.current?.createName===name.trim()?retry.current.agentId:prepareAgentId(name.trim()),name:name.trim()}),!name.trim(),!name.trim()?{title:'请先填写 Agent 名称','aria-disabled':true}:null),
       current?h('div',null,
         h('p',{className:'lm-muted'},current.authorityNodeId+' · 版本 '+current.revision),
         h('select',{value:session,disabled:busy,'aria-label':'选择本机会话',onChange:event=>setSession(event.target.value)},

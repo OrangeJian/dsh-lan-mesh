@@ -7,7 +7,9 @@
 .lm-discoverResults{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:0}
 .lm-discoverProject{display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .lm-discoverProjectBody{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.lm-discoverProjectTitle{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;min-width:0}
 .lm-discoverProjectName{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.lm-discoverSameName{flex:none;font-size:11px;line-height:1.6;padding:0 6px;border-radius:10px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2)}
 .lm-discoverId{font-size:11px;overflow-wrap:anywhere;user-select:text;color:var(--dsw-alias-label-secondary)}
 .lm-discoverEmpty{padding:20px 0;font-size:13px}.lm-discoverError{margin:0;font-size:12px}
 .lm-projectEntry{display:flex;align-items:flex-start;position:relative;gap:4px;min-width:0}

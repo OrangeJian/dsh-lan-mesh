@@ -153,7 +153,8 @@ window.__ModuleLoader__.load({
           invite: '拉进房',
           inviteHint: '把本节点的一个会话拉进这个房间',
           inviteAction: '拉进来',
-          inviteNone: '本节点没有可拉进来的会话',
+          inviteNone: '选择要拉进来的会话',
+          inviteEmpty: '本节点没有可拉进来的会话',
           invited: '已拉进房',
           inviteForbidden: '只有房间成员可以拉会话进来',
           // room skill references: a reference names a capability, it never
@@ -400,7 +401,8 @@ window.__ModuleLoader__.load({
           invite: 'Invite into room',
           inviteHint: 'Pull a session from this node into the room',
           inviteAction: 'Invite',
-          inviteNone: 'No session on this node to invite',
+          inviteNone: 'Select a session to invite',
+          inviteEmpty: 'No session on this node to invite',
           invited: 'Invited',
           inviteForbidden: 'Only room members can invite a session',
           // room skill references
@@ -600,16 +602,36 @@ function discoverProjectsView(input, query='') {
     /* @ux-shell:discovery:start */
 /** Nonmodal read-only discovery surface; all joins use the existing Host handler. */
 function DiscoverProjectsPanel({h,rows,query,onQuery,onJoin,onClose,busy,labels={},panelRef,error=''}) {
-  const copy={title:'发现项目',close:'关闭',search:'搜索项目、设备或 Room ID',leader:'Leader',unknownLeader:'负责人未知',unknownDevice:'设备未知',empty:'没有符合条件的可加入项目',join:'加入',joining:'加入中…',hint:'同名项目请核对负责人设备与 Room ID。加入仍由现有房间权限校验。',...labels};
+  const copy={title:'发现项目',close:'关闭',search:'搜索项目、设备或 Room ID',leader:'负责人',unknownLeader:'负责人未知',unknownDevice:'设备未知',empty:'没有符合条件的可加入项目',join:'加入',joining:'加入中…',hint:'同名项目已按房间编号区分，加入前请确认目标；加入仍由现有房间权限校验。',sameName:'同名项目',...labels};
+  const list=Array.isArray(rows)?rows:[];
+  // Same-name projects are the disambiguation trap: give each card a short id
+  // so two identically named rooms are visibly different, instead of pushing
+  // the job onto a prose hint. The full id stays available on hover / aria.
+  const nameCounts=new Map();
+  for(const row of list){const key=String(row?.name??'');nameCounts.set(key,(nameCounts.get(key)||0)+1);}
+  const shortId=id=>{const value=String(id??'');const match=value.match(/([0-9a-f]{6,})/i);return match?'#'+match[1].slice(0,8):value;};
   return h('aside',{className:'lm-discoverPanel',id:'lm-discover-projects',role:'region','aria-label':copy.title,tabIndex:-1,ref:panelRef,onKeyDown:event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}}},
     h('div',{className:'lm-discoverHead'},h('h2',null,copy.title),h('button',{type:'button',className:'lm-btn lm-discoverClose',onClick:onClose,'aria-label':copy.close},copy.close)),
     h('p',{className:'lm-discoverHint'},copy.hint),
     h('input',{className:'lm-input lm-discoverSearch',type:'search',value:query,maxLength:200,'aria-label':copy.search,placeholder:copy.search,onChange:event=>onQuery(event.target.value)}),
     error?h('p',{className:'lm-error lm-discoverError',role:'alert'},error):null,
-    h('div',{className:'lm-discoverResults','aria-live':'polite'},rows.length===0?h('p',{className:'lm-muted lm-discoverEmpty'},copy.empty):rows.map(row=>h('article',{key:row.id,className:'lm-discoverProject'},
-      h('div',{className:'lm-discoverProjectBody'},h('strong',{className:'lm-discoverProjectName'},row.name),row.topic?h('p',{className:'lm-discoverTopic'},row.topic):null,
-        h('p',{className:'lm-discoverLeader'},`${copy.leader}: ${row.leaderName||copy.unknownLeader} · ${row.deviceName||copy.unknownDevice}`),h('code',{className:'lm-discoverId'},row.id)),
-      h('button',{type:'button',className:'lm-btn lm-btnPrimary lm-joinBtn',disabled:!!busy,onClick:()=>onJoin(row.id),'aria-label':`${copy.join} ${row.name} · ${row.id}`},busy===row.id?copy.joining:copy.join)))));
+    h('div',{className:'lm-discoverResults','aria-live':'polite'},list.length===0?h('p',{className:'lm-muted lm-discoverEmpty'},copy.empty):list.map(row=>{
+      const leader=String(row?.leaderName??''),device=String(row?.deviceName??'');
+      const hasOrigin=leader!==''||device!=='';
+      const duplicate=(nameCounts.get(String(row?.name??''))||0)>1;
+      return h('article',{key:row.id,className:'lm-discoverProject'},
+        h('div',{className:'lm-discoverProjectBody'},
+          h('div',{className:'lm-discoverProjectTitle'},
+            h('strong',{className:'lm-discoverProjectName'},row.name),
+            duplicate?h('span',{className:'lm-discoverSameName',title:copy.sameName},copy.sameName):null,
+          ),
+          row.topic?h('p',{className:'lm-discoverTopic'},row.topic):null,
+          hasOrigin?h('p',{className:'lm-discoverLeader'},`${copy.leader}: ${leader||copy.unknownLeader}${device?' · '+device:''}`):null,
+          h('code',{className:'lm-discoverId',title:String(row.id)},shortId(row.id)),
+        ),
+        h('button',{type:'button',className:'lm-btn lm-btnPrimary lm-joinBtn',disabled:!!busy,onClick:()=>onJoin(row.id),'aria-label':`${copy.join} ${row.name} · ${row.id}`},busy===row.id?copy.joining:copy.join),
+      );
+    })));
 }
     /* @ux-shell:discovery:end */
     /* @ux-shell:workspace-model:start */
@@ -684,7 +706,7 @@ function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
       setMessage('已保存');
     });
   }
-  const button=(label,onClick,disabled=false)=>h('button',{type:'button',className:'lm-btn',onClick,disabled:busy||disabled},label);
+  const button=(label,onClick,disabled=false,extra)=>h('button',{type:'button',className:'lm-btn',onClick,disabled:busy||disabled,...(extra||{})},label);
   const nameInput=h('input',{value:name,maxLength:120,disabled:busy,'aria-label':'Agent 名称',placeholder:'Agent 名称',onChange:event=>setName(event.target.value)});
   return h('section',{className:'lm-workspacePage','aria-label':'本机 Agent 身份'},
     h('header',{className:'lm-workspacePageHead'},h('h2',null,'本机 Agent 身份'),button('刷新',()=>void run(refresh))),
@@ -694,8 +716,9 @@ function AgentRegistryPane({h,React,call,self,localAgents=[]}) {
       h('select',{value:selected,disabled:busy,'aria-label':'选择 Agent',onChange:event=>{setSelected(event.target.value);setName('');setSession('');}},
         h('option',{value:''},'新建 Agent'),...rows.map(row=>h('option',{key:row.agentId,value:row.agentId},row.name+' · '+row.agentId))),
       nameInput,
+      h('p',{className:'lm-muted lm-agentNameHint'},'请先输入名称，再创建 Agent。'),
       current?button('重命名',()=>submit({type:'rename',agentId:current.agentId,expectedRevision:current.revision,name:name.trim()}),!name.trim()):
-        button('创建',()=>submit({type:'define',agentId:retry.current?.createName===name.trim()?retry.current.agentId:prepareAgentId(name.trim()),name:name.trim()}),!name.trim()),
+        button('创建',()=>submit({type:'define',agentId:retry.current?.createName===name.trim()?retry.current.agentId:prepareAgentId(name.trim()),name:name.trim()}),!name.trim(),!name.trim()?{title:'请先填写 Agent 名称','aria-disabled':true}:null),
       current?h('div',null,
         h('p',{className:'lm-muted'},current.authorityNodeId+' · 版本 '+current.revision),
         h('select',{value:session,disabled:busy,'aria-label':'选择本机会话',onChange:event=>setSession(event.target.value)},
@@ -849,7 +872,9 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-discoverResults{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:0}
 .lm-discoverProject{display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .lm-discoverProjectBody{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.lm-discoverProjectTitle{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;min-width:0}
 .lm-discoverProjectName{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.lm-discoverSameName{flex:none;font-size:11px;line-height:1.6;padding:0 6px;border-radius:10px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2)}
 .lm-discoverId{font-size:11px;overflow-wrap:anywhere;user-select:text;color:var(--dsw-alias-label-secondary)}
 .lm-discoverEmpty{padding:20px 0;font-size:13px}.lm-discoverError{margin:0;font-size:12px}
 .lm-projectEntry{display:flex;align-items:flex-start;position:relative;gap:4px;min-width:0}
@@ -869,13 +894,18 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 @media(max-width:600px){.lm-discoverPanel{left:8px;right:8px;top:48px;bottom:8px;padding:14px}.lm-discoverProject{gap:10px}.lm-discoverHead h2{font-size:16px}}
     /* @ux-shell:project-styles:end */
 /* @ux-shell:workspace-styles:start */
+/* Semantic state tokens scoped to the real panel root (there is no .lm-workbench class).
+   Host --dsw-alias-* tokens can resolve to white/blank in some themes, so the skeleton
+   and stale-state colors get explicit fallbacks. */
+.lm-panel{--lm-skeleton-bg:color-mix(in srgb,var(--dsw-alias-label-primary) 8%,var(--dsw-alias-bg-base));--lm-state-warn:var(--dsw-alias-state-warn,#8A5B12)}
+@media(prefers-color-scheme:dark){.lm-panel{--lm-state-warn:#C4A45B}}
 .lm-workspacePage{padding:24px;overflow:auto;min-height:0;flex:1;color:var(--dsw-alias-label-primary)}
 .lm-workspacePageHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}.lm-workspacePageHead h1{margin:0;font-size:20px;font-weight:600}.lm-workspacePageHead p{margin:6px 0 0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
 .lm-deviceList{max-width:1040px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;overflow:hidden}.lm-deviceRow{padding:18px;display:flex;gap:24px;align-items:center;border-bottom:1px solid var(--dsw-alias-border-l1)}.lm-deviceRow:last-child{border-bottom:0}.lm-deviceIdentity{flex:1;min-width:0}.lm-deviceIdentity>strong{margin-right:8px;font-size:14px;overflow-wrap:anywhere}.lm-deviceId{margin:6px 0 0;font-size:12px;overflow-wrap:anywhere;user-select:text;color:var(--dsw-alias-label-secondary)}
 .lm-deviceFacts{display:grid;grid-template-columns:100px minmax(80px,1fr);gap:6px 16px;font-size:12px;margin:0;min-width:220px}.lm-deviceFacts dt,.lm-managementFacts dt{color:var(--dsw-alias-label-secondary)}.lm-deviceFacts dd,.lm-managementFacts dd{margin:0;overflow-wrap:anywhere}.lm-workspaceHint{max-width:900px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.7;margin:18px 0}
 .lm-managementFacts{max-width:800px;display:grid;grid-template-columns:130px 1fr;gap:16px 24px;padding:22px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;font-size:13px}.lm-diagnosticHelp{margin:24px 0;max-width:800px;font-size:13px}.lm-diagnosticHelp summary{cursor:pointer;padding:8px 0}.lm-diagnosticHelp p{color:var(--dsw-alias-label-secondary);line-height:1.7}
-.lm-shellReadState{flex:1;padding:40px 24px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;max-width:900px}.lm-shellReadState h2{font-size:16px;font-weight:600;margin:0}.lm-shellReadState p{margin:0;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary)}.lm-shellErrorText{overflow-wrap:anywhere;font-size:12px}.lm-shellSkeleton{height:12px;width:min(480px,100%);background:var(--dsw-alias-bg-layer-2);border-radius:5px}.lm-shellSkeleton+ .lm-shellSkeleton{width:min(320px,85%)}
-.lm-shellStale{flex:none;margin:0 20px 12px;padding:12px 14px;border:1px solid var(--dsw-alias-state-warn);border-radius:8px;font-size:12px}.lm-shellStale p{margin:5px 0;overflow-wrap:anywhere}.lm-shellStale .lm-shellRetry{margin-top:6px}
+.lm-shellReadState{flex:1;padding:40px 24px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;max-width:900px}.lm-shellReadState h2{font-size:16px;font-weight:600;margin:0}.lm-shellReadState p{margin:0;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary)}.lm-shellErrorText{overflow-wrap:anywhere;font-size:12px}.lm-shellSkeleton{height:12px;width:min(480px,100%);background:var(--lm-skeleton-bg);border-radius:5px}.lm-shellSkeleton+ .lm-shellSkeleton{width:min(320px,85%)}
+.lm-shellStale{flex:none;margin:0 20px 12px;padding:12px 14px;border:1px solid var(--lm-state-warn);border-radius:8px;font-size:12px}.lm-shellStale p{margin:5px 0;overflow-wrap:anywhere}.lm-shellStale .lm-shellRetry{margin-top:6px}
 .lm-archivedToggle{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;text-align:left;padding:7px 9px;min-height:30px;border-radius:6px;cursor:pointer}.lm-archivedToggle:hover{background:var(--dsw-alias-bg-layer-2)}
 @media(max-width:900px){.lm-workspacePage{padding:18px}.lm-deviceRow{align-items:flex-start;flex-direction:column;gap:12px}.lm-deviceFacts{width:100%;min-width:0}.lm-managementFacts{grid-template-columns:100px minmax(0,1fr);padding:16px;gap:12px}.lm-shellStale{margin:0 12px 10px}}
 
@@ -957,7 +987,7 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-networkWorkbench h1{margin:0;font-size:21px;font-weight:600}.lm-networkWorkbench h2{margin:0;font-size:16px;overflow-wrap:anywhere}
 .lm-networkWorkbench .lm-networkHeader p,.lm-networkWorkbench .lm-networkHint{font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary);margin:8px 0 0;overflow-wrap:anywhere}
 .lm-networkWorkbench .lm-networkRefresh{flex:none;min-height:34px}
-.lm-networkWorkbench .lm-networkStale{padding:12px 14px;border:1px solid var(--dsw-alias-state-warn,var(--dsw-alias-border-l1));border-radius:8px;font-size:12px;margin-bottom:16px}
+.lm-networkWorkbench .lm-networkStale{padding:12px 14px;border:1px solid var(--lm-state-warn,var(--dsw-alias-border-l1));border-radius:8px;font-size:12px;margin-bottom:16px}
 .lm-networkWorkbench .lm-networkSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 20px}
 .lm-networkWorkbench .lm-networkSummary>span{padding:14px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;font-size:13px;overflow-wrap:anywhere}
 .lm-networkWorkbench .lm-networkToolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}
@@ -1138,8 +1168,10 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
 .lm-identMeta{color:var(--dsw-alias-label-secondary);font-size:11px;word-break:break-all}
 .lm-railTitle{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--dsw-alias-label-secondary)}
 .lm-nav{display:flex;flex-direction:column;gap:2px;padding:4px 0 8px}
-.lm-navBtn{display:flex;align-items:center;gap:8px;border:0;background:none;cursor:pointer;color:var(--dsw-alias-label-primary);font-size:13px;padding:7px 10px;border-radius:8px;text-align:left;transition:all .12s ease}
-.lm-navBtn:hover{background:var(--dsw-alias-bg-layer-2)}
+.lm-navBtn{display:flex;align-items:center;gap:8px;border:0;background:none;cursor:pointer;color:var(--dsw-alias-label-primary);font-size:13px;padding:7px 10px;border-radius:8px;text-align:left;white-space:nowrap;flex-shrink:0;transition:all .12s ease}
+.lm-navBtn:hover{background:color-mix(in srgb,var(--dsw-alias-label-primary) 6%,var(--dsw-alias-bg-base))}
+.lm-navBtn:active{background:color-mix(in srgb,var(--dsw-alias-label-primary) 12%,var(--dsw-alias-bg-base));transform:translateY(.5px)}
+.lm-navBtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .lm-navBtnActive{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-brand-primary);font-weight:600;box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary)}
 .lm-navCount{margin-left:auto;font-size:11px;color:var(--dsw-alias-label-secondary);min-width:18px;text-align:center;padding:0 4px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);line-height:16px}
 .lm-backBtn{border:0;background:none;cursor:pointer;color:var(--dsw-alias-label-secondary);font-size:12px;padding:2px 6px;border-radius:6px;text-align:left}
@@ -1493,7 +1525,45 @@ html[data-lan-mesh-mode='lanmesh'] nav[class*='panelList']{display:none}
      * @returns {string}
      */
     function errorText(error) {
-      return String(error?.message ?? error);
+      const original = String(error?.message ?? error);
+      const code = typeof error?.code === 'string' ? error.code : '';
+      if (code === '') return original;
+      // Stable failure codes get an actionable lead-in; the original message
+      // is kept so details are never lost and existing text checks still hold.
+      // This is presentation only — it does not change what the server allows.
+      const hintsZh = {
+        FORBIDDEN: '你没有权限执行此操作（可能不是该房间成员）',
+        NOT_ROOM_MEMBER: '你还不是这个房间的成员',
+        NOT_LEADER: '只有房间负责人可以执行此操作',
+        NOT_OWNER: '只有本机所有者可以执行此操作',
+        NOT_READY: '协作服务尚未就绪，请稍后重试或刷新',
+        TEAM_STORAGE: '本地存储异常，请检查磁盘空间或联系管理员',
+        TEAM_DISABLED: '该房间的团队执行未开启',
+        STALE_GENERATION: '数据已更新，请刷新后重试',
+        APPROVAL_BINDING_MISMATCH: '计划已变更，请重新核对后批准',
+        REVISION_CONFLICT: '内容已被他人更新，请刷新后重试',
+        ROOM_ARCHIVED: '该房间已归档，不能新增内容',
+        UNKNOWN_ROOM: '找不到该项目，可能已被移除',
+        NO_DISPATCHABLE_CANDIDATE: '没有同时满足授权与能力的执行者',
+      };
+      const hintsEn = {
+        FORBIDDEN: 'You do not have permission (you may not be a room member)',
+        NOT_ROOM_MEMBER: 'You are not a member of this room',
+        NOT_LEADER: 'Only the room leader can do this',
+        NOT_OWNER: 'Only this machine owner can do this',
+        NOT_READY: 'Mesh service is not ready; retry or refresh',
+        TEAM_STORAGE: 'Local storage error; check disk space or contact an admin',
+        TEAM_DISABLED: 'Team execution is not enabled for this room',
+        STALE_GENERATION: 'Data changed; refresh and retry',
+        APPROVAL_BINDING_MISMATCH: 'The plan changed; review and re-approve',
+        REVISION_CONFLICT: 'Content was updated by someone else; refresh and retry',
+        ROOM_ARCHIVED: 'This room is archived; no new content is allowed',
+        UNKNOWN_ROOM: 'Project not found; it may have been removed',
+        NO_DISPATCHABLE_CANDIDATE: 'No worker meets both authorization and capability',
+      };
+      const table = prefersChinese() ? hintsZh : hintsEn;
+      const hint = table[code];
+      return hint ? `${hint}（${code}）：${original}` : original;
     }
 
     /**
@@ -2126,13 +2196,17 @@ function MessageBody(props) {
  if(view.source==='')return null;
  const collapsed=view.collapsible&&!expanded;
  const feedback=copyState==='copied'?'已复制全文':copyState==='failed'?'复制失败，请重试':copyState==='unavailable'?'当前环境不支持复制，请手动选择正文':'';
+ // Distinguish otherwise-identical action labels when many messages are on screen.
+ // The component receives no author/time prop; bodyId is the stable per-message id
+ // passed by the caller (lm-message-body-<encoded message id>).
+ const context=props.bodyId?'（'+String(props.bodyId).replace(/^lm-message-body-/,'')+'）':'';
  return h('div',{className:'lm-messageBody'},
   collapsed?h('span',{className:'lm-messageSummary'},view.source.slice(0,180)+'…正文已折叠，展开全文阅读'):null,
   h('div',{id:props.bodyId,ref:node=>{if(node)node.inert=collapsed;},className:'lm-messageText'+(collapsed?' lm-messageTextCollapsed':'')+(view.codeOnly?' lm-messageCodePreview':'')},
    props.MarkdownText?h(props.MarkdownText,{text:view.source,labels:props.labels}):h('div',{className:'lm-bubblePlain'},view.source)),
   h('div',{className:'lm-messageBodyActions'},
-   view.collapsible?h('button',{type:'button',className:'lm-messageExpand','aria-expanded':expanded,'aria-controls':props.bodyId,onClick:()=>setExpanded(value=>!value)},expanded?'收起全文':'展开全文'):null,
-   h('button',{type:'button',className:'lm-messageCopy',disabled:copyState==='copying',onClick:copy},copyState==='copying'?'正在复制…':'复制全文'),
+   view.collapsible?h('button',{type:'button',className:'lm-messageExpand','aria-label':(expanded?'收起全文':'展开全文')+context,'aria-expanded':expanded,'aria-controls':props.bodyId,onClick:()=>setExpanded(value=>!value)},expanded?'收起全文':'展开全文'):null,
+   h('button',{type:'button',className:'lm-messageCopy','aria-label':'复制全文'+context,disabled:copyState==='copying',onClick:copy},copyState==='copying'?'正在复制…':'复制全文'),
    feedback?h('span',{className:'lm-messageCopyState',role:'status','aria-live':'polite'},feedback):null));
 }
     /* @ux-shell:body-component:end */
@@ -3557,6 +3631,12 @@ function RoomTabs(props) {
       const roomArchived = view.lifecycle?.status === 'archived';
       const members = Array.isArray(view.members) ? view.members : [];
       const tasks = Array.isArray(view.tasks) ? view.tasks : [];
+      // Sessions already in this room on this node cannot be invited again.
+      // Matching uses exact nodeId+sessionId (never a display name); the
+      // server remains the final authority on what an invite may do.
+      const selfNodeId = props.self?.nodeId ?? '';
+      const inRoomSessions = new Set(members.filter((member) => member.nodeId === selfNodeId && member.sessionId !== HUMAN_SESSION_ID).map((member) => member.sessionId));
+      const invitableAgents = localAgents.filter((row) => !inRoomSessions.has(row.id));
       // Only the conversation belongs in the chat: `room-task` rows are the
       // assignment notices and they are already shown in the task list.
       const messageRows = roomMessageRows(mergeRoomTranscript(history.messages,detail.messages),{self:props.self,members,peers:props.peers}).filter(row=>row.message?.kind==='room-message');
@@ -4047,8 +4127,8 @@ function RoomTabs(props) {
                           value: inviteSession,
                           onChange: (event) => setInviteSession(event.target.value),
                         },
-                        h('option', { value: '' }, COPY.inviteNone),
-                        ...localAgents.map((row) =>
+                        h('option', { value: '' }, invitableAgents.length === 0 ? COPY.inviteEmpty : `${COPY.inviteNone}（${invitableAgents.length}）`),
+                        ...invitableAgents.map((row) =>
                           h('option', { key: row.id, value: row.id }, labelOf(row)),
                         ),
                       ),
@@ -4058,6 +4138,8 @@ function RoomTabs(props) {
                           type: 'button',
                           className: 'lm-btn lm-btnSmall lm-btnPrimary lm-inviteBtn',
                           disabled: busy === 'invite' || inviteSession === '',
+                          title: inviteSession === '' ? COPY.inviteNone : undefined,
+                          'aria-label': inviteSession === '' ? `${COPY.inviteAction}：${COPY.inviteNone}` : undefined,
                           onClick: doInvite,
                         },
                         busy === 'invite' ? COPY.assigning : COPY.inviteAction,
@@ -4764,12 +4846,18 @@ function RoomTabs(props) {
                 type: 'button',
                 className:
                   props.view === view.id ? `lm-navBtn lm-navBtnActive lm-nav-${view.id}` : `lm-navBtn lm-nav-${view.id}`,
+                title: view.label(),
                 onClick: () => props.onNav(view.id),
               },
               h('span', null, view.label()),
               ['inbox','board'].includes(view.id)?h('span', { className: 'lm-navCount' }, String(navCount(view.id))):null,
             ),
           ),
+          // Kept in the top nav group on purpose: the host renders a fixed
+          // account menu over the bottom of the sidebar. Anchoring this entry
+          // at the top keeps it clickable at every viewport height (especially
+          // <=700px) without depending on the host bar's hash-classed height.
+          h('button',{type:'button',className:'lm-navBtn lm-discoverTrigger',ref:discoverTriggerRef,'aria-expanded':showDiscover,'aria-controls':'lm-discover-projects',onClick:()=>{discoverCycle.current++;setShowDiscover(value=>!value)}},h('span',null,COPY.discoverProjects),h('span',{className:'lm-navCount'},String(discoverProjectsView(joinable).length))),
         ),
 
         h(
@@ -4876,7 +4964,6 @@ function RoomTabs(props) {
                   )),
                 ),
               ),
-          h('button',{type:'button',className:'lm-navBtn lm-discoverTrigger',ref:discoverTriggerRef,'aria-expanded':showDiscover,'aria-controls':'lm-discover-projects',onClick:()=>{discoverCycle.current++;setShowDiscover(value=>!value)}},h('span',null,COPY.discoverProjects),h('span',{className:'lm-navCount'},String(discoverProjectsView(joinable).length))),
           showDiscover ? h(DiscoverProjectsPanel,{h,rows:discoverProjectsView(joinable,discoverQuery),query:discoverQuery,onQuery:setDiscoverQuery,panelRef:discoverRef,labels:COPY.discoverLabels,busy:props.joinBusy,error:props.railNoticeBad?props.railNotice:'',onClose:closeDiscover,onJoin:async id=>{const cycle=discoverCycle.current;if(await props.onJoin(id)===true&&cycle===discoverCycle.current)closeDiscover();}}):null,
         ),
 
@@ -5337,13 +5424,13 @@ function InboxWorkbench(props){
  const act=async(all)=>{if(life.current.pending)return;if(!all&&!readableIdentity){setError('消息身份不完整，无法单独标为已读');return;}const submitted=selected;life.current.pending=true;setBusy(true);setError('');try{const result=all?await props.onMarkRead():await props.onMarkMessageRead(row.id,row.nodeId);if(!life.current.alive)return;if(result===false){setError('保存已读状态失败，请重试');return;}setSelected(current=>current===submitted?'':current);setConfirm(false);}catch{if(life.current.alive)setError('保存已读状态失败，请重试');}finally{life.current.pending=false;if(life.current.alive)setBusy(false);}};
  const names={all:'全部未读',mentions:'@我',tasks:'任务',system:'系统'};
  return h('section',{className:'lm-inboxWorkbench'+(row?' lm-inboxHasDetail':''),onKeyDown:e=>{if(e.key==='Escape'){e.preventDefault();if(confirm)setConfirm(false);else close();}}},
- h('header',{className:'lm-inboxToolbar'},h('h1',null,'收件箱'),h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>setConfirm(true)},'全部标为已读')),
+ h('header',{className:'lm-inboxToolbar'},h('h1',null,'收件箱'),h('button',{type:'button',className:'lm-btn',disabled:busy||model.allRows.length===0,title:'当前没有未读提醒',onClick:()=>setConfirm(true)},'全部标为已读')),
  h('p',{className:'lm-inboxScope'},'当前返回 '+model.allRows.length+' 条未读；搜索范围为本次返回的记录。'),
  h('div',{className:'lm-inboxFilters'},h('input',{type:'search',value:query,'aria-label':'搜索提醒',placeholder:'搜索正文、项目或来源',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeFilter??filter,'aria-label':'提醒类型',onChange:e=>setFilter(e.target.value)},...(model.availableFilters??['all']).map(id=>h('option',{key:id,value:id},names[id]||id)))),
  confirm?h('div',{className:'lm-inboxConfirm',role:'group','aria-label':'确认全部已读'},h('p',null,'将确认时本节点的当前未读记录标为已读，不删除来源记录；范围不限于当前搜索结果。'),h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>act(true)},'确认全部标为已读'),h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>setConfirm(false)},'取消')):null,
  error?h('p',{role:'alert',className:'lm-error'},error):null,
- h('div',{className:'lm-inboxColumns'},h('div',{className:'lm-inboxList','aria-label':'未读提醒'},model.rows.length?model.rows.map(item=>h('button',{type:'button',key:item.key,className:'lm-msg lm-inboxRow'+(selected===item.key?' lm-inboxRowSelected':''),'aria-pressed':selected===item.key,onClick:e=>{focus.current=e.currentTarget;setSelected(item.key);setError('');}},h('div',{className:'lm-inboxRowMeta'},h('strong',null,item.sender),h('span',null,item.roomLabel||'直接消息'),h('time',null,item.timestamp)),h('div',{className:'lm-inboxPreview'},item.preview||item.body),h('small',null,item.device))):h('p',{className:'lm-muted'},'当前没有匹配的未读提醒')),
- row?h('aside',{className:'lm-inboxDetail','aria-label':'提醒详情'},h('button',{type:'button',className:'lm-btn',ref:detailFocus,onClick:close},'返回列表'),h('h2',null,row.sender),h('p',null,row.device+' · '+(row.roomLabel||'直接消息')),h('time',null,row.timestamp),h('div',{className:'lm-inboxFullText'},props.MarkdownText?h(props.MarkdownText,{text:row.body}):row.body),h('div',{className:'lm-inboxActions'},h('button',{type:'button',className:'lm-btn',disabled:busy||!readableIdentity,onClick:()=>act(false)},busy?'正在保存…':'标为已读'),!readableIdentity?h('span',{role:'status'},'消息身份不完整，无法单独标为已读'):null,row.roomId?h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>props.onOpenRoom?.(row.roomId)},'前往房间（不定位具体消息）'):null)):h('aside',{className:'lm-inboxDetail lm-muted'},'选择提醒查看全文；查看不会自动标为已读。')));
+ h('div',{className:'lm-inboxColumns'},h('div',{className:'lm-inboxList','aria-label':'未读提醒'},model.rows.length?model.rows.map(item=>h('button',{type:'button',key:item.key,className:'lm-msg lm-inboxRow'+(selected===item.key?' lm-inboxRowSelected':''),'aria-pressed':selected===item.key,onClick:e=>{focus.current=e.currentTarget;setSelected(item.key);setError('');}},h('div',{className:'lm-inboxRowMeta'},h('strong',null,item.sender),h('span',null,item.roomLabel||'直接消息'),h('time',null,item.timestamp)),h('div',{className:'lm-inboxPreview'},item.preview||item.body),h('small',null,item.device))):h('p',{className:'lm-muted'},'当前没有未读提醒。已读记录仍保留在原房间。')),
+ row?h('aside',{className:'lm-inboxDetail','aria-label':'提醒详情'},h('button',{type:'button',className:'lm-btn',ref:detailFocus,onClick:close},'返回列表'),h('h2',null,row.sender),h('p',null,row.device+' · '+(row.roomLabel||'直接消息')),h('time',null,row.timestamp),h('div',{className:'lm-inboxFullText'},props.MarkdownText?h(props.MarkdownText,{text:row.body}):row.body),h('div',{className:'lm-inboxActions'},h('button',{type:'button',className:'lm-btn',disabled:busy||!readableIdentity,onClick:()=>act(false)},busy?'正在保存…':'标为已读'),!readableIdentity?h('span',{role:'status'},'消息身份不完整，无法单独标为已读'):null,row.roomId?h('button',{type:'button',className:'lm-btn',disabled:busy,onClick:()=>props.onOpenRoom?.(row.roomId)},'前往房间（不定位具体消息）'):null)):h('aside',{className:'lm-inboxDetail lm-muted'},'选择左侧任意一条提醒查看全文；已读记录仍保留在原房间，查看不会自动标为已读。')));
 }
     /* @ux-shell:inbox-component:end */
     /* @ux-shell:network-component:start */
@@ -5414,7 +5501,7 @@ function roomTaskBoardView({rooms,self,query='',status='all',assignee='all'}={})
 function RoomTaskBoard(props){
  const {h,React}=props;const [query,setQuery]=React.useState(''),[status,setStatus]=React.useState('all'),[assignee,setAssignee]=React.useState('all');
  const model=props.modelOf({rooms:props.rooms,self:props.self,query,status,assignee});const labels={all:'全部状态',open:'待开始',doing:'进行中',blocked:'受阻',done:'已完成',unknown:'未知状态'};
- return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',disabled:props.refreshing===true,'aria-busy':props.refreshing===true?'true':undefined,onClick:props.onRefresh},props.refreshing===true?'刷新中…':'刷新'):null),h('p',{className:'lm-taskBoardScope'},'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),model.groups.length?model.groups.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),...group.rows.map(row=>h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null)))):h('p',{className:'lm-muted'},model.counts.all?'没有匹配的房间任务':'当前没有房间任务'));
+ return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',disabled:props.refreshing===true,'aria-busy':props.refreshing===true?'true':undefined,onClick:props.onRefresh},props.refreshing===true?'刷新中…':'刷新'):null),h('p',{className:'lm-taskBoardScope'},'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),model.groups.length?model.groups.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),...group.rows.map(row=>h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null)))):h('p',{className:'lm-muted'},model.counts.all?'没有匹配的房间任务':'当前没有房间任务。任务由房间内成员派发，看板只做只读汇总。'));
 }
     /* @ux-shell:task-board-component:end */
     /* @ux-shell:owner-plan-model:start */

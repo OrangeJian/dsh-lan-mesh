@@ -3,7 +3,7 @@
 .lm-networkWorkbench h1{margin:0;font-size:21px;font-weight:600}.lm-networkWorkbench h2{margin:0;font-size:16px;overflow-wrap:anywhere}
 .lm-networkWorkbench .lm-networkHeader p,.lm-networkWorkbench .lm-networkHint{font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary);margin:8px 0 0;overflow-wrap:anywhere}
 .lm-networkWorkbench .lm-networkRefresh{flex:none;min-height:34px}
-.lm-networkWorkbench .lm-networkStale{padding:12px 14px;border:1px solid var(--dsw-alias-state-warn,var(--dsw-alias-border-l1));border-radius:8px;font-size:12px;margin-bottom:16px}
+.lm-networkWorkbench .lm-networkStale{padding:12px 14px;border:1px solid var(--lm-state-warn,var(--dsw-alias-border-l1));border-radius:8px;font-size:12px;margin-bottom:16px}
 .lm-networkWorkbench .lm-networkSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 20px}
 .lm-networkWorkbench .lm-networkSummary>span{padding:14px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;font-size:13px;overflow-wrap:anywhere}
 .lm-networkWorkbench .lm-networkToolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}
