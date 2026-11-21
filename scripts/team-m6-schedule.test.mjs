@@ -11,6 +11,7 @@ import { createPlanLedgerService } from '../lib/m6-plan-service.mjs';
 import { createResultReviewLedger } from '../lib/m6-review-ledger.mjs';
 import { planFingerprint } from '../lib/m6-plan-preview.mjs';
 import { deriveCandidateAuthority } from '../lib/m6-candidate-authority.mjs';
+import { filterWorkerCandidates } from '../lib/m6-worker-candidates.mjs';
 import { resultHash } from '../lib/task-result-context.mjs';
 
 const ROOM = 'room-m6';
@@ -265,4 +266,182 @@ test('deriveCandidateAuthority feeds the same shape the coordinator filter expec
   assert.equal(authority.leaderScope, true);
   assert.deepEqual(authority.authorizations, [WORKER]);
   assert.deepEqual(authority.profiles, [{ memberKey: WORKER, capabilities: ['build'] }]);
+});
+
+/**
+ * Free the M1 single slot for a v1 execution WITHOUT accepting the task:
+ * expire -> uncertain -> human reconcile -> cancelled/ready. Unlike
+ * `driveToAccepted`, this keeps the task queueable (attempt 2), so a second
+ * dispatch of the SAME taskId actually reaches the spec path instead of being
+ * stopped by CAPACITY_FULL / TASK_NOT_QUEUEABLE.
+ */
+async function releaseSlotForRework(coordinator, taskId, executionId) {
+  await coordinator.command({
+    type: 'expire', roomId: ROOM, actorKey: LEADER, taskId, executionId,
+    generation: 1, now: Date.now() + 1_000_000,
+  });
+  await coordinator.command({
+    type: 'reconcile', roomId: ROOM, actorKey: LEADER, taskId, executionId,
+    generation: 1, stopped: true, reason: 'confirmed stopped on host',
+  });
+}
+
+/**
+ * v1 baseline for "same taskId, re-approved v2" regressions:
+ *  - plan-a dispatched once, then reconciled back to `ready` (slot free,
+ *    re-queueable with a NEW executionId).
+ *  - plan-c dispatched and ACCEPTED through the review ledger, so the fixture
+ *    carries a real `task.reviews[].decision === 'accepted'` record AND an
+ *    accepted dependency that a v2 `dependsOn` change may legally point at.
+ *  - both v1 executions are terminal, so no candidate filter CAPACITY_FULL.
+ */
+async function prepareV1(t) {
+  const ctx = await setup(t);
+  const firstA = await ctx.schedule({ expectedRevision: 1, fingerprint: FP, taskId: 'plan-a' });
+  await releaseSlotForRework(ctx.coordinator, 'plan-a', firstA.executionId);
+  const firstC = await ctx.schedule({ expectedRevision: 1, fingerprint: FP, taskId: 'plan-c' });
+  await driveToAccepted(ctx.coordinator, ctx.review, 'plan-c', firstC.executionId);
+  return { ...ctx, firstA, firstC };
+}
+
+/** Submit + approve a NEW plan revision whose content is exactly `tasks`. */
+async function approveV2(ctx, tasks, tag) {
+  const fingerprint = planFingerprint(tasks);
+  const submitted = await ctx.plans.submitPlan({
+    requestId: `req-submit-${tag}`, roomId: ROOM, planId: 'plan-1',
+    expectedRevision: ctx.submit.revision, expectedGeneration: 1, tasks,
+  }, { actorKey: LEADER });
+  await ctx.plans.approvePlan({
+    requestId: `req-approve-${tag}`, roomId: ROOM, planId: 'plan-1',
+    expectedRevision: submitted.revision, expectedGeneration: 1, fingerprint,
+  }, { actorKey: LEADER });
+  return { revision: submitted.revision, fingerprint };
+}
+
+const V2_CHANGES = [
+  { name: 'title', change: { title: 'Plan A v2 (re-approved)' } },
+  { name: 'detail', change: { detail: 'a-v2 rewritten detail' } },
+  { name: 'dependsOn', change: { dependsOn: ['plan-c'] } },
+];
+
+test('regression A: a re-approved v2 spec must not dispatch the v1 task spec for the same taskId', async t => {
+  for (const { name, change } of V2_CHANGES) {
+    await t.test(`regression A / v2 changes ${name}`, async sub => {
+      const ctx = await prepareV1(sub);
+      const { store, schedule, sent, firstA, firstC } = ctx;
+      const v2Tasks = structuredClone(PLAN_TASKS);
+      const v2Spec = { ...PLAN_TASKS[0], ...change };
+      Object.assign(v2Tasks.find(task => task.taskId === 'plan-a'), change);
+      const approved = await approveV2(ctx, v2Tasks, `v2-${name}`);
+      assert.equal(approved.revision, 2, 'v2 必须是重新提交并重新批准的新版本');
+
+      const before = store.read();
+      const sentBefore = sent.length;
+      // PROOF the assertions hit the SPEC, not M1 capacity: both v1 executions
+      // are terminal and the candidate filter still recommends WORKER.
+      assert.equal(before.executions[firstA.executionId].state, 'cancelled');
+      assert.equal(before.executions[firstC.executionId].state, 'succeeded');
+      const filter = filterWorkerCandidates({
+        ...deriveCandidateAuthority(authorityConfig()),
+        executions: before.executions,
+        task: { requiredCapabilities: ['build'] },
+      });
+      assert.deepEqual(filter.recommended, [WORKER], 'M1 单槽已释放：WORKER 仍在推荐候选内');
+
+      const outcome = await schedule({
+        expectedRevision: approved.revision, fingerprint: approved.fingerprint, taskId: 'plan-a',
+      }).then(body => ({ dispatched: body }), error => ({ rejected: { code: error.code } }));
+
+      // FUTURE GUARD for acceptance path 1 ("dispatch the approved v2 spec").
+      // Path 1 is NOT implemented in this batch. This `if` branch does not run
+      // under the current fix: the unconditional refusal assertion below
+      // (`assert.deepEqual(outcome, { rejected: ... })`) rejects ANY dispatch
+      // result, even if all five guards here would pass. (On the unfixed code
+      // these are the assertions that fail and prove the stale v1 spec was
+      // dispatched.) If a later batch adopts path 1, this test MUST be
+      // rewritten -- especially that unconditional assertion -- or it will
+      // report a false regression. This batch implements path 2 only.
+      if (outcome.dispatched) {
+        const body = outcome.dispatched;
+        assert.equal(body.title, v2Spec.title, '派单 body 标题必须绑定 v2 已批准规格');
+        assert.equal(body.detail, v2Spec.detail, '派单 body 详情必须绑定 v2 已批准规格');
+        assert.deepEqual(body.dependsOn, v2Spec.dependsOn, '派单 body 依赖必须绑定 v2 已批准规格');
+        assert.deepEqual(store.read().executions[body.executionId].descriptor, body, 'descriptor 必须使用 v2 规格');
+        assert.deepEqual(dispatchOf(sent, body.executionId), body, '实际派出的 body 必须使用 v2 规格');
+      }
+
+      // ACCEPTANCE PATH 2 -- the ONLY path implemented in this batch: when a
+      // reused taskId's existing spec conflicts with the approved revision,
+      // refuse BEFORE enqueue with TASK_SPEC_CONFLICT and zero new executions
+      // or outbox entries. The assertion below unconditionally locks this
+      // refusal branch: this test does NOT also accept path 1.
+      assert.deepEqual(outcome, { rejected: { code: 'TASK_SPEC_CONFLICT' } }, '必须在入队前以明确冲突码拒绝旧规格派发');
+      const after = store.read();
+      assert.deepEqual(Object.keys(after.executions), Object.keys(before.executions), '拒绝后 executions 键集合不得新增');
+      assert.deepEqual(after.executions, before.executions, '拒绝后 executions 内容不得变化');
+      assert.deepEqual(Object.keys(after.outbox), Object.keys(before.outbox), '拒绝后 outbox 键集合不得新增');
+      assert.deepEqual(after.outbox, before.outbox, '拒绝后 outbox 内容不得变化');
+      assert.equal(sent.length, sentBefore, '拒绝后不得向 Worker 发出任何新派单');
+      await ctx.coordinator.close();
+    });
+  }
+});
+
+test('regression B: v1 executions, descriptors and the accepted review stay intact across a v2 refusal and rework', async t => {
+  const ctx = await prepareV1(t);
+  const { store, schedule, coordinator, firstA, firstC } = ctx;
+
+  const before = store.read();
+  const v1Executions = structuredClone(before.executions);
+  const v1Outbox = structuredClone(before.outbox);
+  const v1TaskA = structuredClone(before.tasks['plan-a']);
+  const v1TaskC = structuredClone(before.tasks['plan-c']);
+  const v1Reviews = structuredClone(before.tasks['plan-c'].reviews);
+  assert.equal(v1Reviews.length, 1, '夹具必须真的产生一条评审记录');
+  assert.equal(v1Reviews[0].decision, 'accepted', '评审记录必须是 accepted');
+  assert.equal(v1Reviews[0].reviewedExecutionId, firstC.executionId, '评审必须绑定 v1 的那次执行');
+  assert.equal(before.executions[firstA.executionId].descriptor.title, 'Plan A', 'v1 descriptor 必须在');
+  assert.equal(before.executions[firstC.executionId].descriptor.title, 'Plan C', 'v1 descriptor 必须在');
+
+  // v2 changes title + detail + dependsOn at once, and is re-approved.
+  const v2Tasks = structuredClone(PLAN_TASKS);
+  Object.assign(v2Tasks.find(task => task.taskId === 'plan-a'), {
+    title: 'Plan A v2 (re-approved)', detail: 'a-v2 rewritten detail', dependsOn: ['plan-c'],
+  });
+  const approved = await approveV2(ctx, v2Tasks, 'v2-regression-b');
+  await assert.rejects(schedule({
+    expectedRevision: approved.revision, fingerprint: approved.fingerprint, taskId: 'plan-a',
+  }), { code: 'TASK_SPEC_CONFLICT' });
+
+  const afterRefusal = store.read();
+  assert.deepEqual(afterRefusal.executions, v1Executions, '拒绝后 v1 执行记录（含 descriptor）不得被覆盖/删除/改写');
+  assert.deepEqual(afterRefusal.outbox, v1Outbox, '拒绝后 outbox 不得新增');
+  assert.deepEqual(afterRefusal.tasks['plan-a'], v1TaskA, '拒绝后 plan-a 仍是 v1 规格');
+  assert.deepEqual(afterRefusal.tasks['plan-c'], v1TaskC, '拒绝后 plan-c 任务记录不得改写');
+  assert.deepEqual(afterRefusal.tasks['plan-c'].reviews, v1Reviews, '拒绝后 accepted 评审记录不得被覆盖/删除/改写');
+
+  // Rework after the refusal: re-submit + re-approve a version whose spec
+  // MATCHES the existing task (revision 3). The unchanged reducer must still
+  // accept it with a NEW executionId, leaving all v1 evidence traceable.
+  const v3Tasks = structuredClone(PLAN_TASKS);
+  const v3Fingerprint = planFingerprint(v3Tasks);
+  const v3 = await ctx.plans.submitPlan({
+    requestId: 'req-submit-v3-rework', roomId: ROOM, planId: 'plan-1',
+    expectedRevision: approved.revision, expectedGeneration: 1, tasks: v3Tasks,
+  }, { actorKey: LEADER });
+  await ctx.plans.approvePlan({
+    requestId: 'req-approve-v3-rework', roomId: ROOM, planId: 'plan-1',
+    expectedRevision: v3.revision, expectedGeneration: 1, fingerprint: v3Fingerprint,
+  }, { actorKey: LEADER });
+  const rework = await schedule({
+    expectedRevision: v3.revision, fingerprint: v3Fingerprint, taskId: 'plan-a',
+  });
+  assert.notEqual(rework.executionId, firstA.executionId, '重做必须使用全新 executionId');
+  assert.equal(rework.title, 'Plan A', '重做派单绑定与既有 task 一致的批准规格');
+  const final = store.read();
+  assert.equal(final.executions[rework.executionId].attempt, 2, '重做沿用既有 reducer 的 attempt 递增');
+  assert.deepEqual(final.executions[firstA.executionId], v1Executions[firstA.executionId], '重做后 v1 执行记录仍完整');
+  assert.deepEqual(final.executions[firstC.executionId], v1Executions[firstC.executionId], '重做后评审所绑定的 v1 执行仍完整');
+  assert.deepEqual(final.tasks['plan-c'].reviews, v1Reviews, '重做后 accepted 评审记录仍完整');
+  await coordinator.close();
 });
