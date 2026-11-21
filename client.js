@@ -643,7 +643,7 @@ function networkWorkspaceView({self,peers,agents,agentsStatus,stale=false}={}) {
  const nodes=[],seen=new Set(),catalogueReady=agentsStatus==='ready';
  const list=Array.isArray(peers)?peers:[];
  if(typeof self?.nodeId==='string'&&self.nodeId){seen.add(self.nodeId);const local=Array.isArray(agents?.local)?agents.local:[];nodes.push({id:self.nodeId,name:self.selfName||self.name||self.nodeId,local:true,ageSeconds:null,sessions:catalogueReady?local.length:null,running:catalogueReady&&local.every(a=>a?.status==='running'||a?.status==='idle')?local.filter(a=>a.status==='running').length:null});}
- for(const peer of list){if(!peer||typeof peer.nodeId!=='string'||!peer.nodeId||seen.has(peer.nodeId))continue;seen.add(peer.nodeId);nodes.push({id:peer.nodeId,name:typeof peer.name==='string'&&peer.name?peer.name:peer.nodeId,local:false,ageSeconds:Number.isFinite(peer.ageSeconds)&&peer.ageSeconds>=0?peer.ageSeconds:null,sessions:null,running:null});}
+ for(const peer of list){if(!peer||typeof peer.nodeId!=='string'||!peer.nodeId||seen.has(peer.nodeId))continue;seen.add(peer.nodeId);const identity=typeof peer.selfName==='string'?peer.selfName.trim():'';nodes.push({id:peer.nodeId,name:identity||(typeof peer.name==='string'&&peer.name?peer.name:peer.nodeId),local:false,ageSeconds:Number.isFinite(peer.ageSeconds)&&peer.ageSeconds>=0?peer.ageSeconds:null,sessions:null,running:null});}
  // The remote catalogue can be partial. A positive match is evidence, absence isn't zero.
  if(catalogueReady)for(const n of nodes.filter(n=>!n.local)){const matches=(Array.isArray(agents?.remote)?agents.remote:[]).filter(a=>a.nodeId===n.id);if(matches.length)n.sessions=matches.length;}
  return {nodes,peerCount:Array.isArray(peers)?nodes.filter(n=>!n.local).length:null,stale};
@@ -2152,15 +2152,16 @@ function mergeRoomTranscript(earlier,current) {
     function AttachmentCard({refData:ref,roomId}) {
       const [error,setError]=React.useState('');
       const [retry,setRetry]=React.useState(0);
-      const url='/api/lan-mesh/attachments?'+new URLSearchParams({room:roomId,blobId:ref.blobId});
+      const [downloadFailed,setDownloadFailed]=React.useState(false);
+      const url='/api/lan-mesh/attachments/download?'+new URLSearchParams({room:roomId,blobId:ref.blobId});
       const download=async()=>{
-        try {const response=await fetch(url,{credentials:'same-origin'});if(!response.ok)throw Error(await response.text());const blob=await response.blob();const link=document.createElement('a');const objectURL=URL.createObjectURL(blob);link.href=objectURL;link.download=ref.name;link.click();URL.revokeObjectURL(objectURL);setError('');}
-        catch(e){setError(COPY.attachmentUnavailable+' — '+errorText(e));}
+        try {const response=await fetch(url,{credentials:'same-origin'});if(!response.ok){const body=await response.text();let detail='';try{detail=JSON.parse(body)?.error||'';}catch{}throw Error(detail? `HTTP ${response.status}: ${detail}` : `HTTP ${response.status}`);}const blob=await response.blob();const link=document.createElement('a');const objectURL=URL.createObjectURL(blob);link.href=objectURL;link.download=ref.name;link.click();URL.revokeObjectURL(objectURL);setError('');setDownloadFailed(false);}
+        catch(e){setDownloadFailed(true);setError(COPY.attachmentUnavailable+' — '+(errorText(e)||COPY.download));}
       };
       return h('div',{className:'lm-attachment'},
         /^image\/(png|jpeg|gif|webp|avif|bmp)$/i.test(ref.mediaType)&&!error?h('a',{href:url+'&preview=1',target:'_blank',rel:'noopener'},h('img',{key:retry,src:url+'&preview=1',alt:ref.name,onError:()=>setError(COPY.attachmentUnavailable),style:{maxWidth:160,maxHeight:120}})):null,
         h('span',null,ref.name+' · '+formatFileSize(ref.size)),h('button',{type:'button',onClick:download},COPY.download),
-        error?h('span',{role:'alert'},error,h('button',{type:'button',onClick:()=>{setError('');setRetry(n=>n+1);}},COPY.attachmentRetry)):null);
+        error?h('span',{role:'alert'},error,h('button',{type:'button',onClick:()=>{if(downloadFailed)return download();setError('');setRetry(n=>n+1);}},COPY.attachmentRetry)):null);
     }
 
     /* @ux-shell:body-model:start */
@@ -3709,7 +3710,9 @@ function RoomTabs(props) {
       // Rows show disambiguated labels; the draft keeps readable text and keys
       // separately so selecting a duplicate never changes its target identity.
       const mentionLabel = mentionLabels(members);
-      const memberMatches = mention === undefined ? [] : matchMention(members, mention.query, mentionLabel);
+      const otherMembers = members.filter((member) =>
+        !selfNodeId || member.nodeId !== selfNodeId || member.sessionId !== (sessionId ?? HUMAN_SESSION_ID));
+      const memberMatches = mention === undefined ? [] : matchMention(otherMembers, mention.query, mentionLabel);
       // Include "@all" in the popup when the query is empty or matches "all".
       const allEntry = { __all: true, name: COPY.mentionAll, title: COPY.mentionAll };
       const query = (mention?.query ?? '').toLowerCase();
@@ -4769,8 +4772,7 @@ function RoomTabs(props) {
         if (editingNick !== true) return;
         setEditingNick(false);
         if (nickDraft !== (props.selfNickname ?? '')) {
-          props.onSelfNickname(nickDraft);
-          props.onSelfNicknameSave?.();
+          props.onSelfNicknameSave?.(nickDraft);
         }
       };
       const cancelNick = () => {
@@ -6773,7 +6775,7 @@ function OwnerResultPanel(props) {
       const nav = useMeshNav();
       const [snapshot, setSnapshot] = React.useState(null);
       const [agents, setAgents] = React.useState({ local: [], remote: [] });
-      const [nickname, setNickname] = React.useState('');
+      const nickname = snapshot?.self?.selfName ?? '';
       const [newName, setNewName] = React.useState('');
       const [newTopic, setNewTopic] = React.useState('');
       const [busy, setBusy] = React.useState('');
@@ -6788,8 +6790,6 @@ function OwnerResultPanel(props) {
           const value = await panelCall('snapshot', { sessionId: HUMAN_SESSION_ID });
           if (!isActive() || request !== snapshotRequest.current) return;
           setSnapshot(value);
-          const name = typeof value?.self?.selfName === 'string' ? value.self.selfName : '';
-          setNickname((current) => (current === '' ? name : current));
         } catch (error) {
           if (isActive()) patchMeshNav({ notice: `${COPY.error}: ${errorText(error)}`, noticeBad: true });
         }
@@ -6839,9 +6839,9 @@ function OwnerResultPanel(props) {
         if (opened === false) notice(COPY.sessionUnavailable, true);
       };
 
-      const saveNickname = async () => {
+      const saveNickname = async (name) => {
         try {
-          await panelCall('nickname', { self: true, name: nickname.trim() });
+          await panelCall('nickname', { self: true, name: name.trim() });
           await refresh();
         } catch (error) {
           notice(`${COPY.error}: ${errorText(error)}`, true);
@@ -6965,7 +6965,6 @@ function OwnerResultPanel(props) {
           finally { preferencePending.current = false; setPreferenceBusy(''); }
         },
         selfNickname: nickname,
-        onSelfNickname: setNickname,
         onSelfNicknameSave: saveNickname,
         view: nav.view,
         onNav: (next) => go({ view: next, roomId: '' }),

@@ -67,3 +67,13 @@ test('a missing peer count reads 未核对 rather than an offline or zero conclu
  assert.match(text(tree),/发现节点 未核对/);
  assert.doesNotMatch(text(tree),/离线|offline/i);
 });
+test('network identities prefer configured names and fall back for older peers', () => {
+ const {nodes}=networkWorkspaceView({
+  self:{nodeId:'local',name:'DESKTOP-A',selfName:'笔记本'},
+  peers:[
+   {nodeId:'remote',name:'DESKTOP-B',selfName:'台式机'},
+   {nodeId:'legacy',name:'DESKTOP-C'},
+  ],
+ });
+ assert.deepEqual(nodes.map(node=>node.name),['笔记本','台式机','DESKTOP-C']);
+});
