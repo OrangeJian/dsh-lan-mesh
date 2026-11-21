@@ -7,25 +7,13 @@
 
 运行时使用 Node 内置模块及 `diff`（共享文档行级合并）。
 
-开发预览：[Agent Team M1 使用说明](docs/team-m1-usage.md)。新增独立执行账本、派发确认、租约及结果核对，默认关闭；自动编排和验收界面尚未实现。新源码也修复了“项目早于对端启动，导致可加入列表为空”的补同步问题，更新后需重载插件。
+开发进度与后续验收见 [项目路线图](ROADMAP.md)。Agent Team 默认关闭。M6 已提供 Owner 审批和成果评审、候选预览与可选派单工具，真实多节点派单仍待验收。基础手动派单见 [Agent Team M1 使用说明](docs/team-m1-usage.md)。
 
 2026-11-11 源码预览：M3 整改已接续完成，M4 共享 Markdown 与 M5 固定版本上下文已接入面板/工具/跨节点流程。使用和证据见 [M4/M5 交付回执](docs/handoffs/dsh-m4-m5-development-report.md)。浏览器与物理设备仍由负责人验收；旧交接稿中的“待整改”是历史批次状态。
 
-## 截图
+## 界面预览
 
-> 截图待补。按下面每条说明截图，放进 `docs/screenshots/`，再把对应的 `<!-- SCREENSHOT -->` 占位行换成 `![描述](docs/screenshots/xxx.png)` 即可。
-
-1. **面板全貌** → `docs/screenshots/panel.png` —— 侧栏「局域网协作」图标 + 主面板（左边房间列表 / 可加入项目 / 新建入口，右边成员行 + 气泡聊天 + 可折叠任务区）。
-2. **房间聊天** → `docs/screenshots/room-chat.png` —— 气泡式对话；输入框打 `@` 弹出成员选择框；成员显示会话标题而非 `session-xxxx`。
-3. **任务派发与进度** → `docs/screenshots/task.png` —— 房间详情里选成员、填标题派活；任务状态 open / doing / blocked / done 流转。
-4. **远端 agent** → `docs/screenshots/agents.png` —— Agents 区列出远端机器可联络的 agent，点「派任务」投第一句指令。
-5. **存活自检** → `docs/screenshots/info.png` —— 浏览器打开 `http://127.0.0.1:45871/lan-mesh/v1/info` 返回 `{"ok":true,"node":{...},"protocol":2}`。
-
-<!-- SCREENSHOT: panel.png -->
-<!-- SCREENSHOT: room-chat.png -->
-<!-- SCREENSHOT: task.png -->
-<!-- SCREENSHOT: agents.png -->
-<!-- SCREENSHOT: info.png -->
+网络工作台、收件箱和任务看板的组件预览见 [UX 证据目录](docs/ux/) 。真实宿主验收状态见 [项目路线图](ROADMAP.md)。
 
 ## 文档
 

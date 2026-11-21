@@ -1,0 +1,37 @@
+# 历史路线图快照
+现行状态和优先级见 [项目路线图](../../ROADMAP.md)。以下保留原阶段记录。
+
+# dsh-lan-mesh 路线图
+
+2026-11-15 G1：0.4.3静态节点连接完成，400/400末版独立回归；[交付与限制](../handoffs/v0.4.3-static-peers.md)。G1软件侧继续完善，真实三机/跨网段仍待验收。后续按G2上下文补强再到M6，不将工作区暂停草稿算作交付。按负责人要求仅本地提交，不推送。
+
+2026-11-15 G0-A进展：[已提交0.4.1基线核查](../handoffs/g0-baseline-report-2026-11-15.md)完成396/396、schema82/82、panel198/198；DSH升级rc.3的公开契约已重新核对。继续按G0-B/G1/G2→M6推进，不提前发布M6草稿。物理三机验收仍未关闭。
+
+2026-11-15：依据负责人引用的V2完整方案调整工作顺序，见[工作对齐与首批任务](../superpowers/plans/2026-11-15-v2-work-realignment.md)。先G0代码/兼容基线审计及可靠性定位，再复用M3—M5补交互和证据引用，M6拆为计划审批、DAG调度、Review交付三批。原0.5—0.8排期保留为历史候选，不再按版本号直接连续实施；已有0.3/0.4成果继续保留。本文更新不代表G0完成或新业务能力已实现。
+
+2026-11-14：0.4.0 已实现人类Leader归档/恢复、已归档历史入口、独立参与资格/审计与只读边界；[交付、升级要求及测试限制](../handoffs/v0.4.0-delivery.md)。0.3.0独立提交 `8c3b4cc`。生命周期的退出/本机删除、移交/接管仍未实现；另新增后续需求“输入框直接@文档引用”，当前仍从文档页选择固定版本上下文。
+
+2026-11-14：0.3.0 已实现本机置顶/静音/@例外与持久化；[交付与测试限制](../handoffs/v0.3.0-delivery.md)。下一批0.4.0归档/恢复启动；不得将生命周期整体标为完成。
+
+2026-11-14 排期更新：当前交付 0.2.1（`ebbe235`）。负责人反馈双机基本使用及阅读换行正常，完整异常场景与 M1 三机验收仍待逐项记录。下一批启动本机置顶/静音（目标 0.3.0），随后归档/恢复、退出/本地删除、负责人移交/接管，再推进 M6。详见[剩余批次及首批实施计划](../superpowers/plans/2026-11-14-remaining-delivery-schedule.md)。本次已确认归档只读且保留已有任务核对，静音默认保留可关闭的 @ 例外；排期不等于代码已实现。
+
+2026-11-11 接续更新：M4/M5 业务提交到 `bd6582a`，核心修正 `2ad89a8`；完整自动化370/370，面板193/193，官方schema82/82，真实localhost文档/上下文及既有附件smoke通过。详见 [交付回执](../handoffs/dsh-m4-m5-development-report.md)。下方旧批次测试计数保留为历史；浏览器与物理设备仍待负责人验收。
+
+核对日期：2026-11-10。状态依据 `codex/room-collaboration` 当前代码；旧批次回执保留为历史。M3 完成交付证据见 `docs/handoffs/m3-delivery.md`，后续 DSH 启动提示词见 `docs/handoffs/dsh-after-m3-prompt.md`，本轮 DSH 连续开发的阶段结果与复核入口见 `docs/handoffs/dsh-next-development-report.md`。不合并 main、不发布 npm；测试、代码审查与真实设备验收分别记录。
+
+| 里程碑 | 优先级/状态 | 目标、任务与依赖 | 代码/测试依据 | 验收及下一步 |
+|---|---|---|---|---|
+| M1 真实跨设备验收 | P0，代码已实现，**设备验收未完成（全部场景未验收）** | 可靠派发、ACK、租约、不确定结果、恢复；需 A/B/C 设备与授权 | `lib/team-*.mjs`、`scripts/team-*.test.mjs`、`scripts/team-smoke.mjs`、`docs/handoffs/m1-three-device-acceptance.md` | smoke 使用真实 HTTP、stub runtime、127.0.0.1，不能证明真实模型跨设备执行；准备清单已就绪但**尚未执行任何真实设备运行**，12 项场景全部「未验收」；须由负责人提供 A/B/C 设备后按清单取证 |
+| M2 Composer | P0，**本批次完成（待 Codex 独立验收）** | 机器标识、精确 mentions、技能引用选择器、人类成员拉入会话均已实现；技能引用只是提示，不安装不执行；邀请权限按入口派生而非客户端自报 | `client.js`、`lib/room-message.mjs`、`scripts/room-message.test.mjs`、`index.js`（`roomSkills` 端点）、`lib/service.mjs`（`addRoomMember`）、`scripts/room-invite.test.mjs`、`docs/ui-contract.md`；提交 `43e572c`、`a1279e1`、`25b4876`（评审修复：邀请权限按入口派生、跨节点同名技能三态） | 本批次：`npm test` 117/117、`panel-check` 137/137、`schema-check` 66/66、`room-invite` 11/11、`check:composer-compat` PASS、`twin-transport-check` ok；**仍缺真实浏览器截图与手工操作记录**，交回 Codex 前须补齐 |
+| M3 附件 | P1，**九项终审发现已整改 + 第二轮收尾整改已实现（待 Codex 独立复核）** | 独立 Blob、流式传输、多附件输入及 sender+Leader 提交已实现；终审指出的授权、恢复、并发、草稿、GC、holder 与旧节点兼容缺口已逐项整改；第二轮补齐收据并发串行、同 ID 内容校验、通知定向、迟到成员元数据同步、丢 ACK 只读对账 | 业务提交 `8d8d79b`..`221901b`；第一轮 `6999d2a`（#1-#9 源码）、`bf348d8`（11 项回归）；第二轮 `d3558e5`（收据事务）、`d595118`（同 ID 内容校验）、`2b7388b`（通知定向）、`f538cbc`（迟到成员同步）、`313e398`（丢 ACK 对账）；[终审问题](../handoffs/dsh-m3-review-findings.md)、[收尾整改计划](../superpowers/plans/2026-11-10-m3-completion-remediation.md)、[交付记录](../handoffs/m3-delivery.md) | 第二轮实测：`npm test` 198/198、`m3-review-regression` 23/23、`room-attachment-sync` 6/6、`panel-check` 167/167、`schema-check` 72/72、`composer-compat` PASS、`twin` ok、rooms/attachment(3 PASS)/smoke/agents/team smoke 全部通过（首次 `npm test` 曾遇 Windows EPERM rename 与残留进程导致的挂起，均已记录并重跑）。#7 的读取侧与元数据回填侧均已实现，但仍依赖 Leader 在线提供清单，且只有真实双机/浏览器才能确认端到端；浏览器与物理设备仍由负责人验收 |
+| M4 共享 Markdown | P1，源码实现与接线已完成，待负责人实机验收 | 纯状态、diff3、原子修订/审计/幂等/outbox、Leader 权威路由、分片副本、离线提案、文档面板/工具、导入导出 | `lib/shared-doc-*.mjs`、`client.js`、`scripts/shared-docs-smoke.mjs`；[完整回执](../handoffs/dsh-m4-m5-development-report.md) | 已补非 Leader 权威、可信身份、自动合并重试及多人冲突数据恢复；自动化与真实 localhost HTTP 通过，未操作浏览器、不冒充多设备验收 |
+| M5 Project Context | P1，源码实现与接线已完成，待负责人实机验收 | 有界固定 revision/hash 的上下文、显式决策/问题、引用选择、@/任务/Team 投递及持久审计 | `lib/room-context*.mjs`、`lib/context-delivery-store.mjs`、Team adapter、面板文档版本选择；[完整回执](../handoffs/dsh-m4-m5-development-report.md) | 上下文签名版本独立协商，旧节点拒绝；不复制完整历史、不自动猜决策；实际模型与物理设备尚未验收 |
+| 房间生命周期 | P1，**方案已形成，未实现** | 归档/恢复、本地置顶/静音、本地历史删除与退出语义、负责人移交与无主接管 | `docs/superpowers/specs/2026-11-09-room-lifecycle-notes.md`（已确认产品规则）、`docs/superpowers/specs/2026-11-10-room-lifecycle-design.md`（状态/权限/兼容/并发方案与局部裁定） | 只产出设计方案，没有代码与测试；实施前须先确认方案中的待决项 |
+| M6 自动编排 | P2，未开始，**实施计划已形成** | 能力描述、任务依赖 DAG、容量匹配、分解/调度/验收、人类可审查计划界面；依赖 M1 实机验收及 M5 | `docs/agent-team-v0.2-design.md`（方向）、`docs/superpowers/plans/2026-11-10-agent-team-m6-plan.md`（可实施子集 + D1-D9 待决项） | 无 M6 业务实现；9 项协议/权限待决项均标 OPEN，工具名与字段为 PROPOSAL；不自动重跑 uncertain 执行，不得以 localhost stub 代替三设备实机验收 |
+
+开发协作遵循 `docs/development-workflow.md`。架构和差距见 `docs/architecture/project-workspace.md`。交接候选稿见 `docs/handoffs/dsh-development-handoff.md`。每次交付须更新本表，附提交、实际测试与设备验收证据。
+
+### G2 增量 0.4.4
+
+直接 @共享文档：固定修订与 hash、最多 8 份、单独移除、失败保留输入及异步隔离。后续依次推进成果引用、Skill 版本、来源/过期提示，再复核 M6 门槛。物理设备与真实模型验收仍单独保留。
+
