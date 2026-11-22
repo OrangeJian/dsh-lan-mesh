@@ -1995,7 +1995,7 @@ export function apply(ctx, rawConfig) {
         case 'roomSay':
           return {
             ok: true,
-            value: await node.sayInRoom({ room: str('room'), sessionId: 'human', text: str('text'), mentions: request.mentions, skillRefs: request.skillRefs, attachments: request.attachments, messageId: request.messageId,contextSelection:request.contextSelection }),
+            value: await node.sayInRoom({ room: str('room'), sessionId: 'human', text: str('text'), projectMode: request.projectMode, mentions: request.mentions, skillRefs: request.skillRefs, attachments: request.attachments, messageId: request.messageId,contextSelection:request.contextSelection }),
           };
         case 'roomHistory':
           return {ok:true,value:await node.roomHistory({room:str('room'),sessionId:'human',via:'panel',cursor:request.cursor,before:request.before,limit:request.limit})};

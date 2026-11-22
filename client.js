@@ -777,7 +777,7 @@ function filterJoinedProjects(input,query='') {
 }
 function workspaceNavigationTarget(value,rooms=[]) {
  if(typeof value!=='string')return null;
- if(value.startsWith('view:')){const view=value.slice(5);return ['network','inbox','board','manage','rooms','agents'].includes(view)?{view,roomId:''}:null;}
+ if(value.startsWith('view:')){const view=value.slice(5);return ['network','inbox','manage','rooms','agents'].includes(view)?{view,roomId:''}:null;}
  if(value.startsWith('room:')){const id=value.slice(5);return (Array.isArray(rooms)?rooms:[]).some(room=>room?.id===id&&room.deleted!==true)?{view:'rooms',roomId:id}:null;}
  return null;
 }
@@ -787,12 +787,12 @@ function workspaceNavigationTarget(value,rooms=[]) {
 function WorkbenchNavigation({h,rooms=[],archivedRooms=[],view,roomId,onExit,onToggle,onNavigate,notice='',resolveTarget,labels={}}) {
  const copy={back:'返回对话',backHint:'回到 DSH 原生对话',toggle:'展开或收起导航',nav:'导航',switch:'切换工作区或项目',workspaces:'工作区',projects:'我的项目',archived:'已归档',network:'网络总览',inbox:'收件箱',board:'任务看板',manage:'管理与诊断',rooms:'项目列表',agents:'会话管理',...labels};
  const mine=(Array.isArray(rooms)?rooms:[]).filter(r=>r&&typeof r.id==='string'),past=(Array.isArray(archivedRooms)?archivedRooms:[]).filter(r=>r&&typeof r.id==='string'),allowed=[...mine,...past];
- const current=roomId&&allowed.some(r=>r.id===roomId)?'room:'+roomId:'view:'+(['network','inbox','board','manage','rooms','agents'].includes(view)?view:'inbox');
+ const current=roomId&&allowed.some(r=>r.id===roomId)?'room:'+roomId:'view:'+(['network','inbox','manage','rooms','agents'].includes(view)?view:'inbox');
  return h('div',{className:'lm-workbenchNavigationWrap'},h('nav',{className:'lm-workbenchNavigation','aria-label':copy.switch},
    h('button',{type:'button',className:'lm-navBtn lm-workbenchReturn lm-mainReturn','aria-label':copy.back,title:copy.backHint,onClick:onExit},h('span',{'aria-hidden':true},'←'),h('span',null,copy.back)),
    h('button',{type:'button',className:'lm-navBtn lm-sidebarToggle','aria-label':copy.toggle,title:copy.toggle,onClick:onToggle},h('span',{'aria-hidden':true},'☰'),h('span',{className:'lm-sidebarToggleLabel'},copy.nav)),
    h('select',{className:'lm-workspaceSwitch',value:current,'aria-label':copy.switch,onChange:event=>{const target=resolveTarget?.(event.target.value,allowed);if(target)onNavigate(target);}},
-     h('optgroup',{label:copy.workspaces},...['network','inbox','board','manage','rooms','agents'].map(id=>h('option',{key:id,value:'view:'+id},copy[id]))),
+     h('optgroup',{label:copy.workspaces},...['network','inbox','manage','rooms','agents'].map(id=>h('option',{key:id,value:'view:'+id},copy[id]))),
      mine.length?h('optgroup',{label:copy.projects},...mine.map(room=>h('option',{key:room.id,value:'room:'+room.id},`${room.name||room.id} · ${room.id}`))):null,
      past.length?h('optgroup',{label:copy.archived},...past.map(room=>h('option',{key:room.id,value:'room:'+room.id},`${room.name||room.id} · ${room.id}`))):null)),
    notice?h('p',{className:'lm-navigationNotice',role:'status'},notice):null);
@@ -961,6 +961,18 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-roomTabSurface .lm-inviteRow .lm-select{flex:1;min-width:0}
 .lm-roomTabSurface .lm-inviteRow>.lm-muted{flex:0 1 220px}
 @media(max-width:650px){.lm-roomTabSurface .lm-inviteRow{flex-wrap:wrap}.lm-roomTabSurface .lm-inviteRow>.lm-muted{flex-basis:100%}}
+.lm-roomPane.lm-topicOpen {position:relative;padding-inline-end:min(38%,26rem)}
+.lm-discussionPane {position:absolute;inset:0 0 0 auto;z-index:3;box-sizing:border-box;width:min(38%,26rem);display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--dsw-alias-bg-base,#fff);border-inline-start:1px solid var(--dsw-alias-border-l1);overflow:hidden}
+.lm-discussionPane header {display:flex;align-items:center;justify-content:space-between}
+.lm-topicPosts {flex:1;min-height:0;overflow:auto}
+.lm-topicPosts article {padding:12px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.lm-topicPosts p {white-space:pre-wrap;overflow-wrap:anywhere}
+.lm-discussionPane footer {display:grid;gap:8px}
+.lm-discussionPane textarea {min-height:4em;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1)}
+.lm-discussionCard {display:grid;gap:5px;max-width:100%;padding:12px 16px;text-align:start;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:10px}
+.lm-discussionCard strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm-discussionCard small,.lm-discussionCard span {color:var(--dsw-alias-label-secondary)}
+@media(max-width:760px){.lm-roomPane.lm-topicOpen{padding-inline-end:0}.lm-discussionPane{width:min(100%,26rem)}}
     /* @ux-shell:message-styles:end */
 /* @ux-shell:inbox-styles:start */
 .lm-inboxWorkbench{display:flex;flex-direction:column;min-height:0;flex:1;padding:20px;overflow:hidden;color:var(--dsw-alias-label-primary)}
@@ -1048,6 +1060,30 @@ function useComposerField(React,record,name,initial,canWrite=()=>true) {
 .lm-roomTaskBoard small{color:var(--dsw-alias-label-secondary)}.lm-roomTaskBoard .lm-taskBoardPreview{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px}
 .lm-roomTaskBoard button:focus-visible,.lm-roomTaskBoard input:focus-visible,.lm-roomTaskBoard select:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .lm-roomTaskBoard{container-type:inline-size;container-name:lm-task-board}
+.lm-taskBoardLanes {
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(min(17rem,85%),1fr);
+  gap:12px;
+  min-width:0;
+  overflow-x:auto;
+  padding:2px 2px 10px;
+}
+.lm-taskBoardLanes:focus-visible {outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}
+.lm-taskBoardLanes .lm-taskBoardGroup {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-width:0;
+  min-height:10rem;
+  padding:12px;
+  border:1px solid var(--dsw-alias-border-l1);
+  border-radius:10px;
+  background:var(--dsw-alias-bg-layer-2);
+  overflow-wrap:anywhere;
+}
+.lm-taskBoardGroup .lm-taskBoardRow {margin:0}
+.lm-taskBoardGroup h2 {padding-bottom:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}
 /* An element is never its own container, so the padding step stays a window query; the layout switch below is the pane-driven one that matters when the host main column is narrower than its window. */
 @media(max-width:650px){.lm-roomTaskBoard{padding:16px}}
 @container lm-task-board (max-width:650px){.lm-roomTaskBoard .lm-taskBoardFilters>*{width:100%}.lm-roomTaskBoard .lm-taskBoardRowHead{align-items:flex-start;flex-wrap:wrap}}
@@ -1988,16 +2024,13 @@ function mergeRoomTranscript(earlier,current) {
     // (removed in v0.2.0 — the panel is always the human)
 
     /**
-     * One task: status chip, who owns it, and the buttons that move it.
+     * Display a task with its reported status and assignee.
      * @param {object} props - task plus room/session context.
      * @returns {object} task element.
      */
     function TaskItem(props) {
       const task = props.task;
       const status = STATUS_ORDER.includes(task.status) ? task.status : 'unknown';
-      // The service lets the leader move any task and an assignee move their own.
-      const canMove = STATUS_ORDER.includes(task.status)&&canMoveRoomTask({task,nodeId:props.nodeId,sessionId:props.sessionId,isLeader:props.isLeader});
-      const busy = props.busy === task.id;
       return h(
         'div',
         { className: 'lm-task' },
@@ -2013,25 +2046,6 @@ function mergeRoomTranscript(earlier,current) {
           ),
         ),
         task.detail ? h('div', { className: 'lm-taskDetail' }, task.detail) : null,
-        canMove
-          ? h(
-              'div',
-              { className: 'lm-statusBtns' },
-              ...STATUS_ORDER.filter((value) => value !== status).map((value) =>
-                h(
-                  'button',
-                  {
-                    key: value,
-                    type: 'button',
-                    className: 'lm-btn lm-btnSmall',
-                    disabled: busy,
-                    onClick: () => props.onStatus(task, value),
-                  },
-                  STATUS_LABELS[value] ?? value,
-                ),
-              ),
-            )
-          : null,
       );
     }
 
@@ -3464,6 +3478,33 @@ function RoomTabs(props) {
 }
     /* @ux-shell:room-tabs:end */
 
+    function DiscussionPane({roomId,topic,rows,call,onRefresh,onClose,readOnly}) {
+      const [draft,setDraft]=React.useState('');
+      const [busy,setBusy]=React.useState(false);
+      const [error,setError]=React.useState('');
+      async function reply() {
+        if (busy || !draft.trim()) return;
+        setBusy(true);
+        try {
+          const value = await call('roomSay',{room:roomId+'#discussion/'+topic,text:draft.trim()});
+          setDraft('');
+          const failed = value?.delivered?.find(row=>row.ok===false);
+          setError(failed ? failed.error || COPY.deliverFailed : '');
+          await onRefresh();
+        } catch(e) { setError(errorText(e)); } finally {setBusy(false);}
+      }
+      return h('aside',{className:'lm-discussionPane','aria-label':'话题讨论'},
+        h('header',null,h('strong',null,'话题讨论'),h('button',{className:'lm-btn',onClick:onClose,'aria-label':'关闭话题'},'关闭')),
+        h('div',{className:'lm-topicPosts'},...rows.map(({message,deviceLabel})=>
+          h('article',{key:JSON.stringify([message.from?.nodeId,message.id])},
+            h('strong',null,message.from?.title||message.from?.name||deviceLabel),
+            h('p',null,projectMessage(message.text).text),
+            ...(message.attachments??[]).map(ref=>h(AttachmentCard,{key:ref.blobId,refData:ref,roomId}))))),
+        error?h('p',{role:'alert'},error):null,
+        !readOnly?h('footer',null,h('textarea',{value:draft,disabled:busy,'aria-label':'回复话题',placeholder:'回复这个话题…',onChange:e=>setDraft(e.target.value)}),
+          h('button',{className:'lm-btn',disabled:busy||!draft.trim(),onClick:reply},'发送回复')):null);
+    }
+
     function RoomPane(props) {
       const roomId = String(props.room?.id ?? '');
       const sessionId = props.sessionId;
@@ -3521,6 +3562,8 @@ function RoomTabs(props) {
       /** Quick-task: when checked, the next message also becomes a task
        *  assigned to the first @mentioned member (or everyone if @all). */
       const [quickTask, setQuickTask] = draftField('quickTask',false);
+      const [discussionMode,setDiscussionMode]=draftField('discussionMode',false);
+      const [openTopic,setOpenTopic]=React.useState(null);
       /** Local originals and uploaded references stay in this room draft until acceptance. */
       const [attachmentRows, setAttachmentRows] = React.useState(()=>[...(draftRecord.attachments?.rows??[])]);
       const attachmentDraft = React.useRef(null);
@@ -3646,7 +3689,17 @@ function RoomTabs(props) {
       // Only the conversation belongs in the chat: `room-task` rows are the
       // assignment notices and they are already shown in the task list.
       const messageRows = roomMessageRows(mergeRoomTranscript(history.messages,detail.messages),{self:props.self,members,peers:props.peers}).filter(row=>row.message?.kind==='room-message');
-      const messages = messageRows.map(row=>row.message);
+      const topics = new Map();
+      const mainRows = messageRows.filter(row=>{
+        const topic = projectMessage(row.message.text);
+        if (!['discussion','reply'].includes(topic.kind)) return true;
+        const entries = topics.get(topic.id);
+        if (entries) { entries.push(row); return false; }
+        topics.set(topic.id,[row]);
+        return true;
+      });
+      const selectedTopic=openTopic?.roomId===roomId && topics.has(openTopic.id)?openTopic.id:null;
+      const messages = mainRows.map(row=>row.message);
 
       // Following belongs to this chat viewport, never the document or Inbox count.
       const loadEarlier=async()=>{
@@ -3870,6 +3923,8 @@ function RoomTabs(props) {
         setBusy('say');
         try {
           const sayArgs = { room: roomId, sessionId, text, ...(Object.keys(contextSelection).length?{contextSelection}:{}) };
+          if (discussionMode) sayArgs.projectMode='discussion';
+          else if (quickTask) sayArgs.projectMode='task';
           if (draftMentions.length > 0 && !/@all(?:\s|$)/i.test(text)) sayArgs.mentions = draftMentions.map(({ memberKey, label }) => ({ memberKey, label }));
           // Only confirmed picks become references. `skillRefs` is metadata for
           // the reader, never an instruction to this node: nothing is loaded,
@@ -3887,6 +3942,7 @@ function RoomTabs(props) {
           sayArgs.messageId=sendAttempt.current.messageId;
           const submittedAttempt=sendAttempt.current,submittedRevision=draftRecord.revision;
           const value = await call('roomSay', sayArgs);
+          if (discussionMode && draftLifetime.current.alive) setOpenTopic({roomId,id:sayArgs.messageId});
           const delivered = Array.isArray(value?.delivered) ? value.delivered : [];
           const failed = delivered.filter((row) => row.ok !== true);
           if(draftLifetime.current.alive){if (failed.length > 0) flash(`${COPY.deliverFailed}: ${failed[0].name ?? ''} ${failed[0].error ?? ''}`, true);else flash('', false);}
@@ -4079,19 +4135,6 @@ function RoomTabs(props) {
         setNickDraft('');
       };
 
-      const doStatus = async (task, status) => {
-        setBusy(task.id);
-        try {
-          await call('roomStatus', { room: roomId, sessionId, task: task.id, status, note: '' });
-          await load();
-          props.onChanged?.();
-        } catch (error) {
-          flash(`${COPY.error}: ${errorText(error)}`, true);
-        } finally {
-          setBusy('');
-        }
-      };
-
       const roomTabPrefix='lm-room-'+encodeURIComponent(roomId);
       const memberContent=panelTab==='members'
             ? h(
@@ -4193,19 +4236,10 @@ function RoomTabs(props) {
             ? h(
                 'div',
                 { className: 'lm-taskList' },
-                tasks.length === 0
-                  ? h('div', { className: 'lm-muted' }, COPY.noTasks)
-                  : tasks.map((task) =>
-                      h(TaskItem, {
-                        key: task.id,
-                        task,
-                        sessionId,
-                        nodeId:self.nodeId,
-                        isLeader,
-                        busy,
-                        onStatus: doStatus,
-                      }),
-                    ),
+                h(RoomTaskBoard, { key: roomId, h, React, modelOf: roomTaskBoardView, self,
+                  room: view.id === roomId ? view : {id:roomId,tasks:[]}, onRefresh: () => load(),
+                  renderTask: row => h(TaskItem,{key:row.key,task:row.task}),
+                }),
                 isLeader && !roomArchived && members.length > 0
                   ? h(
                       'div',
@@ -4264,7 +4298,9 @@ function RoomTabs(props) {
 
       return h(
         'div',
-        { className: 'lm-roomPane' },
+        { className: 'lm-roomPane'+(selectedTopic && panelTab==='chat'?' lm-topicOpen':'') },
+        selectedTopic && panelTab==='chat'?h(DiscussionPane,{key:roomId+selectedTopic,roomId,topic:selectedTopic,rows:topics.get(selectedTopic),
+          call,onRefresh:load,onClose:()=>setOpenTopic(null),readOnly:roomArchived||viewer.isMember!==true}):null,
 
         h(
           'div',
@@ -4384,8 +4420,16 @@ function RoomTabs(props) {
           h('div',{className:'lm-historyToolbar'},h('button',{type:'button',className:'lm-btn lm-btnSmall lm-loadEarlier',disabled:history.status==='loading',onClick:loadEarlier},history.status==='loading'?'正在加载历史…':history.cursor===''?'重新检查更早记录':'加载更早记录'),h('span',{className:'lm-muted'},history.cursor===''?'已到本机当前保留记录的开头；不代表其他设备历史完整。':'本机历史记录'),history.error?h('span',{role:'alert',className:'lm-error'},history.error):null),
           messages.length === 0
             ? h('div', { className: 'lm-muted' }, detail.status === 'loading' ? COPY.loading : COPY.noChat)
-            : messageRows.map((messageRow) => {
-                const message=messageRow.message;
+            : mainRows.map((messageRow) => {
+                let message=messageRow.message;
+                const topic=projectMessage(message.text);
+                if (topics.has(topic.id)) {
+                  const posts=topics.get(topic.id);
+                  const root=posts.find(row=>projectMessage(row.message.text).kind==='discussion');
+                  return h('button',{type:'button',key:topic.id,className:'lm-discussionCard',onClick:()=>setOpenTopic({roomId,id:topic.id})},
+                    h('small',null,'讨论话题'),h('strong',null,root?projectMessage(root.message.text).text:'查看话题'),h('span',null,posts.length+' 条发言 ›'));
+                }
+                if (topic.kind==='task') message={...message,text:'任务 · '+topic.text};
                 // Look up the sender in the member list so remote humans and
                 // agents show their room display name (nickname / title) instead
                 // of just the node name that rides in the envelope.
@@ -4627,6 +4671,8 @@ function RoomTabs(props) {
             h(
               'div',
               { className: 'lm-composerToolbar' },
+              h('button',{type:'button',className:discussionMode?'lm-discussionMode lm-btn lm-taskPillOn':'lm-discussionMode lm-btn',
+                'aria-pressed':discussionMode,onClick:()=>{setDiscussionMode(!discussionMode);setQuickTask(false);}},'讨论话题'),
               h(
                 'label',
                 { className: 'lm-attachBtn', title: COPY.attachFile },
@@ -4666,7 +4712,7 @@ function RoomTabs(props) {
                       disabled: isLeader !== true,
                       title: isLeader === true ? COPY.quickTaskLabel : COPY.quickTaskLeaderOnly,
                       'aria-label': isLeader === true ? COPY.quickTaskLabel : `${COPY.quickTaskLabel}: ${COPY.quickTaskLeaderOnly}`,
-                      onClick: () => { if (isLeader === true) setQuickTask((current) => !current); },
+                      onClick: () => { if (isLeader === true) {setDiscussionMode(false);setQuickTask((current) => !current);} },
                     },
                     h('span', null, COPY.quickTaskLabel),
                   )
@@ -5075,7 +5121,6 @@ function RoomTabs(props) {
     const NAV_ORDER = [
       {id:'network',label:()=>COPY.navNetwork},
       { id: 'inbox', label: () => COPY.navInbox },
-      { id: 'board', label: () => COPY.navBoard },
       {id:'manage',label:()=>COPY.navManage},
     ];
     const navLabel = (view) => (view === undefined ? '' : NAV_ORDER.find((entry) => entry.id === view)?.label?.() ?? '');
@@ -5093,7 +5138,7 @@ function RoomTabs(props) {
       if(view==='manage')return h(React.Fragment,null,h(ManagementWorkspace,{h,self:props.self,uiVersion:PLUGIN_VERSION,hostVersion:props.pluginVersion,onOpenAgents:props.onOpenAgents,labels:COPY.managementLabels}),h(AgentRegistryPane,{h,React,call:props.call,self:props.self,localAgents:agents.local}));
       if (view === 'rooms') return RoomListPane(props);
       if (view === 'inbox') return h(InboxPane,props);
-      if (view === 'board') return BoardPane(props);
+      if (view === 'board') return RoomListPane(props);
       if (view === 'agents')
         return h(
           'div',
@@ -5487,6 +5532,21 @@ function NetworkWorkbench(props) {
      * @param {object} props - rooms with tasks, handlers.
      * @returns {object} pane element.
      */
+    /* @ux-shell:project-discussion:start */
+// The topic reference is carried in the signed, persisted message text so it
+// survives Room history, attachment replication and mixed-version transport.
+function projectMessage(text) {
+  const value = typeof text === 'string' ? text : '';
+  const match = /^\[LAN (discussion|reply|task) ([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\]\n/.exec(value);
+  return match ? {kind:match[1], id:match[2], text:value.slice(match[0].length)} : {kind:'chat',id:'',text:value};
+}
+
+function projectMessageText(kind,id,text) {
+  const value = '[LAN '+kind+' '+id+']\n'+text;
+  if (projectMessage(value).kind !== kind || !['discussion','reply','task'].includes(kind)) throw Error('无效的项目消息标记');
+  return value;
+}
+    /* @ux-shell:project-discussion:end */
     /* @ux-shell:task-board-model:start */
 /** Room task projection only: no Team execution or acceptance inference. */
 function canMoveRoomTask({task,nodeId,sessionId,isLeader}={}) {
@@ -5508,8 +5568,11 @@ function roomTaskBoardView({rooms,self,query='',status='all',assignee='all'}={})
 /** Read-only cross-Room board; existing Room owns every task mutation. */
 function RoomTaskBoard(props){
  const {h,React}=props;const [query,setQuery]=React.useState(''),[status,setStatus]=React.useState('all'),[assignee,setAssignee]=React.useState('all');
- const model=props.modelOf({rooms:props.rooms,self:props.self,query,status,assignee});const labels={all:'全部状态',open:'待开始',doing:'进行中',blocked:'受阻',done:'已完成',unknown:'未知状态'};
- return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',disabled:props.refreshing===true,'aria-busy':props.refreshing===true?'true':undefined,onClick:props.onRefresh},props.refreshing===true?'刷新中…':'刷新'):null),h('p',{className:'lm-taskBoardScope'},'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),model.groups.length?model.groups.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),...group.rows.map(row=>h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null)))):h('p',{className:'lm-muted'},model.counts.all?'没有匹配的房间任务':'当前没有房间任务。任务由房间内成员派发，看板只做只读汇总。'));
+ const model=props.modelOf({rooms:props.room?[props.room]:props.rooms,self:props.self,query,status,assignee});const labels={all:'全部状态',open:'待开始',doing:'进行中',blocked:'受阻',done:'已完成',unknown:'未知状态'};
+ const lanes = ['open','doing','blocked','done','unknown']
+   .filter(id => (id !== 'unknown' || model.counts.unknown > 0) && (model.activeStatus === 'all' || model.activeStatus === id))
+   .map(id => model.groups.find(group => group.id === id) ?? {id,label:labels[id],rows:[]});
+ return h('section',{className:'lm-roomTaskBoard'},h('header',null,h('h1',null,'任务看板'),props.onRefresh?h('button',{type:'button',className:'lm-btn',disabled:props.refreshing===true,'aria-busy':props.refreshing===true?'true':undefined,onClick:props.onRefresh},props.refreshing===true?'刷新中…':'刷新'):null),h('p',{className:'lm-taskBoardScope'},props.room?(props.room.name || props.room.id):'跨房间任务汇总 · 当前返回的 Room 任务；进入房间查看和核对，不代表 Team 执行或成果验收。'),h('div',{className:'lm-taskBoardFilters'},h('input',{type:'search',value:query,'aria-label':'搜索房间任务',placeholder:'搜索任务、项目或负责人',onChange:e=>setQuery(e.target.value)}),h('select',{value:model.activeStatus,'aria-label':'任务状态',onChange:e=>setStatus(e.target.value)},...Object.keys(labels).filter(id=>id==='all'||model.counts[id]>0).map(id=>h('option',{key:id,value:id},labels[id]+' '+model.counts[id]))),h('select',{value:model.activeAssignee,'aria-label':'任务负责人',onChange:e=>setAssignee(e.target.value)},h('option',{value:'all'},'全部负责人'),...model.assignees.map(a=>h('option',{key:a.key,value:a.key},a.label)))),h('div',{className:'lm-taskBoardLanes',role:'region','aria-label':'任务状态泳道',tabIndex:0},...lanes.map(group=>h('section',{key:group.id,className:'lm-taskBoardGroup'},h('h2',null,group.label+' '+group.rows.length),group.rows.length===0?h('small',{className:'lm-laneEmpty'},'暂无任务'):null,...group.rows.map(row=>props.renderTask?props.renderTask(row):h('button',{key:row.key,type:'button',className:'lm-roomRow lm-boardRow lm-taskBoardRow',onClick:()=>props.onOpenRoom?.(row.roomId),'aria-label':row.title+' · '+row.roomName+' · 进入房间'},h('div',{className:'lm-taskBoardRowHead'},h('strong',null,row.title),h('span',null,row.statusLabel)),h('div',null,row.roomName+' · '+row.roomId+(row.archived?' · 已归档':'')),h('small',null,row.assigneeName+' · '+row.device+' · '+row.updatedAt),row.detail?h('div',{className:'lm-taskBoardPreview'},row.detail):null))))));
 }
     /* @ux-shell:task-board-component:end */
     /* @ux-shell:owner-plan-model:start */
@@ -6624,7 +6687,6 @@ function OwnerResultPanel(props) {
         meta)));
 }
     /* @ux-shell:owner-result-component:end */
-    function BoardPane(props) {return h(RoomTaskBoard,{...props,h,React,modelOf:roomTaskBoardView});}
 
     /** Exact Host route the panel posts to; the Host mounts it under `/api`. */
     const ROUTE_PATH = 'api/lan-mesh';

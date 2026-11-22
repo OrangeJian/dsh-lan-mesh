@@ -4,7 +4,7 @@ export function filterJoinedProjects(input,query='') {
 }
 export function workspaceNavigationTarget(value,rooms=[]) {
  if(typeof value!=='string')return null;
- if(value.startsWith('view:')){const view=value.slice(5);return ['network','inbox','board','manage','rooms','agents'].includes(view)?{view,roomId:''}:null;}
+ if(value.startsWith('view:')){const view=value.slice(5);return ['network','inbox','manage','rooms','agents'].includes(view)?{view,roomId:''}:null;}
  if(value.startsWith('room:')){const id=value.slice(5);return (Array.isArray(rooms)?rooms:[]).some(room=>room?.id===id&&room.deleted!==true)?{view:'rooms',roomId:id}:null;}
  return null;
 }

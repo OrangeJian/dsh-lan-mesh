@@ -41,3 +41,15 @@
 .lm-roomTabSurface .lm-inviteRow .lm-select{flex:1;min-width:0}
 .lm-roomTabSurface .lm-inviteRow>.lm-muted{flex:0 1 220px}
 @media(max-width:650px){.lm-roomTabSurface .lm-inviteRow{flex-wrap:wrap}.lm-roomTabSurface .lm-inviteRow>.lm-muted{flex-basis:100%}}
+.lm-roomPane.lm-topicOpen {position:relative;padding-inline-end:min(38%,26rem)}
+.lm-discussionPane {position:absolute;inset:0 0 0 auto;z-index:3;box-sizing:border-box;width:min(38%,26rem);display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--dsw-alias-bg-base,#fff);border-inline-start:1px solid var(--dsw-alias-border-l1);overflow:hidden}
+.lm-discussionPane header {display:flex;align-items:center;justify-content:space-between}
+.lm-topicPosts {flex:1;min-height:0;overflow:auto}
+.lm-topicPosts article {padding:12px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.lm-topicPosts p {white-space:pre-wrap;overflow-wrap:anywhere}
+.lm-discussionPane footer {display:grid;gap:8px}
+.lm-discussionPane textarea {min-height:4em;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1)}
+.lm-discussionCard {display:grid;gap:5px;max-width:100%;padding:12px 16px;text-align:start;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:10px}
+.lm-discussionCard strong {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm-discussionCard small,.lm-discussionCard span {color:var(--dsw-alias-label-secondary)}
+@media(max-width:760px){.lm-roomPane.lm-topicOpen{padding-inline-end:0}.lm-discussionPane{width:min(100%,26rem)}}

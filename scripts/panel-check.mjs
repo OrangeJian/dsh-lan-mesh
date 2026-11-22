@@ -814,8 +814,8 @@ const checks = [
   ['project settings are accessible row-end actions',lastNodes.filter(n=>n.type==='summary'&&n.props['aria-label']?.startsWith('项目操作')).length===2&&!lastText.includes('房间设置')],
   ['the rail shows the configured identity', lastText.includes('建哥') && lastText.includes('node-a')],
   [
-    'the rail shows inbox and the task board',
-    lastText.includes('收件箱') && lastText.includes('任务看板') && count('lm-navBtn') >= 3,
+    'the rail shows inbox and leaves boards inside rooms',
+    lastText.includes('收件箱') && !lastText.includes('任务看板') && count('lm-navBtn') >= 3,
   ],
   ['the projects section lists the rooms I joined', count('lm-roomRow') === 2],
   ['each joined room offers local preferences', count('lm-roomPreferences') === 2 && lastText.includes('静音时被 @ 仍提醒')],
@@ -1042,7 +1042,7 @@ const mentionRowLabels = () =>
 checks.push(
   // v0.3.0: the mention list only appears when typing @; @all is the first
   // entry in the popup menu rather than a permanent chip above the composer.
-  ['typing at sign opens the member picker', count('lm-mentionItem') === 5],
+  ['typing at sign opens the member picker', count('lm-mentionItem') === 4],
   [
     '@all is the first entry in the picker',
     mentionRowLabels()[0] === '@所有成员',
@@ -1335,15 +1335,9 @@ checks.push(
   ['empty conversation says so', lastText.includes('房间里还没有消息')],
 );
 
-// The task board aggregates tasks across the human's rooms.
 await click('lm-backBtn');
 await switchTo(RailHost);
-await clickRail('lm-nav-board');
-await switchTo(Component);
-checks.push(
-  ['board aggregates the open task', lastText.includes('Split the panel') && lastText.includes('Alpha room')],
-  ['board shows the across-rooms header', lastText.includes('跨房间任务汇总')],
-);
+checks.push(['room task boards have no global navigation entry',count('lm-nav-board')===0]);
 
 // The inbox is what reached this node, so the useful header is who spoke and
 // in which room — the recipient is always this node and stays out of the text.
@@ -1475,7 +1469,7 @@ const Card=()=>h(window.__attachmentCard,{refData:{blobId:'a'.repeat(64),name:'m
 await switchTo(Card);lastNodes.find(n=>n.type==='img').props.onError();await settleIn(Card);
 checks.push(['unavailable attachment preview offers retry',lastText.includes('附件暂不可用')&&lastNodes.some(n=>n.type==='button'&&n.children.includes('重试'))]);
 lastNodes.find(n=>n.type==='button'&&n.children.includes('重试')).props.onClick();await settleIn(Card);
-checks.push(['preview retry restores authorized image URL',lastNodes.some(n=>n.type==='img'&&n.props.src.startsWith('/api/lan-mesh/attachments?room=room-1&blobId='))]);
+checks.push(['preview retry restores authorized image URL',lastNodes.some(n=>n.type==='img'&&n.props.src.startsWith('/api/lan-mesh/attachments/download?room=room-1&blobId='))]);
 await lastNodes.find(n=>n.type==='button'&&n.children.includes('下载')).props.onClick();await settleIn(Card);
 checks.push(['download failure is visible and retryable',lastText.includes('附件暂不可用')&&lastNodes.some(n=>n.type==='button'&&n.children.includes('重试'))]);
 
@@ -1854,7 +1848,7 @@ const TaskOwnerRoom=()=>h(window.__roomPane,{room:{id:'room-task-owner'},session
 await switchTo(TaskOwnerRoom);await clickOn(TaskOwnerRoom,'lm-roomTab-tasks');
 checks.push(['same human session on a different node never grants task controls',count('lm-statusBtns')===0&&count('lm-ownerTeamOverview')===0&&lastText.includes('Exact owner task')]);
 ownerNode='node-a';[...intervals.values()].find(timer=>timer.ms===2000).fn();await settleIn(TaskOwnerRoom);
-checks.push(['exact local human owner retains existing task controls',count('lm-statusBtns')===1]);
+checks.push(['local owner sees the reported task without manual moves',count('lm-statusBtns')===0&&lastText.includes('Exact owner task')]);
 let resultSend;
 const resultRef={executionId:'exec-pinned',resultHash:'a'.repeat(64),reviewStatus:'review'};
 const resultCall=async(method,args)=>{
@@ -1870,6 +1864,16 @@ const resultVisible=lastText.includes('成果 · exec-pinned');
 lastNodes.find(n=>hasClass(n,'lm-composerInput')).props.onChange({target:{value:'Check this result',selectionStart:17}});
 await settleIn(ResultRoom);await clickOn(ResultRoom,'lm-sendBtn');
 checks.push(['selected Team result reaches Room send with its exact hash',resultVisible&&JSON.stringify(resultSend?.contextSelection?.selectedTaskResults)===JSON.stringify([{executionId:resultRef.executionId,resultHash:resultRef.resultHash}])]);
+const discussionId='13579000-0000-4000-8000-000000000001';
+const topicMessages=['discussion','reply'].map((kind,i)=>({kind:'room-message',id:'post-'+i,room:'room-topic',
+  from:{nodeId:'node-a',sessionId:i?'agent':'human',title:i?'研究员':'Owner'},
+  text:'[LAN '+kind+' '+discussionId+']\n'+(i?'只在侧栏显示的发言':'项目讨论示例')}));
+const TopicRoom=()=>h(window.__roomPane,{room:{id:'room-topic'},sessionId:'human',self:answers.snapshot.self,
+  call:async method=>method==='roomDetail'?{room:{id:'room-topic',members:[human],tasks:[]},viewer:{isMember:true},messages:topicMessages}:{}});
+await switchTo(TopicRoom);
+checks.push(['topic leaves one card and no replies in the project chat',count('lm-discussionCard')===1&&!lastText.includes('只在侧栏显示的发言')]);
+await clickOn(TopicRoom,'lm-discussionCard');
+checks.push(['opening the topic shows its agent replies in the side panel',count('lm-discussionPane')===1&&lastText.includes('只在侧栏显示的发言')&&lastText.includes('研究员')]);
 let failed = 0;
 for (const [label, ok] of checks) {
   if (!ok) failed += 1;
