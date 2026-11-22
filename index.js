@@ -1972,6 +1972,7 @@ export function apply(ctx, rawConfig) {
           return {
             ok: true,
             value: await node.assignTask({
+              teamDispatch: true,
               room: str('room'),
               sessionId: 'human',
               assignee: str('assignee'),

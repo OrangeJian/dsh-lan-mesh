@@ -764,6 +764,8 @@ function OwnerTeamOverview({h,React,call,roomId,selectedResults=[],onSelectResul
         h('button',{type:'button',className:'lm-btn lm-selectTaskResult','aria-pressed':selected,disabled:!selected&&selectedResults.length>=8,onClick:()=>onSelectResult(ref)},selected?'取消引用':'引用成果'));
     }):null,
     value?.known&&value.status!=='absent'&&value.taskCounts&&value.executionCounts?h('div',null,counts('任务状态',value.taskCounts),counts('执行状态',value.executionCounts)):null,
+    value?.tasks?.length?h('ul',{'aria-label':'Team 任务'},...value.tasks.map(task=>h('li',{key:task.taskId},
+      task.title+' · '+(labels[task.status]??'未知状态')+(task.executionId?' · '+task.executionId:'')))):null,
     value?.known&&value.status!=='absent'&&value.status!=='archived'&&Number.isSafeInteger(value.generation)?h(OwnerPlanPanel,{key:roomId,h,React,call,roomId,model:ownerPlanPanelModel,newRequestId:rpcId}):null,
     value?.known&&value.status!=='absent'&&value.status!=='archived'&&Number.isSafeInteger(value.generation)?h(OwnerResultPanel,{key:'result:'+roomId,h,React,call,roomId,model:ownerResultPanelModel,newRequestId:rpcId}):null);
 }
@@ -2257,6 +2259,9 @@ function MessageBody(props) {
              );
        const bubbleContents = [];
        if (body !== null) bubbleContents.push(body);
+       if (props.onOpenTeam && /^team-(assigned|result|review)-/.test(message.id ?? '')) {
+         bubbleContents.push(h('button', { type:'button', className:'lm-btn', onClick:props.onOpenTeam }, '查看任务与验收'));
+       }
        if (attachment !== null) bubbleContents.push(attachment);
        // Two attachments can share identical bytes (same blobId) but different
        // file names, or the same file can be selected twice. The blob is still
@@ -4398,6 +4403,7 @@ function RoomTabs(props) {
                 const kind =
                   fromSession === HUMAN_SESSION_ID ? 'human' : fromSession === '' ? 'system' : 'agent';
                 return h(ChatBubble, {
+                  onOpenTeam: isLeader && sessionId === HUMAN_SESSION_ID ? () => setPanelTab('tasks') : undefined,
                   key: typeof message.id==='string'?JSON.stringify([message.from?.nodeId??'',message.id]):`${messageStamp(message)}-${senderOf(message)}`,
                   message,
                   roomId,
